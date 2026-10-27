@@ -27,3 +27,13 @@ Thumbs.db
 # Local runtime data
 *.sqlite3
 *.db
+
+# Raw source documents: kept locally only (provenance + sha256 live in the yaml files)
+data/manufacturers/**/*
+!data/manufacturers/*/
+!data/manufacturers/README.md
+!data/manufacturers/*/sources.yaml
+data/tenders/**/*
+!data/tenders/*/
+!data/tenders/README.md
+!data/tenders/*/tender.yaml
