@@ -195,6 +195,13 @@ tender-matcher/
 - Detect scanned pages (very little text layer) → OCR, mark `ocr=true`.
 - Tables: each row becomes its own chunk **with header and product family/model repeated**.
 - Prose: section-aware chunks, ~300–500 tokens, small overlap.
+- **Every chunk keeps two versions of its text:**
+  - `raw_text`: original, verbatim. Used for quotes and evidence verification. Never modified.
+  - `search_text`: cleaned for retrieval only. Lowercased, plurals/inflections reduced
+    ("valves" → "valve"), special characters folded (ligatures, curly quotes, dashes), codes in one
+    canonical form (SS 316 / SS-316 → `ss316`).
+  - One shared `normalize_for_search()` cleans both catalogue chunks and tender queries, so both
+    sides always match. Quotes are never taken from `search_text`. See section 12 for the cases it must handle.
 - Spec extraction outputs `SpecFact {manufacturer, product_family, model, attribute, value, unit, min, max, doc_id, page, quote}`.
 - **Every `quote` must be verified** to exist on the cited page (normalized fuzzy match ≥ 0.9). Drop facts that fail.
 - Normalize units with `pint` to canonical units defined in the ontology.
@@ -262,7 +269,7 @@ tender-matcher/
 5. **Ontology + unit normalization**: valves_pumps.yaml, pint helpers.
 6. **Spec fact extraction + quote verifier** (LLM client interface + provider).
 7. **Indexing**: embeddings, vector index, BM25; ingestion pipeline + CLI/endpoint.
-8. **Tender parsing**: parser, classifier, splitter, normalizer, tender pipeline.
+8. **Tender parsing**: link fetcher (follow spec/BOQ/ATC links in `bid.pdf`, depth ≤ 3, see D1), parser, classifier, splitter, normalizer, tender pipeline.
 9. **Retrieval**: query builder, hybrid search with RRF, reranker.
 10. **Matching**: comparator, LLM judge, evidence verifier, confidence, model selection.
 11. **Scoring & reporting**: scorer, JSON report, Excel report.
@@ -281,3 +288,68 @@ tender-matcher/
 - Don't invent evidence, page numbers, or quotes, in code or in test fixtures presented as real.
 - Don't hard-code manufacturer names, attributes, or thresholds in Python.
 - Don't add a dependency without saying why in the step summary.
+
+## 12. Known retrieval failure cases (handle at ingestion + query time)
+
+Example: tender says "balls valve", catalogue says "Ball Valves". Plain BM25 sees `balls`≠`ball` and
+`valve`≠`valves` → zero term overlap → the right chunk may not be retrieved, or ranks below a chunk that
+merely says "valve" many times. Dense search usually recovers it, but must not be relied on alone.
+
+**Core rule:** every chunk stores `raw_text` (verbatim, used for quotes + verification) **and**
+`search_text` (normalized, used only for BM25/embeddings). One shared `normalize_for_search()` is used by
+both the indexer and the query builder, so both sides are normalized identically. Quotes are never taken
+from `search_text`. Vocabularies (synonyms, abbreviations, spelling variants) live in `ontology/*.yaml`.
+
+**A. Text variants: normalize identically on both sides**
+
+| # | Failure case | Example | Handling |
+|---|---|---|---|
+| A1 | Plural / inflection | ball valve ↔ balls valve ↔ Ball Valves | lowercase + stemming (Snowball) in `search_text` |
+| A2 | Typos in tender | "buterfly", "gate vlave", "globle" | query side only: fuzzy-correct to ontology vocabulary (edit distance ≤ 2, tokens ≥ 5 chars); log the correction |
+| A3 | Unicode / ligatures | "Butterﬂy" (ﬂ ligature, seen in L&T catalogue), `3”`, en-dash, NBSP | NFKC + quote/dash/space folding |
+| A4 | Spacing / hyphen in codes | SS316 / SS 316 / SS-316 / 316 SS; 17-4-PH / 17-4PH; A 216 Gr. WCB / A216 WCB | canonical code patterns from ontology (`ss316`, `a216_wcb`) |
+| A5 | Abbreviations | NRV=check valve, BFV=butterfly, CI=cast iron, SG iron=ductile, NB/DN=size, #/lb=Class | ontology synonyms, expand query |
+| A6 | Compound / word order | ball-valve, "valve, ball", "valves – ball type" | tokenization splits hyphens; phrase match tolerant to order |
+| A7 | OCR misreads | SS316→55316, O↔0, l↔1, S↔5, B↔8 | OCR-confusion variants only for codes in ontology; mark `ocr=true` → lower confidence |
+| A8 | Hindi / bilingual lines | Hindi heading + English spec | detect script; index the English part; never match on transliteration alone |
+
+**B. Ranking failures: right words, wrong product**
+
+| # | Failure case | Example | Handling |
+|---|---|---|---|
+| B1 | Term appears in other context | "ball" in ball bearing / float ball; "check" in "check the…"; "gate" in "gate unit" | match product **type** as a phrase; filter by product_family before rank |
+| B2 | Sibling sub-type | butterfly query → triple-offset vs concentric; ball → floating vs trunnion | sub-type is an ontology attribute; mismatch = LEAST, not FULL |
+| B3 | Dense confuses similar types | gate ↔ globe ↔ plug | type filter/boost first, embeddings second |
+| B4 | Numbers inside ranges | tender 200 mm, catalogue "50 to 600 mm" → BM25 sees no "200" | numeric checks only via structured `spec_facts` + comparator, never via text match |
+| B5 | Units / size systems | kg/cm² vs bar; 3" vs 80 mm vs DN80 | `pint` + ontology size tables (NPS↔DN) |
+| B6 | PN ↔ Class | PN16 vs Class 150 | EN 1759 mapping table only, never via bar values |
+| B7 | Negation / exclusion | "not suitable for steam", "without gear operator" | flagged to LLM judge; comparator never treats as positive |
+| B8 | Long documents dominate | a 100-page catalogue repeats "valve" everywhere | BM25 length normalization; rank per chunk, not per document |
+| B9 | Duplicate content | same table in catalogue + brochure | dedupe by normalized text hash; keep higher-priority source |
+| B10 | Model mixing | size from model A, material from model B | all facts for a match from one model/family (section 7) |
+
+**C. Ingestion failures that break retrieval later**
+
+| # | Failure case | Handling |
+|---|---|---|
+| C1 | Table continues on next page without header | carry header forward to continuation table |
+| C2 | Horizontally merged cells filled down wrongly | fix fill logic in `table_extractor` (known bug) |
+| C3 | Column header split across two rows | merge multi-row headers before chunking |
+| C4 | Outlined/vector text (no text layer, few images) | detect and OCR |
+| C5 | OCR'd tables lose columns | rebuild rows from word bboxes |
+| C6 | Model name only in section heading | repeat section/model in every chunk (already done) |
+| C7 | Footnotes change meaning ("*on request", "optional") | keep footnote markers; map to `partial_match` |
+
+**D. Tender-side failures**
+
+| # | Failure case | Handling |
+|---|---|---|
+| D1 | Real spec is in a linked attachment, not bid.pdf | follow spec/BOQ/ATC links during tender ingestion |
+| D2 | Compound line | "SS316 body & disc, PN16, flanged" → split into atomic requirements |
+| D3 | Vague line ("good quality", "as per standard") | classify `vague` → `unsupported` |
+| D4 | "or equivalent", named make | record flag; never auto-fail other makes |
+| D5 | Same item repeated with different sizes | one requirement set per line item |
+
+**Tests:** every row above gets at least one unit test (normalizer, query builder, comparator, or table
+extractor). The retrieval eval must include a variant set: same query written ≥ 3 ways (plural, typo,
+abbreviation) must return the same top-1 chunk.

@@ -1,0 +1,33 @@
+bid_number: GEM/2026/B/8169451
+gem_bid_id: 10044932
+item_category: SINGLE STAGE WATER CIRCULATION PUMP WITH MOTOR MOUNTED ON M. S. BASE
+  PLATE, CENTRIFUGAL, BRONZE IMP
+total_quantity: 2
+ministry: Ministry of Defence
+source: GeM BidPlus public bid listing (ongoing bids)
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/10044932
+  fetched_at: '2026-10-22T06:59:59+00:00'
+  sha256: ad19b4bedb864790ccfd90e6542bf8f9c90d4c31e49ebed4ecd6ed1e8d20294a
+- file: null
+  role: omp_doc
+  url: https://bidplus.gem.gov.in/bidding/downloadOmppdfile/
+  fetched_at: '2026-10-22T07:00:00+00:00'
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  content_type: text/html; charset=UTF-8
+  note: empty response from GeM; not stored
+- file: buyer_spec.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/1076965/54/78/703/CatalogAttrs/SpecificationDocument/2026/10/16/spec_2026-10-16-10-43-07_a9d93a2dac0bb23768f9b8b033eb747b.pdf
+  fetched_at: '2026-10-22T07:00:01+00:00'
+  sha256: c0af6946f74ade79b1af117a02ce3cb25fc9332349997f397715d8bc2aa2ea0f
+  content_type: application/pdf
+- file: null
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Oct/GEM_2026_B_8169451/CLM0010/spec_edf8ebf2-3415-451d-a5461792128580072_992226.pdf
+  fetched_at: '2026-10-22T07:00:02+00:00'
+  sha256: c0af6946f74ade79b1af117a02ce3cb25fc9332349997f397715d8bc2aa2ea0f
+  content_type: application/pdf
+  duplicate_of: buyer_spec.pdf

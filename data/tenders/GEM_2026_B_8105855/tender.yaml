@@ -1,0 +1,45 @@
+bid_number: GEM/2026/B/8105855
+gem_bid_id: 9972168
+item_category: 'Cast Carbon Steel TPattern Globe Valve of size 3inches with full bore,Cast
+  Carbon Steel Non-Return '
+total_quantity: 56
+ministry: Ministry of Coal
+source: GeM BidPlus public bid listing (ongoing bids)
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/9972168
+  fetched_at: '2026-10-22T06:59:11+00:00'
+  sha256: 5be9f94309c9dd322f9c4f9e3444a8cfbea03a68ae4c5247c0841888bbd9a273
+- file: mii_mse_doc.pdf
+  role: mii_mse_doc
+  url: https://bidplus.gem.gov.in/bidding/bid/downloadMseMiiDoc/9972168/1790832298.pdf
+  fetched_at: '2026-10-22T06:59:11+00:00'
+  sha256: 7c38504c665986e0434de22c7b1534572712c5972be076fc8ad5aefe7bb603e2
+  content_type: application/pdf
+- file: null
+  role: mii_mse_doc
+  url: https://bidplus.gem.gov.in/bidding/bid/downloadMseMiiDoc/9972168/1790832278.pdf
+  fetched_at: '2026-10-22T06:59:13+00:00'
+  sha256: 7c38504c665986e0434de22c7b1534572712c5972be076fc8ad5aefe7bb603e2
+  content_type: application/pdf
+  duplicate_of: mii_mse_doc.pdf
+- file: boq_spec.pdf
+  role: boq_spec
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqDocument/2026/10/1/37015793_revised_specification_document_2026-10-01-10-41-38_77803d7043e8ddc6fc5528e183c46881.pdf
+  fetched_at: '2026-10-22T06:59:14+00:00'
+  sha256: 20e474733aca2b64c886cebf03c228bb0fd80a3a7318225d5e4513a759586f79
+  content_type: application/pdf
+- file: boq_items.csv
+  role: boq_items
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqLineItemsDocument/2026/10/1/37015793_boq_document_2026-10-01-10-41-38_abec2d86c53091738c1fc6c462e9085e.csv
+  fetched_at: '2026-10-22T06:59:15+00:00'
+  sha256: 9ece93c8803607ff49c293f091671f076bdbfd51f16b12912df06899598a3cb4
+  content_type: application/octet-stream
+- file: null
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Oct/GEM_2026_B_8105855/CLM0010/ATC1_4a7dbfe7-b5bb-4850-935b1790832822081_BUYER4@MM1SEC.pdf
+  fetched_at: '2026-10-22T06:59:17+00:00'
+  sha256: 20e474733aca2b64c886cebf03c228bb0fd80a3a7318225d5e4513a759586f79
+  content_type: application/pdf
+  duplicate_of: boq_spec.pdf

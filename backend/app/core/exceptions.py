@@ -56,6 +56,13 @@ class DocumentParseError(AppError):
     code = "document_parse_error"
 
 
+class SourceRegistryError(AppError):
+    """A `sources.yaml` entry is invalid, or does not match the file on disk."""
+
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    code = "source_registry_error"
+
+
 class NoEvidenceError(AppError):
     """No verifiable evidence was found for a requirement."""
 

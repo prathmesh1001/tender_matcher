@@ -1,0 +1,37 @@
+bid_number: GEM/2026/B/7956201
+gem_bid_id: 9800441
+item_category: Globe valve size 6 inch , Globe valve size 8 inch , Globe valve size
+  4 inch , Gate valve size 10 inch , gate valve size 2 inch , Gate valve size 3 inch
+  , Forged Steel Gate Valve
+source: Provided by user (local copy from 'least match/globe vlave'); attachment URLs
+  unknown
+user_label: least match/globe vlave
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/9800441
+  fetched_at: '2026-09-01T11:07:06+00:00'
+  sha256: e2ddb8073a44b56d8f3beecdadaa910c07f93276b1cae6fd8b4582daaccb85f1
+  original_name: GeM-Bidding-9800441.pdf
+- file: atc.pdf
+  role: atc
+  url: null
+  fetched_at: '2026-09-01T11:17:00+00:00'
+  sha256: e6e28316738c9e090baf216868f600a4f54a6fad0e6b3abd97cc34b6e72e6c13
+  original_name: pdf1.pdf
+- file: boq_spec.pdf
+  role: boq_spec
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqDocument/2026/8/24/specifications_2026-08-24-16-31-52_ba7167f474adb123eb0ccb3551229c50.pdf
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:52+00:00'
+  sha256: a24f507f1abea3177cb0551c816255a0772cebc56ad8eb5ec5fc2dd2861bf414
+  content_type: application/pdf
+- file: boq_items.csv
+  role: boq_items
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqLineItemsDocument/2026/8/24/boq_2026-08-24-16-31-52_a70033cc0841c6ec3a156f5ea98242e2.csv
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:53+00:00'
+  sha256: 5ff1fada7567a398c68455d2309dbbb1e240d3e21e5611e8366662c8978c78c6
+  content_type: application/octet-stream

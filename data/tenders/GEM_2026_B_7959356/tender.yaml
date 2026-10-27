@@ -1,0 +1,37 @@
+bid_number: GEM/2026/B/7959356
+gem_bid_id: 9804147
+item_category: 60 HP Centrifugal Pump Make KSB with 60 HP Motor & Starter Panel
+total_quantity: 1
+ministry: Ministry of Power
+source: GeM BidPlus public bid listing (ongoing bids)
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/9804147
+  fetched_at: '2026-10-22T07:00:20+00:00'
+  sha256: 1979cceffd6ea52063f0a607c67e6e4475d81da8ba8b15c1683d310a5b428fc3
+- file: null
+  role: omp_doc
+  url: https://bidplus.gem.gov.in/bidding/downloadOmppdfile/
+  fetched_at: '2026-10-22T07:00:20+00:00'
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  content_type: text/html; charset=UTF-8
+  note: empty response from GeM; not stored
+- file: buyer_spec.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/4800482/54/78/703/CatalogAttrs/SpecificationDocument/2026/8/25/boq_and_ts_2026-08-25-12-43-23_89d1ecc055d9dbbadd3f8058ce2d7189.pdf
+  fetched_at: '2026-10-22T07:00:22+00:00'
+  sha256: b8d215dc9f7f3e0c20ad92ddca1d2df4e040992e080b24e43689d20203a30323
+  content_type: application/pdf
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Aug/GEM_2026_B_7959356/CL10360/Integcomp_f383b68f-8d0e-41ae-9f6c1787642357309_buyer1.nhdcl.mp@gembuyer.in.pdf
+  fetched_at: '2026-10-22T07:00:24+00:00'
+  sha256: 4dc4b81cc6484501e9de65b6723c6c79efd6a9e1e2d477f7fa12849979860e46
+  content_type: application/pdf
+- file: atc_2.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Aug/GEM_2026_B_7959356/CLM0010/ATC_60a261b6-87c2-4b76-a05e1787642310479_buyer1.nhdcl.mp@gembuyer.in.pdf
+  fetched_at: '2026-10-22T07:00:26+00:00'
+  sha256: 49ccf8dae76e108060b8827d7fbba9be6de465484630d72df7f8a965354044ae
+  content_type: application/pdf

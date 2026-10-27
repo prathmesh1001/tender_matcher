@@ -12,6 +12,13 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "pydantic>=2.9",
     "pydantic-settings>=2.5",
+    "sqlalchemy>=2.0.36",
+    "psycopg[binary]>=3.2",
+    "alembic>=1.14",
+    "pymupdf>=1.25",
+    "pyyaml>=6.0",
+    "pytesseract>=0.3.13",
+    "pillow>=11.0",
 ]
 
 [project.optional-dependencies]
@@ -22,6 +29,7 @@ dev = [
     "ruff>=0.6",
     "black>=24.8",
     "mypy>=1.11",
+    "types-pyyaml>=6.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -48,6 +56,7 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D", "ANN", "S101"]
+"alembic/versions/**" = ["D415"]  # first line is the migration message
 
 # ---------------------------------------------------------------- black
 [tool.black]
@@ -60,6 +69,13 @@ python_version = "3.14"
 strict = true
 plugins = ["pydantic.mypy"]
 files = ["app", "tests"]
+# PyMuPDF declares py.typed but leaves many functions unannotated.
+untyped_calls_exclude = ["pymupdf"]
+
+[[tool.mypy.overrides]]
+# pytesseract ships no type hints.
+module = ["pytesseract", "pytesseract.*"]
+ignore_missing_imports = true
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

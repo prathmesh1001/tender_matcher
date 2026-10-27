@@ -1,0 +1,25 @@
+bid_number: GEM/2026/B/8157057
+gem_bid_id: 10030897
+item_category: 'Butterfly valve with Worm Gear & Handwheel (Manually operated) Model:
+  IVGK, Valve Size - 450MM, CLA'
+total_quantity: 2
+ministry: null
+source: GeM BidPlus public bid listing (ongoing bids)
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/10030897
+  fetched_at: '2026-10-22T06:59:05+00:00'
+  sha256: 543200dc8014b1b7209b81a4dcfb3ab905d1f73a80146394a11376ae65bd7a85
+- file: buyer_spec.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/10072432/54/78/703/CatalogAttrs/SpecificationDocument/2026/10/13/technical_specifications_2026-10-13-19-37-03_681f19886fa70b4c4302e3b64704c7f8.pdf
+  fetched_at: '2026-10-22T06:59:06+00:00'
+  sha256: 07db7be3d4d28ad78a7eecde1a9adb1a74ee2c065d57648d338a47a8a83b36ae
+  content_type: application/pdf
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Oct/GEM_2026_B_8157057/CLM0010/Enquiry_d0e9929b-24f3-4aad-96e41791900574191_ee_pd3_btps_obra.pdf
+  fetched_at: '2026-10-22T06:59:07+00:00'
+  sha256: 74b9dcef9ccd5c087a3cf0c44bb7bdf414b062ff72fb8dbc4a290fd996a7ec66
+  content_type: application/pdf

@@ -1,0 +1,39 @@
+bid_number: GEM/2026/B/8167974
+gem_bid_id: 10043182
+item_category: CENTRIFUGAL HORIZONTAL PUMP WITH SUITABLE MOTOR FOR UNLOADING OF HYDROCHLORIC
+  ACID,CENTRIFUGAL HORI
+total_quantity: 2
+ministry: Ministry of Steel
+source: GeM BidPlus public bid listing (ongoing bids)
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/10043182
+  fetched_at: '2026-10-22T07:00:06+00:00'
+  sha256: 3f9558a8381be8822f709f0bf18fadb3cbe3844f8160b64c9b495bcb177a70dc
+- file: null
+  role: omp_doc
+  url: https://bidplus.gem.gov.in/bidding/downloadOmppdfile/
+  fetched_at: '2026-10-22T07:00:06+00:00'
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  content_type: text/html; charset=UTF-8
+  note: empty response from GeM; not stored
+- file: buyer_spec.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/10816317/54/78/703/CatalogAttrs/SpecificationDocument/2026/10/15/specification_2026-10-15-17-23-31_c0677be07a115e00ba2f98151cfe4c83.pdf
+  fetched_at: '2026-10-22T07:00:07+00:00'
+  sha256: 6419f77717d4370ea3e3a1981cc7535757dd239b21e636df0a178147a8108047
+  content_type: application/pdf
+- file: null
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/10816317/54/78/703/CatalogAttrs/SpecificationDocument/2026/10/15/specification_2026-10-15-17-24-46_f3a6f937f745c6f91019e97a615bd488.pdf
+  fetched_at: '2026-10-22T07:00:09+00:00'
+  sha256: 6419f77717d4370ea3e3a1981cc7535757dd239b21e636df0a178147a8108047
+  content_type: application/pdf
+  duplicate_of: buyer_spec.pdf
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Oct/GEM_2026_B_8167974/CLM0010/GEMATC_d507910b-10fb-46de-8a8e1792067102235_surajitmj2.pdf
+  fetched_at: '2026-10-22T07:00:10+00:00'
+  sha256: 51a160875d285459235ca769a07698300ff636a05005ab127d718df1777ab452
+  content_type: application/pdf

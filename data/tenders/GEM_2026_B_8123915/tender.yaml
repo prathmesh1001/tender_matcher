@@ -1,0 +1,51 @@
+bid_number: GEM/2026/B/8123915
+gem_bid_id: 9993215
+item_category: 'Globe Valve Flange End ASA 150 Material: Cast Steel Size 25mm,Globe
+  Valve Flange End ASA 150 Materi'
+total_quantity: 150
+ministry: Ministry of Defence
+source: GeM BidPlus public bid listing (ongoing bids)
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/9993215
+  fetched_at: '2026-10-22T06:59:20+00:00'
+  sha256: 644efdf1bcd3d38076b26a0b46bec0679abc4ccb6b6ce8d0bdf9b5dbcbf7c422
+- file: null
+  role: mii_mse_doc
+  url: https://bidplus.gem.gov.in/bidding/downloadMseMiiDoc/9993215/1791288226.pdf
+  fetched_at: '2026-10-22T06:59:21+00:00'
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  content_type: text/html; charset=UTF-8
+  note: empty response from GeM; not stored
+- file: null
+  role: omp_doc
+  url: https://bidplus.gem.gov.in/bidding/downloadOmppdfile/
+  fetched_at: '2026-10-22T06:59:22+00:00'
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  content_type: text/html; charset=UTF-8
+  note: empty response from GeM; not stored
+- file: buyer_spec.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/17415631/54/78/703/CatalogAttrs/SpecificationDocument/2026/10/6/spec_for_globe_valve_25_mm_2026-10-06-16-01-02_d396ea209592c6ea6dce376c3a6cae4a.pdf
+  fetched_at: '2026-10-22T06:59:23+00:00'
+  sha256: 00686cdc55d2bf8128b9e928e091b5764bb5b03543870243a68eed3b49540ee2
+  content_type: application/pdf
+- file: buyer_spec_2.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/17415631/54/78/703/CatalogAttrs/SpecificationDocument/2026/10/6/spec_for_globe_valve_32_mm_2026-10-06-16-05-52_62f88b74b08755df4649818c1f661fd6.pdf
+  fetched_at: '2026-10-22T06:59:24+00:00'
+  sha256: 7b8834fd409f7d46c181383b27d37b43877d37da1348348c8f64331edaa7592e
+  content_type: application/pdf
+- file: buyer_spec_3.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/17415631/54/78/703/CatalogAttrs/SpecificationDocument/2026/10/6/spec_for_globe_valve_40_mm_2026-10-06-16-08-26_4f5a0b9f81e88646f49057e6d9cba343.pdf
+  fetched_at: '2026-10-22T06:59:25+00:00'
+  sha256: 8a3a9c648100c70bc4b440d62c541117a3fe22f0b1766655ebadcd1f81f70eca
+  content_type: application/pdf
+- file: atc.xlsx
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Oct/GEM_2026_B_8123915/CLM0010/ATCc_ae22a781-38a0-470f-a00a1791288569671_JWMM2.docx
+  fetched_at: '2026-10-22T06:59:27+00:00'
+  sha256: 75e0ae8d4e438d1b9974f32c836f608b5e98460e4fac720bca0bbfd17dfebaeb
+  content_type: application/octet-stream

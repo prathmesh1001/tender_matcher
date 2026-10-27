@@ -1,0 +1,45 @@
+manufacturer: LnT_Valves
+documents:
+- file: lt_gate_globe_check_api600.pdf
+  category: valves_pumps
+  title: Gate, Globe & Check Valves - API 600
+  doc_type: catalogue
+  url: https://www.lntvalves.com/media/40495/2-lt-gate-globe-check-valves-api-600_250627.pdf
+  fetched_at: '2026-10-22T09:14:38+00:00'
+  sha256: 23a5741f0bf902a774fe385de6d6eabf31c23b14efe5b53fbe19b97e91603e0b
+  notes: File name suggests revision 25-06-27; listed on lntvalves.com/knowledge-centre/catalogues-brochures/
+- file: lt_gate_globe_check_api602.pdf
+  category: valves_pumps
+  title: Gate, Globe & Check Valves - API 602 (forged)
+  doc_type: catalogue
+  url: https://www.lntvalves.com/media/40404/3-lt-gate-globe-check-valves-api-602.pdf
+  fetched_at: '2026-10-22T09:14:38+00:00'
+  sha256: 0ec2e8581eabbe208f0843b969a4f0fbe687cbce39173bb7bcb6c2b1e669a60a
+- file: lt_triple_offset_butterfly.pdf
+  category: valves_pumps
+  title: Triple Offset Butterfly Valves
+  doc_type: catalogue
+  url: https://www.lntvalves.com/media/40410/9-lt-valves-triple-offset-butterfly-valves.pdf
+  fetched_at: '2026-10-22T09:14:38+00:00'
+  sha256: 6754944c10ffda31824a9c585cf00bcbd317056237b2188d7a6651cfab436bbc
+- file: lt_aquaseal_butterfly_check.pdf
+  category: valves_pumps
+  title: Aquaseal Butterfly & Check Valves
+  doc_type: catalogue
+  url: https://www.lntvalves.com/media/40411/10-lt-aquaseal-butterfly-check-valves.pdf
+  fetched_at: '2026-10-22T09:14:38+00:00'
+  sha256: 2001374ed75f20aa4d77fb8dc0a0f4fd8ba7c86a2ba64b0e75b378b563c2bf72
+- file: lt_cryogenic_valves.pdf
+  category: valves_pumps
+  title: Cryogenic Valves
+  doc_type: catalogue
+  url: https://www.lntvalves.com/media/40428/lt-valves-cryogenic-valves.pdf
+  fetched_at: '2026-10-22T09:14:39+00:00'
+  sha256: dd2d79484f268a1f8d322575916843c18a3e6271a210b5c78bb01748f0795421
+- file: lt_process_ball_valves.pdf
+  category: valves_pumps
+  title: Process Ball Valves
+  doc_type: catalogue
+  url: https://www.lntvalves.com/media/40408/7-lt-process-ball-valves.pdf
+  fetched_at: '2026-10-22T09:14:39+00:00'
+  sha256: 02e7f25a6fb8e64e44ce2e78c1bd79aabf578037c5f7a6ddb94a3f5124bb5833

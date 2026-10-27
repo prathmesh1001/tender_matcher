@@ -1,0 +1,32 @@
+bid_number: GEM/2026/B/8026686
+gem_bid_id: 9881425
+item_category: Design, manufacturing, SITC of horizontal centrifugal water pump motor
+  set for cooling water Pump
+total_quantity: 1
+ministry: Ministry of Power
+source: GeM BidPlus public bid listing (ongoing bids)
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/9881425
+  fetched_at: '2026-10-22T07:00:13+00:00'
+  sha256: 2106a83b9005812cc7687147beb88a789e72687a3569740e49396e4e061c7279
+- file: null
+  role: omp_doc
+  url: https://bidplus.gem.gov.in/bidding/downloadOmppdfile/
+  fetched_at: '2026-10-22T07:00:14+00:00'
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  content_type: text/html; charset=UTF-8
+  note: empty response from GeM; not stored
+- file: buyer_spec.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/20849057/54/78/703/CatalogAttrs/SpecificationDocument/2026/9/11/sd_2026-09-11-12-47-32_96fde792683cf3ddb5c4e3a4e2105d81.pdf
+  fetched_at: '2026-10-22T07:00:15+00:00'
+  sha256: 8f3ebe00f4389fa1ae180387e32946a5b8d9fbd984b6de2ad1f97405a1ca5553
+  content_type: application/pdf
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Sep/GEM_2026_B_8026686/CLM0010/ATC_c5131a83-9c88-4c15-9fdb1789112318182_104060K.pdf
+  fetched_at: '2026-10-22T07:00:17+00:00'
+  sha256: 1f0d3d2fbfdb1c094c8453612fe48e06ce13f8395ec3041729d32b48f775a7c5
+  content_type: application/pdf

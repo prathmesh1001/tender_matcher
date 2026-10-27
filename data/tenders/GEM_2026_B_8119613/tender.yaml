@@ -1,0 +1,39 @@
+bid_number: GEM/2026/B/8119613
+gem_bid_id: 9988310
+item_category: TRIPLE OFFSET BUTTERFLY VALVE, 250MM,TRIPLE OFFSET BUTTERFLY VALVE,
+  300MM
+total_quantity: 9
+ministry: Ministry of Steel
+source: GeM BidPlus public bid listing (ongoing bids)
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/9988310
+  fetched_at: '2026-10-22T06:58:58+00:00'
+  sha256: 2fe69344801ba14a140615a639badad1a5d20a0b980949c11a19c32ca2ff7f55
+- file: null
+  role: omp_doc
+  url: https://bidplus.gem.gov.in/bidding/downloadOmppdfile/
+  fetched_at: '2026-10-22T06:58:58+00:00'
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  content_type: text/html; charset=UTF-8
+  note: empty response from GeM; not stored
+- file: buyer_spec.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/688029/54/78/703/CatalogAttrs/SpecificationDocument/2026/10/5/ts_2026-10-05-18-06-41_40b8abee3342c0c2d1e23519cda23627.pdf
+  fetched_at: '2026-10-22T06:58:59+00:00'
+  sha256: 69c0837c4745e42cfb9c4f06685df241aac9097c8ca93b0c9dbb944adf9b2f8a
+  content_type: application/pdf
+- file: null
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/688029/54/78/703/CatalogAttrs/SpecificationDocument/2026/10/5/ts_2026-10-05-18-09-26_cd3c742bcfb78ff6124745c3a443b9c0.pdf
+  fetched_at: '2026-10-22T06:59:00+00:00'
+  sha256: 69c0837c4745e42cfb9c4f06685df241aac9097c8ca93b0c9dbb944adf9b2f8a
+  content_type: application/pdf
+  duplicate_of: buyer_spec.pdf
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Oct/GEM_2026_B_8119613/CLM0010/LTE_D11M_ba5418fc-465e-4b7c-af791791205272726_buyer_P58.pdf
+  fetched_at: '2026-10-22T06:59:02+00:00'
+  sha256: 3ad64c3f3fbfb08e3f0eac7b3b6b06954a7f72aefcd31c58d844c72c015b9066
+  content_type: application/pdf

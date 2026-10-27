@@ -1,5 +1,6 @@
 """Shared pytest fixtures."""
 
+import os
 from collections.abc import Iterator
 
 import pytest
@@ -8,6 +9,14 @@ from fastapi.testclient import TestClient
 
 from app.core.config import Environment, Settings
 from app.main import create_app
+
+# Matches the docker-compose `db` service; override with TEST_DATABASE_URL.
+DEFAULT_TEST_DATABASE_URL = "postgresql+psycopg://tender:tender@localhost:5433/tender_matcher_test"
+
+
+def get_test_database_url() -> str:
+    """URL of the database the test suite is allowed to wipe."""
+    return os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
 
 
 @pytest.fixture
@@ -19,6 +28,7 @@ def settings() -> Settings:
         APP_VERSION="9.9.9",
         ENVIRONMENT=Environment.TEST,
         LOG_JSON=False,
+        DATABASE_URL=get_test_database_url(),  # type: ignore[arg-type]
     )
 
 

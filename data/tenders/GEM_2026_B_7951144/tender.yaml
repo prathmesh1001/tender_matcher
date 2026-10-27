@@ -1,0 +1,46 @@
+bid_number: GEM/2026/B/7951144
+gem_bid_id: 9794401
+item_category: U- SEALING RING (HW-286.57) -- ROUGH M/CD FORGING OF SIZE OD-602 MM,
+  ID-494 MM & TH. 28 MM WITH MATL , ROUGH MACHINED FORGING FOR VALVE CONE (HW-172.71)
+  -- ITEM AS PER DRG. 31120201997 REV. 01 WITH MATL.
+source: Provided by user (local copy from 'unreleted/U_tender-1'); attachment URLs
+  unknown
+user_label: unreleted/U_tender-1
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/9794401
+  fetched_at: '2026-09-01T11:38:22+00:00'
+  sha256: 09b1601fc4dee77fb79b3667e3c56a081f0c43e781a2e5f8a7f91bf4d7419fd6
+  original_name: GeM-Bidding-9794401.pdf
+- file: atc.pdf
+  role: atc
+  url: null
+  fetched_at: '2026-09-01T11:47:37+00:00'
+  sha256: 8d4ab35576fc8a53846ce2ae3c9f129114068b42ffc8ad47a861045fef3efac4
+  original_name: pdf1.pdf
+- file: buyer_spec.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/1047967/54/78/703/CatalogAttrs/SpecificationDocument/2026/8/22/nitdocd312260207_2026-08-22-13-53-29_c0e1f1926e606d321befa707c6f21131.pdf
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:47+00:00'
+  sha256: c62d2f6261d5db8b354dcf9737443007a267ceca2faaaf5791e2f378d3d32784
+  content_type: application/pdf
+- file: null
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/1047967/54/78/703/CatalogAttrs/SpecificationDocument/2026/8/22/nitdocd312260207_2026-08-22-14-01-27_1e1aaef352b4fd3e5e3c03ec21c2d223.pdf
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:49+00:00'
+  sha256: c62d2f6261d5db8b354dcf9737443007a267ceca2faaaf5791e2f378d3d32784
+  content_type: application/pdf
+  duplicate_of: buyer_spec.pdf
+- file: attachment.html
+  role: attachment
+  url: https://herp.bhel.com/
+  found_in: buyer_spec.pdf
+  depth: 2
+  fetched_at: '2026-10-22T09:11:50+00:00'
+  sha256: d06197f3e7e14eba3cceb0de4d009b8ddd42a3dcb2fbab963f2e6cb13bee4d66
+  content_type: text/html;charset=utf-8

@@ -1,0 +1,27 @@
+bid_number: GEM/2026/B/8071357
+gem_bid_id: 9932819
+item_category: Submersible Sewerage Pump
+total_quantity: 10
+ministry: PMO
+source: GeM BidPlus public bid listing (ongoing bids)
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/9932819
+  fetched_at: '2026-10-22T07:00:29+00:00'
+  sha256: 7b0a241f065245e9d2a7aaab87f7036df0d03dff9503e541dbb31531d97d44d7
+- file: null
+  role: omp_doc
+  url: https://bidplus.gem.gov.in/bidding/downloadOmppdfile/
+  fetched_at: '2026-10-22T07:00:29+00:00'
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  content_type: text/html; charset=UTF-8
+  note: empty response from GeM; not stored
+- file: gem_category_spec.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/-MYu6MGQLsvrrPjsP88bhvpyZcWOdrTnT_v-0SuR5BA
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:57+00:00'
+  sha256: 39c6383eb59e6d6b88bfe093fe3fd16049651c8d1b15b8231193c563650b6fd3
+  content_type: text/html; charset=UTF-8

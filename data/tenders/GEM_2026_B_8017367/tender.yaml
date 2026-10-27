@@ -1,0 +1,38 @@
+bid_number: GEM/2026/B/8017367
+gem_bid_id: 9870784
+item_category: DUAL PLATE WAFER TYPE CHECK VALVE, DN50, PN16 OR HIGHER,DUAL PLATE
+  WAFER TYPE CHECK VALVE, DN125, P
+total_quantity: 218
+ministry: Ministry of Power
+source: GeM BidPlus public bid listing (ongoing bids)
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/9870784
+  fetched_at: '2026-10-22T06:58:49+00:00'
+  sha256: 883623c3e26501737b70fea66b5ef9e6ba184abdcc894d337172bd6de42eeaa8
+- file: null
+  role: omp_doc
+  url: https://bidplus.gem.gov.in/bidding/downloadOmppdfile/
+  fetched_at: '2026-10-22T06:58:49+00:00'
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  content_type: text/html; charset=UTF-8
+  note: empty response from GeM; not stored
+- file: boq_spec.pdf
+  role: boq_spec
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqDocument/2026/9/9/technical_specification_of_valves_-6_2026-09-09-16-11-33_640ee57d94e909ff5613c1dfac97adc5.pdf
+  fetched_at: '2026-10-22T06:58:51+00:00'
+  sha256: f35eb7c4d14baba56f16686b3871240440b8d9408dc1faead349f933c0275e41
+  content_type: application/pdf
+- file: boq_items.csv
+  role: boq_items
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqLineItemsDocument/2026/9/9/boq_item_sample_file_-15_2026-09-09-16-11-33_a2f8f49b5fc49d278624fe163a692ba1.csv
+  fetched_at: '2026-10-22T06:58:52+00:00'
+  sha256: 2291a4bf0f4bc85ed43c847d606978991626092066de79f5a7ed9485b29f4ef9
+  content_type: application/octet-stream
+- file: atc.xlsx
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Sep/GEM_2026_B_8017367/CLM0010/ATC2_a8d5ac6b-4bfd-4f1a-b98d1790333722997_Proc@Dulhasti.docx
+  fetched_at: '2026-10-22T06:58:53+00:00'
+  sha256: bc37d11f83aea79a8a576dbacb239f3f528e46938f857ec56ef7ac7d2a330419
+  content_type: application/octet-stream

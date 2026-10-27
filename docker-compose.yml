@@ -1,0 +1,23 @@
+# Local stack. Step 2: database only; backend/frontend/redis services are added in Step 16.
+#   docker compose up -d db
+services:
+  db:
+    image: pgvector/pgvector:0.8.1-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tender}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tender}
+      POSTGRES_DB: ${POSTGRES_DB:-tender_matcher}
+    ports:
+      # 5433 on the host so it never clashes with a locally installed Postgres on 5432.
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

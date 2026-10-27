@@ -1,0 +1,46 @@
+bid_number: GEM/2026/B/8063368
+gem_bid_id: 9923732
+item_category: Pneumatic (ATO) globe type two way control valve of size 1" for steam
+  line,Pneumatic (ATC) globe ty
+total_quantity: 4
+ministry: PMO
+source: GeM BidPlus public bid listing (ongoing bids)
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/9923732
+  fetched_at: '2026-10-22T06:59:39+00:00'
+  sha256: 902ab44fa3a96190010379e5991da3f5487fe2f65ad1daf64cad024744617d09
+- file: null
+  role: omp_doc
+  url: https://bidplus.gem.gov.in/bidding/downloadOmppdfile/
+  fetched_at: '2026-10-22T06:59:39+00:00'
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  content_type: text/html; charset=UTF-8
+  note: empty response from GeM; not stored
+- file: buyer_spec.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/12957214/54/78/703/CatalogAttrs/SpecificationDocument/2026/9/21/tech_spec_compliance_2026-09-21-14-54-18_815ec2aed4d4759b87f2f00d4f0b638f.pdf
+  fetched_at: '2026-10-22T06:59:41+00:00'
+  sha256: 781563ab6baa04687769d2437ee143e5fc6e04c584cf0d64ed566eaf355a0bfa
+  content_type: application/pdf
+- file: null
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/12957214/54/78/703/CatalogAttrs/SpecificationDocument/2026/9/21/tech_spec_compliance_2026-09-21-14-57-08_449c85757d7ab0f067f60ad8ebbf51c8.pdf
+  fetched_at: '2026-10-22T06:59:42+00:00'
+  sha256: 781563ab6baa04687769d2437ee143e5fc6e04c584cf0d64ed566eaf355a0bfa
+  content_type: application/pdf
+  duplicate_of: buyer_spec.pdf
+- file: null
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/12957214/54/78/703/CatalogAttrs/SpecificationDocument/2026/9/21/tech_spec_compliance_2026-09-21-15-01-09_ea77d80a5c1d47edf437ab351f54b016.pdf
+  fetched_at: '2026-10-22T06:59:43+00:00'
+  sha256: 781563ab6baa04687769d2437ee143e5fc6e04c584cf0d64ed566eaf355a0bfa
+  content_type: application/pdf
+  duplicate_of: buyer_spec.pdf
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Sep/GEM_2026_B_8063368/CLM0010/XI_HIN_722de263-6bfc-4e27-828e1790066065720_apo2crpu.pdf
+  fetched_at: '2026-10-22T06:59:44+00:00'
+  sha256: 3d017372fee2c7fcbc473386efd3caa5219add38f978c562e74c20ae206b8f1e
+  content_type: application/pdf

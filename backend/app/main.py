@@ -3,6 +3,9 @@
 Run with: `uvicorn app.main:create_app --factory`.
 """
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,6 +13,14 @@ from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
+from app.db.session import create_db_engine, create_session_factory
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Release pooled DB connections when the app shuts down."""
+    yield
+    app.state.engine.dispose()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -32,8 +43,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url=f"{settings.API_PREFIX}/docs",
         swagger_ui_oauth2_redirect_url=f"{settings.API_PREFIX}/docs/oauth2-redirect",
         redoc_url=None,
+        lifespan=_lifespan,
     )
     app.dependency_overrides[get_settings] = lambda: settings
+    # The engine connects lazily, so building the app never requires a reachable DB.
+    app.state.engine = create_db_engine(settings)
+    app.state.session_factory = create_session_factory(app.state.engine)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,

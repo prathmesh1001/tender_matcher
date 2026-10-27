@@ -1,0 +1,66 @@
+bid_number: GEM/2026/B/7907627
+gem_bid_id: 9744681
+item_category: 'CRYOGENIC GLOBE VALVE WITH EXTENDED BONNET, SIZE: 2" " , PN50, BW
+  ENDS, STEM LENGTH 220 MM MIN, , " CRYOGENIC GLOBE VALVE WITH EXTENDED BONNET, SIZE:
+  1.5" " , PN50, BW ENDS, STEM LENGTH 220 MM MIN , CRYOGENIC GLOBE VALVE WITH EXTENDED
+  BONNET, SIZE: 1" " , PN50, BW ENDS, STEM LENGTH 220 MM MIN, , CRYOGENIC GLOBE VALVE
+  WITH EXTENDED BONNET, SIZE: 3/4" " , PN50, SW/BW ENDS, STEM LENGTH 220 MM MIN'
+source: Provided by user (local copy from 'least match/globe valve 2'); attachment
+  URLs unknown
+user_label: least match/globe valve 2
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/9744681
+  fetched_at: '2026-09-02T05:05:26+00:00'
+  sha256: f63730faa0f3254a9c43e0eedafc90204833e39b69f16c91360f5e31ba79abbb
+  original_name: GeM-Bidding-9744681.pdf
+- file: buyer_spec.pdf
+  role: buyer_spec
+  url: null
+  fetched_at: '2026-09-02T05:08:12+00:00'
+  sha256: 9fbf430ef9811d582889194a7949fc3f9bebcfd38fdf7056fa01b8a03a1b08d8
+  original_name: VALVES-GATE,GLOBE & CHECK.pdf
+- file: buyer_spec_2.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/3297554/54/78/703/CatalogAttrs/SpecificationDocument/2026/8/12/technical_bid_2026-08-12-11-23-46_b164aa8468ad23f95972b3f83503268b.pdf
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:40+00:00'
+  sha256: f079c7bbd99a5811106629a39ebd8d814248944f0b683d1e048c6e37fea53016
+  content_type: application/pdf
+- file: null
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/3297554/54/78/703/CatalogAttrs/SpecificationDocument/2026/8/12/technical_bid_2026-08-12-11-24-54_9c2dcd6741650c5f6abc7dce89c28b85.pdf
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:41+00:00'
+  sha256: f079c7bbd99a5811106629a39ebd8d814248944f0b683d1e048c6e37fea53016
+  content_type: application/pdf
+  duplicate_of: buyer_spec_2.pdf
+- file: null
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/3297554/54/78/703/CatalogAttrs/SpecificationDocument/2026/8/12/technical_bid_2026-08-12-11-26-12_e952b50e35abca94ada9fa50818d625a.pdf
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:42+00:00'
+  sha256: f079c7bbd99a5811106629a39ebd8d814248944f0b683d1e048c6e37fea53016
+  content_type: application/pdf
+  duplicate_of: buyer_spec_2.pdf
+- file: null
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/3297554/54/78/703/CatalogAttrs/SpecificationDocument/2026/8/12/technical_bid_2026-08-12-11-27-24_cbf3de8ac5afafa2db6f1d6a4a9f7771.pdf
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:43+00:00'
+  sha256: f079c7bbd99a5811106629a39ebd8d814248944f0b683d1e048c6e37fea53016
+  content_type: application/pdf
+  duplicate_of: buyer_spec_2.pdf
+- file: atc.xlsx
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Aug/GEM_2026_B_7907627/CLM0010/ATCDOC_0174f315-c158-4d65-a26d1786517350317_buyer97thal.docx
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:45+00:00'
+  sha256: 1dbe0dc393601359c6634706c4e50ff61ad2e49c7c1333bfcb52046e84bb50ec
+  content_type: application/octet-stream

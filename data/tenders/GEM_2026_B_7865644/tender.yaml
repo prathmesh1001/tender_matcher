@@ -1,0 +1,35 @@
+bid_number: GEM/2026/B/7865644
+gem_bid_id: 9696453
+item_category: null
+source: Provided by user (local copy from 'unreleted/u_tender 2'); attachment URLs
+  unknown
+user_label: unreleted/u_tender 2
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/9696453
+  fetched_at: '2026-09-01T11:57:37+00:00'
+  sha256: 4607186b3dfd85dc664400231834447a980d7592bb9e9def7874fee104892a7b
+  original_name: GeM-Bidding-9696453.pdf
+- file: atc.pdf
+  role: atc
+  url: null
+  fetched_at: '2026-09-01T12:03:19+00:00'
+  sha256: ab84829cfa00ab4c21aaff6a1676fdb46777e1c39791944e19acf44463dcac97
+  original_name: doc1.pdf
+- file: boq_spec.pdf
+  role: boq_spec
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqDocument/2026/8/1/nit_2026-08-01-17-42-32_d9577d31e0e5311efc2546f569eab2e5.pdf
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:37+00:00'
+  sha256: f32c3e6a67a28764c2f48fde75c5e9523a36b3a5c5b22b37f8bc84985b28df85
+  content_type: application/pdf
+- file: boq_items.csv
+  role: boq_items
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqLineItemsDocument/2026/8/1/boq_item_sample_file_2026-08-01-17-42-32_f77097139d4720c960a44c35954753c8.csv
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:39+00:00'
+  sha256: e1c4d01e5fcdb997f5272b886435570b43608c0d0b8fed8c120ec61258739e60
+  content_type: application/octet-stream

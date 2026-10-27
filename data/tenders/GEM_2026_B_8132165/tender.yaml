@@ -1,0 +1,50 @@
+bid_number: GEM/2026/B/8132165
+gem_bid_id: 10002433
+item_category: PRMM267035 - 4878251588 - GATE VALVE FLANGE A217 WC9 PEROLO 300 3IN
+total_quantity: 1
+ministry: Ministry of Petroleum and Natural Gas
+source: GeM BidPlus public bid listing (ongoing bids)
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/10002433
+  fetched_at: '2026-10-22T06:59:48+00:00'
+  sha256: 6ef5086c81531622e63e98ba37814a97324f1ce30e1f543fc59c4700f5e9f7f0
+- file: null
+  role: mii_mse_doc
+  url: https://bidplus.gem.gov.in/bidding/downloadMseMiiDoc/10002433/1791437771.pdf
+  fetched_at: '2026-10-22T06:59:48+00:00'
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  content_type: text/html; charset=UTF-8
+  note: empty response from GeM; not stored
+- file: mii_mse_doc.pdf
+  role: mii_mse_doc
+  url: https://bidplus.gem.gov.in/bidding/bid/downloadMseMiiDoc/10002433/1791437901.pdf
+  fetched_at: '2026-10-22T06:59:50+00:00'
+  sha256: c6ac97de4b8f121ef516b8934dd69053609b49d48fc670e5620ae7b6e4535c2d
+  content_type: application/pdf
+- file: mii_mse_doc_2.pdf
+  role: mii_mse_doc
+  url: https://bidplus.gem.gov.in/bidding/bid/downloadMseMiiDoc/10002433/1791437843.pdf
+  fetched_at: '2026-10-22T06:59:52+00:00'
+  sha256: b2c92e7adbaadc5646a127b170763e99e56ab33417414d7430460c84c8bbe892
+  content_type: application/pdf
+- file: buyer_spec.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/12387555/54/78/703/CatalogAttrs/SpecificationDocument/2026/10/8/2-prmm267035-0002468148_2026-10-08-10-57-39_9f61d1b95ef3b1d416d33f429652dd8f.pdf
+  fetched_at: '2026-10-22T06:59:53+00:00'
+  sha256: 971b310ac844ff553c7f910aa7bac173489aa31901eb710f689ebe97cd7b6c81
+  content_type: application/pdf
+- file: null
+  role: buyer_doc
+  url: https://bidplus.gem.gov.in/bidding/bid/documentdownload/10002433/1791437455.pdf
+  fetched_at: '2026-10-22T06:59:54+00:00'
+  sha256: 971b310ac844ff553c7f910aa7bac173489aa31901eb710f689ebe97cd7b6c81
+  content_type: application/pdf
+  duplicate_of: buyer_spec.pdf
+- file: buyer_doc.pdf
+  role: buyer_doc
+  url: https://bidplus.gem.gov.in/bidding/bid/documentdownload/10002433/1791437470.pdf
+  fetched_at: '2026-10-22T06:59:56+00:00'
+  sha256: 5b521b9377879797bba1defc108d3c26db10fc854628fec5c0151d7e65b3b11c
+  content_type: application/pdf

@@ -1,0 +1,29 @@
+bid_number: GEM/2026/B/8054155
+gem_bid_id: 9913018
+item_category: Aluminium Phosphide Formulation (V3) Conforming to IS 6438 (Q2) MSE
+  Relaxation for Years Of Experience and Turnover
+source: Provided by user (local copy from 'Downloads'); attachment URLs unknown
+user_label: Downloads
+files:
+- file: bid.pdf
+  role: bid_document
+  url: https://bidplus.gem.gov.in/showbidDocument/9913018
+  fetched_at: '2026-09-21T05:52:26+00:00'
+  sha256: c667447c55f0ca476b77fe939dad9b831def7b14a97032ed3c19925d9145b59a
+  original_name: GeM-Bidding-9913018.pdf
+- file: gem_category_spec.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/WvjIHgHlj86qopLg2yPogncU_IoQsSoiV-XkTTWPyuc
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:54+00:00'
+  sha256: ead3bf5a92f90a0bdaf9a7518b2d0baaae07aff6198f988f58ec367099a09071
+  content_type: text/html; charset=UTF-8
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Sep/GEM_2026_B_8054155/CLM0010/ATC_AP_TAB_70f52521-7ad6-4552-b0181789724214653_jaswinder.singh100.pdf
+  found_in: bid.pdf
+  depth: 1
+  fetched_at: '2026-10-22T09:11:56+00:00'
+  sha256: 69a1347577871bf07e73fed007955f02001480e6a3c6235b443216c5a30a70f8
+  content_type: application/pdf
