@@ -268,7 +268,7 @@ tender-matcher/
 4. **Table extraction + chunking**: table-row chunks with headers, prose chunks with metadata.
 5. **Ontology + unit normalization**: valves_pumps.yaml, pint helpers.
 6. **Spec fact extraction + quote verifier** (LLM client interface + provider).
-7. **Indexing**: embeddings, vector index, BM25; ingestion pipeline + CLI/endpoint.
+7. **Indexing**: embeddings, vector index, BM25; ingestion pipeline + CLI/endpoint. Source files are read through a `FileStore` interface (`LocalFileStore` for now; files live on the dev machine, never in git).
 8. **Tender parsing**: link fetcher (follow spec/BOQ/ATC links in `bid.pdf`, depth ≤ 3, see D1), parser, classifier, splitter, normalizer, tender pipeline.
 9. **Retrieval**: query builder, hybrid search with RRF, reranker.
 10. **Matching**: comparator, LLM judge, evidence verifier, confidence, model selection.
@@ -277,7 +277,7 @@ tender-matcher/
 13. **Frontend scaffold**: Vite + TS + Tailwind, routing, API client, UI primitives.
 14. **Frontend features**: upload, runs list, report view with evidence.
 15. **Evaluation harness**: gold label format, metrics script.
-16. **Docker**: backend + frontend images, docker-compose, `.env.example`.
+16. **Docker**: backend + frontend images, docker-compose, `.env.example`. Add `PostgresFileStore` (vendor + tender files stored in Postgres, keyed by sha256) and a one-off import of the local files; switch via config.
 17. **Docs**: README (setup, docker pull/run, ports, env vars, example output), write-up.
 
 ## 11. Don'ts
