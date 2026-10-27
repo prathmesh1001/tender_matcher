@@ -2,15 +2,16 @@
 
 import uuid
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from app.db.models.chunk import Chunk
 from app.db.models.document import Document
+from app.db.models.tender import TenderDocument
 from app.db.repositories.base import SqlRepository
 
 
 class ChunkRepository(SqlRepository[Chunk]):
-    """Chunks of manufacturer document pages."""
+    """Chunks of manufacturer and tender document pages."""
 
     model = Chunk
 
@@ -40,6 +41,28 @@ class ChunkRepository(SqlRepository[Chunk]):
             .order_by(Chunk.document_id, Chunk.page_number, Chunk.position)
         )
         return list(self._session.scalars(stmt))
+
+    def list_for_tender(self, tender_id: uuid.UUID) -> list[Chunk]:
+        """Return every chunk of every document linked to a tender (bid.pdf and attachments).
+
+        Args:
+            tender_id: The tender.
+
+        Returns:
+            Chunks in a stable order (document, page, position).
+        """
+        stmt = (
+            select(Chunk)
+            .join(TenderDocument, Chunk.document_id == TenderDocument.document_id)
+            .where(TenderDocument.tender_id == tender_id)
+            .order_by(Chunk.document_id, Chunk.page_number, Chunk.position)
+        )
+        return list(self._session.scalars(stmt))
+
+    def count_for_document(self, document_id: uuid.UUID) -> int:
+        """Return how many chunks a document has."""
+        stmt = select(func.count()).select_from(Chunk).where(Chunk.document_id == document_id)
+        return int(self._session.scalar(stmt) or 0)
 
     def delete_for_document(self, document_id: uuid.UUID) -> int:
         """Delete all chunks of a document (before re-chunking it).

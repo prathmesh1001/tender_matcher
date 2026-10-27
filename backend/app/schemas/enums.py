@@ -17,6 +17,13 @@ class DocType(StrEnum):
     OTHER = "other"
 
 
+class DocumentSource(StrEnum):
+    """Where a stored document came from."""
+
+    MANUFACTURER = "manufacturer"
+    TENDER = "tender"
+
+
 class ChunkType(StrEnum):
     """How a chunk was produced from a page."""
 

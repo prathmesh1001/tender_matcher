@@ -149,7 +149,7 @@ def _row_chunk(
         page_number=table.page_number,
         position=0,
         chunk_type=ChunkType.TABLE_ROW,
-        text=text,
+        raw_text=text,
         section=section,
         model=model,
         token_count=max(estimate_tokens(text), 1),
@@ -160,6 +160,7 @@ def _row_chunk(
             "cells": row.cells,
             "raw_row": " ".join(c for c in row.cells if c),
             "bbox": row.bbox.model_dump(),
+            "continued_from_page": table.continued_from_page,
         },
     )
 
@@ -278,7 +279,7 @@ class _ProseBuffer:
                 page_number=self.page_number,
                 position=0,
                 chunk_type=ChunkType.PROSE,
-                text=text,
+                raw_text=text,
                 section=self.section,
                 token_count=max(estimate_tokens(text), 1),
                 meta={"bbox": bbox.model_dump()},

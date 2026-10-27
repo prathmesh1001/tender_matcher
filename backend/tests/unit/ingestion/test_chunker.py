@@ -108,7 +108,7 @@ def test_each_row_becomes_a_chunk_with_header_model_and_raw_cells() -> None:
     assert first.page_number == 3
     assert first.model == "ETN 50"
     assert first.section == "ETN"
-    assert first.text == "ETN | Model: ETN 50; Flow (m3/h): 120; Power (kW): 7.5"
+    assert first.raw_text == "ETN | Model: ETN 50; Flow (m3/h): 120; Power (kW): 7.5"
     assert first.meta["raw_row"] == "ETN 50 120 7.5"
     assert first.meta["header"] == ["Model", "Flow (m3/h)", "Power (kW)"]
     assert first.meta["row_index"] == 0
@@ -150,7 +150,7 @@ def test_split_handles_a_single_word_longer_than_max() -> None:
 def test_headings_set_section_and_are_not_chunks() -> None:
     result = chunk_page(_page("Materials", "Casing in cast iron."), [], OPTIONS)
     [chunk] = result.chunks
-    assert chunk.text == "Casing in cast iron."
+    assert chunk.raw_text == "Casing in cast iron."
     assert chunk.section == "Materials"
     assert result.section == "Materials"
 
@@ -159,14 +159,14 @@ def test_small_blocks_of_one_section_merge_into_one_chunk() -> None:
     result = chunk_page(
         _page("Materials", "Casing in cast iron.", "Impeller in bronze."), [], OPTIONS
     )
-    assert [c.text for c in result.chunks] == ["Casing in cast iron.\nImpeller in bronze."]
+    assert [c.raw_text for c in result.chunks] == ["Casing in cast iron.\nImpeller in bronze."]
     assert result.chunks[0].meta["bbox"]["y0"] == 90
 
 
 def test_new_heading_starts_a_new_chunk_without_overlap() -> None:
     page = _page("Materials", "Casing in cast iron.", "Shaft Seal", "Mechanical seal.")
     chunks = chunk_page(page, [], OPTIONS).chunks
-    assert [(c.section, c.text) for c in chunks] == [
+    assert [(c.section, c.raw_text) for c in chunks] == [
         ("Materials", "Casing in cast iron."),
         ("Shaft Seal", "Mechanical seal."),
     ]
@@ -179,8 +179,8 @@ def test_chunks_over_target_overlap_within_a_section() -> None:
     )  # fmt: skip
     page = _page("one two three four five six seven eight nine", "ten eleven twelve thirteen")
     first, second = chunk_page(page, [], options).chunks
-    assert first.text == "one two three four five six seven eight nine"
-    assert second.text == "eight nine\nten eleven twelve thirteen"
+    assert first.raw_text == "one two three four five six seven eight nine"
+    assert second.raw_text == "eight nine\nten eleven twelve thirteen"
 
 
 def test_section_carries_over_to_the_next_page() -> None:
@@ -215,10 +215,10 @@ def test_catalogue_page_end_to_end(catalogue_pdf: Path) -> None:
     rows = chunks[:3]
     assert all(c.section == "ETN SERIES PERFORMANCE DATA" for c in rows)
     assert [c.model for c in rows] == ["ETN 50", "ETN 50", "ETN 65"]
-    assert "Power (kW): 7.5" in rows[1].text
+    assert "Power (kW): 7.5" in rows[1].raw_text
     # Table text is not duplicated as prose.
-    assert not any("120" in c.text for c in chunks[3:])
-    assert [(c.section, c.text) for c in chunks[3:]] == [
+    assert not any("120" in c.raw_text for c in chunks[3:])
+    assert [(c.section, c.raw_text) for c in chunks[3:]] == [
         ("Materials", "Casing in grey cast iron, impeller in bronze."),
         ("Shaft Seal", "Mechanical seal as standard."),
     ]
@@ -241,4 +241,4 @@ def test_block_longer_than_max_is_split_into_several_prose_chunks() -> None:
     assert len(chunks) > 1
     assert all(c.token_count <= 12 for c in chunks)
     assert [c.position for c in chunks] == list(range(len(chunks)))
-    assert chunks[-1].text.endswith("word29")
+    assert chunks[-1].raw_text.endswith("word29")

@@ -1,4 +1,4 @@
-"""Queries for manufacturer documents and their pages."""
+"""Queries for stored documents (manufacturer and tender) and their pages."""
 
 import uuid
 
@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.db.models.document import Document, Page
 from app.db.repositories.base import SqlRepository
+from app.schemas.enums import DocumentSource
 
 
 class DocumentRepository(SqlRepository[Document]):
@@ -18,18 +19,25 @@ class DocumentRepository(SqlRepository[Document]):
         return self._session.scalar(select(Document).where(Document.sha256 == sha256))
 
     def find(
-        self, *, manufacturer: str | None = None, category: str | None = None
+        self,
+        *,
+        manufacturer: str | None = None,
+        category: str | None = None,
+        source_kind: DocumentSource | None = None,
     ) -> list[Document]:
         """Find documents, optionally filtered, ordered by manufacturer then title.
 
         Args:
             manufacturer: Exact manufacturer name to filter by.
             category: Exact category to filter by.
+            source_kind: Only manufacturer or only tender documents.
 
         Returns:
             Matching documents.
         """
         stmt = select(Document).order_by(Document.manufacturer, Document.title)
+        if source_kind is not None:
+            stmt = stmt.where(Document.source_kind == source_kind)
         if manufacturer is not None:
             stmt = stmt.where(Document.manufacturer == manufacturer)
         if category is not None:

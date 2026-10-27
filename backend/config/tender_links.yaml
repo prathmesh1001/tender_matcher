@@ -1,0 +1,57 @@
+# Which links inside a GeM tender (bid.pdf and its attachments) are downloaded.
+#
+# Rules are tried in order against the full URL; the first match wins. Unmatched links use
+# `default_action`. Derived from the links in 19 GeM bids (docs/tender_analysis.md):
+#   fetch  documents that carry or define requirements (spec, BOQ, ATC) or compliance formats
+#   skip   generic/empty pages (GTC, OMP file, portal home pages, buyer websites)
+#
+# role      name stored on the tender document and used for the local file name
+# purpose   technical | line_items | terms | compliance | generic (informational)
+
+default_action: skip
+
+rules:
+  - role: bid_document
+    pattern: '^https?://bidplus\.gem\.gov\.in/showbidDocument/\d+'
+    action: fetch
+    purpose: technical
+  - role: buyer_spec
+    pattern: '^https?://mkp\.gem\.gov\.in/.*/CatalogAttrs/SpecificationDocument/'
+    action: fetch
+    purpose: technical
+  - role: boq_spec
+    pattern: '^https?://mkp\.gem\.gov\.in/.*/OrderItem/BoqDocument/'
+    action: fetch
+    purpose: technical
+  - role: boq_items
+    pattern: '^https?://mkp\.gem\.gov\.in/.*/OrderItem/BoqLineItemsDocument/'
+    action: fetch
+    purpose: line_items
+  - role: atc
+    pattern: '^https?://fulfilment\.gem\.gov\.in/contract/slafds\?'
+    action: fetch
+    purpose: terms
+  - role: gem_category_spec
+    pattern: '^https?://bidplus\.gem\.gov\.in/bidding/bid/showCatalogue/'
+    action: fetch
+    purpose: technical
+  - role: buyer_doc
+    pattern: '^https?://bidplus\.gem\.gov\.in/bidding/bid/documentdownload/'
+    action: fetch
+    purpose: technical
+  - role: mii_mse_doc
+    pattern: '^https?://bidplus\.gem\.gov\.in/bidding/(?:bid/)?downloadMseMiiDoc/'
+    action: fetch
+    purpose: compliance
+  - role: omp_doc
+    pattern: '^https?://bidplus\.gem\.gov\.in/bidding/downloadOmppdfile/'
+    action: skip
+    purpose: generic
+  - role: gtc
+    pattern: '^https?://admin\.gem\.gov\.in/apis/v1/gtc/'
+    action: skip
+    purpose: generic
+  - role: gtc
+    pattern: '^https?://assets-bg\.gem\.gov\.in/.*/gtc/'
+    action: skip
+    purpose: generic

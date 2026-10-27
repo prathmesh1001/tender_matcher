@@ -27,6 +27,9 @@ class ExtractedTable(BaseModel):
     bbox: BBox
     header: list[str]
     rows: list[TableRow]
+    continued_from_page: int | None = Field(
+        default=None, description="Set when this table continues one from an earlier page."
+    )
 
 
 class ChunkDraft(BaseModel):
@@ -37,7 +40,8 @@ class ChunkDraft(BaseModel):
     page_number: int = Field(ge=1)
     position: int = Field(ge=0, description="Order of the chunk within its page.")
     chunk_type: ChunkType
-    text: str = Field(min_length=1)
+    raw_text: str = Field(min_length=1, description="Verbatim text; quotes come from here.")
+    search_text: str = Field(default="", description="normalize_for_search(raw_text).")
     section: str | None = None
     product_family: str | None = None
     model: str | None = None

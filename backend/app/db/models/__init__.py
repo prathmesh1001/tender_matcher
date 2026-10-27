@@ -6,7 +6,7 @@ from app.db.models.document import Document, Page
 from app.db.models.result import Evidence, MatchResult
 from app.db.models.run import Run
 from app.db.models.spec_fact import SpecFact
-from app.db.models.tender import Requirement, Tender
+from app.db.models.tender import Requirement, Tender, TenderDocument
 
 __all__ = [
     "Base",
@@ -19,4 +19,5 @@ __all__ = [
     "Run",
     "SpecFact",
     "Tender",
+    "TenderDocument",
 ]

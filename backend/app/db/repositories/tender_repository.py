@@ -1,10 +1,10 @@
-"""Queries for tenders and their requirements."""
+"""Queries for tenders, their linked documents and their requirements."""
 
 import uuid
 
 from sqlalchemy import select
 
-from app.db.models.tender import Requirement, Tender
+from app.db.models.tender import Requirement, Tender, TenderDocument
 from app.db.repositories.base import SqlRepository
 
 
@@ -42,5 +42,36 @@ class TenderRepository(SqlRepository[Tender]):
             select(Requirement)
             .where(Requirement.tender_id == tender_id)
             .order_by(Requirement.position)
+        )
+        return list(self._session.scalars(stmt))
+
+    def get_by_bid_number(self, bid_number: str) -> Tender | None:
+        """Return the tender with this GeM bid number (e.g. "GEM/2026/B/8119613"), or None."""
+        return self._session.scalar(select(Tender).where(Tender.bid_number == bid_number))
+
+    def linked_document_ids(self, tender_id: uuid.UUID) -> set[uuid.UUID]:
+        """Return the ids of every document already linked to a tender."""
+        stmt = select(TenderDocument.document_id).where(TenderDocument.tender_id == tender_id)
+        return set(self._session.scalars(stmt))
+
+    def add_document_link(self, link: TenderDocument) -> TenderDocument:
+        """Link a stored document to a tender and flush.
+
+        Args:
+            link: A new tender-document link.
+
+        Returns:
+            The same link, with its id populated.
+        """
+        self._session.add(link)
+        self._session.flush()
+        return link
+
+    def list_documents(self, tender_id: uuid.UUID) -> list[TenderDocument]:
+        """Return a tender's document links ordered by link depth, then role."""
+        stmt = (
+            select(TenderDocument)
+            .where(TenderDocument.tender_id == tender_id)
+            .order_by(TenderDocument.depth.nulls_first(), TenderDocument.role)
         )
         return list(self._session.scalars(stmt))

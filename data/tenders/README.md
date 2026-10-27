@@ -10,7 +10,7 @@ GEM_2026_B_8119613/
   buyer_spec.pdf     buyer-uploaded technical specification
   boq_spec.pdf       BOQ technical specification
   boq_items.csv      BOQ line items
-  atc.pdf|.xlsx      buyer's Additional Terms & Conditions
+  atc.pdf|.docx      buyer's Additional Terms & Conditions (GeM serves Word files as octet-stream)
   mii_mse_doc*.pdf   Make-in-India / MSE declaration formats
 ```
 

@@ -1,30 +1,43 @@
-"""Manufacturer documents and their pages."""
+"""Stored source documents (manufacturer catalogues and tender files) and their pages."""
 
 import uuid
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, str_enum
-from app.schemas.enums import DocType
+from app.schemas.enums import DocType, DocumentSource
 
 if TYPE_CHECKING:
     from app.db.models.chunk import Chunk
 
 
 class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """A catalogue/datasheet/brochure registered in `sources.yaml`. Unique by content hash."""
+    """A parsed source file, unique by content hash.
+
+    Manufacturer documents come from `sources.yaml` and always carry manufacturer, category,
+    doc type and URL. Tender documents (bid.pdf and the files it links to) are tied to their
+    tenders through `TenderDocument`, so a spec shared by two tenders is parsed once.
+    """
 
     __tablename__ = "documents"
+    __table_args__ = (
+        CheckConstraint(
+            "source_kind <> 'manufacturer' OR (manufacturer IS NOT NULL AND category IS NOT NULL"
+            " AND doc_type IS NOT NULL AND url IS NOT NULL)",
+            name="manufacturer_fields",
+        ),
+    )
 
-    manufacturer: Mapped[str] = mapped_column(String(128), index=True)
-    category: Mapped[str] = mapped_column(String(64), index=True)
+    source_kind: Mapped[DocumentSource] = mapped_column(str_enum(DocumentSource), index=True)
+    manufacturer: Mapped[str | None] = mapped_column(String(128), index=True)
+    category: Mapped[str | None] = mapped_column(String(64), index=True)
     title: Mapped[str] = mapped_column(String(512))
-    doc_type: Mapped[DocType] = mapped_column(str_enum(DocType))
-    url: Mapped[str] = mapped_column(Text)
-    file_path: Mapped[str] = mapped_column(Text)
+    doc_type: Mapped[DocType | None] = mapped_column(str_enum(DocType))
+    url: Mapped[str | None] = mapped_column(Text)
+    file_path: Mapped[str] = mapped_column(Text, comment="FileStore reference.")
     sha256: Mapped[str] = mapped_column(String(64), unique=True)
     fetched_at: Mapped[datetime]
     publish_date: Mapped[date | None]

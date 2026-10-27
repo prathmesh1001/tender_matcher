@@ -24,8 +24,8 @@ class SpecFact(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     page_number: Mapped[int]
     manufacturer: Mapped[str] = mapped_column(String(128))
     category: Mapped[str] = mapped_column(String(64))
-    product_family: Mapped[str | None] = mapped_column(String(256))
-    model: Mapped[str | None] = mapped_column(String(256))
+    product_family: Mapped[str | None] = mapped_column(Text)
+    model: Mapped[str | None] = mapped_column(Text)
     attribute: Mapped[str] = mapped_column(String(128), comment="Canonical ontology attribute.")
     value_text: Mapped[str] = mapped_column(Text, comment="Value as written in the source.")
     value_num: Mapped[float | None] = mapped_column(Float, comment="In canonical unit.")

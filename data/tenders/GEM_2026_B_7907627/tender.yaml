@@ -56,7 +56,7 @@ files:
   sha256: f079c7bbd99a5811106629a39ebd8d814248944f0b683d1e048c6e37fea53016
   content_type: application/pdf
   duplicate_of: buyer_spec_2.pdf
-- file: atc.xlsx
+- file: atc.docx
   role: atc
   url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Aug/GEM_2026_B_7907627/CLM0010/ATCDOC_0174f315-c158-4d65-a26d1786517350317_buyer97thal.docx
   found_in: bid.pdf

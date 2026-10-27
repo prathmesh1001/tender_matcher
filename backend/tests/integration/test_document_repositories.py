@@ -95,14 +95,14 @@ def test_chunks_ordered_filtered_and_deleted(db_session: Session, docs: Document
             make_chunk(other, other.pages[0], text="other"),
         ]
     )
-    assert [c.text for c in chunks.list_for_document(acme.id)] == ["p1-0", "p1-1", "p2-0"]
-    assert {c.text for c in chunks.list_for_manufacturer("Acme", "valves_pumps")} == {
+    assert [c.raw_text for c in chunks.list_for_document(acme.id)] == ["p1-0", "p1-1", "p2-0"]
+    assert {c.raw_text for c in chunks.list_for_manufacturer("Acme", "valves_pumps")} == {
         "p1-0",
         "p1-1",
         "p2-0",
     }
     assert chunks.delete_for_document(acme.id) == 3
-    assert [c.text for c in chunks.list_for_manufacturer("Other", "valves_pumps")] == ["other"]
+    assert [c.raw_text for c in chunks.list_for_manufacturer("Other", "valves_pumps")] == ["other"]
 
 
 def test_spec_facts_lookup_keeps_conflicting_facts(

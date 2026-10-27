@@ -30,7 +30,7 @@ files:
   fetched_at: '2026-10-22T06:58:52+00:00'
   sha256: 2291a4bf0f4bc85ed43c847d606978991626092066de79f5a7ed9485b29f4ef9
   content_type: application/octet-stream
-- file: atc.xlsx
+- file: atc.docx
   role: atc
   url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Sep/GEM_2026_B_8017367/CLM0010/ATC2_a8d5ac6b-4bfd-4f1a-b98d1790333722997_Proc@Dulhasti.docx
   fetched_at: '2026-10-22T06:58:53+00:00'

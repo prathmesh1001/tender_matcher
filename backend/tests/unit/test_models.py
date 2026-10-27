@@ -17,6 +17,7 @@ EXPECTED_TABLES = {
     "chunks",
     "spec_facts",
     "tenders",
+    "tender_documents",
     "requirements",
     "runs",
     "results",

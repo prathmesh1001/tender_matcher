@@ -19,8 +19,7 @@ def get_test_database_url() -> str:
     return os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
 
 
-@pytest.fixture
-def settings() -> Settings:
+def make_test_settings() -> Settings:
     """Deterministic settings that ignore the developer's environment and `.env` file."""
     return Settings(
         _env_file=None,
@@ -30,6 +29,12 @@ def settings() -> Settings:
         LOG_JSON=False,
         DATABASE_URL=get_test_database_url(),  # type: ignore[arg-type]
     )
+
+
+@pytest.fixture
+def settings() -> Settings:
+    """Deterministic settings for one test."""
+    return make_test_settings()
 
 
 @pytest.fixture

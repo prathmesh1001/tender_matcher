@@ -22,6 +22,7 @@ from app.schemas.enums import (
     ChunkType,
     DecisionSource,
     DocType,
+    DocumentSource,
     MatchStatus,
     Operator,
     RequirementType,
@@ -36,6 +37,7 @@ def make_document(
     *, manufacturer: str = "AcmePumps", category: str = CATEGORY, pages: int = 2
 ) -> Document:
     doc = Document(
+        source_kind=DocumentSource.MANUFACTURER,
         manufacturer=manufacturer,
         category=category,
         title=f"{manufacturer} test datasheet",
@@ -60,7 +62,8 @@ def make_chunk(doc: Document, page: Page, *, position: int = 0, text: str = "c")
         page_number=page.page_number,
         position=position,
         chunk_type=ChunkType.PROSE,
-        text=text,
+        raw_text=text,
+        search_text=text.lower(),
     )
 
 

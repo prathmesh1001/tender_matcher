@@ -70,6 +70,27 @@ class NoEvidenceError(AppError):
     code = "no_evidence"
 
 
+class OntologyError(AppError):
+    """An ontology YAML file is missing, malformed, or inconsistent."""
+
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    code = "ontology_error"
+
+
+class UnitConversionError(AppError):
+    """A value's unit is unknown or cannot be converted to the attribute's canonical unit."""
+
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    code = "unit_conversion_error"
+
+
+class LinkFetchError(AppError):
+    """A document linked from a tender could not be downloaded."""
+
+    status_code = status.HTTP_502_BAD_GATEWAY
+    code = "link_fetch_error"
+
+
 class ExternalServiceError(AppError):
     """An external dependency (LLM, OCR, embedder, …) failed or returned invalid output."""
 

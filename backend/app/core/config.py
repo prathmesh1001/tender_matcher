@@ -29,6 +29,12 @@ class LogLevel(StrEnum):
     ERROR = "ERROR"
 
 
+class FileStoreBackend(StrEnum):
+    """Where source files are stored (Postgres is added in plan step 16)."""
+
+    LOCAL = "local"
+
+
 class Settings(BaseSettings):
     """Typed application settings loaded from environment variables and an optional `.env` file."""
 
@@ -60,9 +66,45 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = Field(default=10, ge=0)
     DB_POOL_TIMEOUT_S: float = Field(default=30.0, gt=0)
 
+    FILE_STORE_BACKEND: FileStoreBackend = Field(default=FileStoreBackend.LOCAL)
+    FILE_STORE_ROOT: Path = Field(
+        default=Path("../data"),
+        description="Root of the local file store; documents store paths relative to it.",
+    )
     MANUFACTURER_DATA_DIR: Path = Field(
         default=Path("../data/manufacturers"),
         description="Root holding one folder per manufacturer, each with PDFs + sources.yaml.",
+    )
+    TENDER_DATA_DIR: Path = Field(
+        default=Path("../data/tenders"),
+        description="Root holding one folder per tender, each with bid.pdf + tender.yaml.",
+    )
+    ONTOLOGY_DIR: Path = Field(
+        default=Path("ontology"), description="Folder with one ontology YAML per category."
+    )
+
+    TABLE_CONTINUATION_EDGE_FRACTION: float = Field(
+        default=0.25,
+        gt=0,
+        lt=0.5,
+        description="A table ending/starting this close to a page edge may continue across it.",
+    )
+
+    TENDER_LINK_RULES_FILE: Path = Field(
+        default=Path("config/tender_links.yaml"),
+        description="URL patterns deciding which links in a tender are fetched or skipped.",
+    )
+    TENDER_LINK_MAX_DEPTH: int = Field(
+        default=3, ge=1, le=5, description="Follow links this many hops from bid.pdf."
+    )
+    HTTP_TIMEOUT_S: float = Field(default=60.0, gt=0, description="Per-request download timeout.")
+    HTTP_MAX_DOWNLOAD_MB: int = Field(
+        default=100, ge=1, description="Larger linked files are refused."
+    )
+    HTTP_USER_AGENT: str = Field(
+        default="tender-matcher/0.1 (+document fetcher)",
+        min_length=1,
+        description="User-Agent sent when downloading tender attachments.",
     )
 
     CHUNK_TARGET_TOKENS: int = Field(
