@@ -8,12 +8,16 @@ from app.ingestion.chunker import (
     ChunkerOptions,
     chunk_document,
     chunk_page,
+    distinct_columns,
     estimate_tokens,
     find_model_column,
+    find_variant_columns,
     is_heading,
+    key_value_row_text,
     split_long_text,
     table_chunks,
     table_row_text,
+    variant_name,
 )
 from app.ingestion.pdf_parser import ParserOptions, parse_pdf
 from app.ingestion.table_extractor import extract_page_tables
@@ -26,7 +30,9 @@ OPTIONS = ChunkerOptions(
     max_tokens=500,
     overlap_tokens=50,
     heading_max_words=10,
-    model_header_keywords=("model", "type", "size"),
+    heading_min_latin_ratio=0.5,
+    model_header_keywords=("model",),
+    variant_header_keywords=("material", "materials", "specification"),
 )
 PARSER = ParserOptions(ocr_min_text_chars=50, ocr_min_image_coverage=0.5, ocr_dpi=300)
 
@@ -77,6 +83,73 @@ def test_find_model_column_matches_whole_words() -> None:
     assert find_model_column(["Flow", "Pump Model", "Head"], ("model",)) == 1
     assert find_model_column(["Flow", "Head"], ("model",)) is None
     assert find_model_column(["Typeface"], ("type",)) is None  # not a whole word
+
+
+def test_size_and_type_columns_are_not_models() -> None:
+    header = ["Size NPS", "Valve Type", "Body Style", "Class 150 A"]
+    assert find_model_column(header, OPTIONS.model_header_keywords) is None
+
+
+MATERIAL_HEADER = ["No.", "Components", "Materials WCB/ WCC", "Materials CF8M"]
+
+
+def _material_table(rows: list[list[str]], header: list[str] = MATERIAL_HEADER) -> ExtractedTable:
+    return ExtractedTable(
+        page_number=4,
+        index=0,
+        bbox=_box(100, 100),
+        header=header,
+        rows=[TableRow(cells=r, bbox=_box(120 + 20 * i, 20)) for i, r in enumerate(rows)],
+    )
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [
+        (MATERIAL_HEADER, [2, 3]),
+        (
+            ["Part", "Material specification Single-piece", "Material specification Two-piece"],
+            [1, 2],
+        ),
+        (["Sl. No.", "Description", "Material", "Material"], [2, 3]),
+        (["Body Material", "Disc Material", "Shaft Material"], []),  # different attributes
+        (["Components", "Materials"], []),  # one column only
+    ],
+)
+def test_find_variant_columns(header: list[str], expected: list[int]) -> None:
+    assert find_variant_columns(header, OPTIONS.variant_header_keywords) == expected
+
+
+def test_variant_names_are_the_words_that_differ() -> None:
+    assert variant_name(MATERIAL_HEADER, [2, 3], 2) == "WCB/ WCC"
+    assert variant_name(MATERIAL_HEADER, [2, 3], 3) == "CF8M"
+    assert variant_name(["Material", "Material"], [0, 1], 1) == "Material 2"
+
+
+def test_each_material_version_is_its_own_chunk() -> None:
+    table = _material_table([["1", "Body", "A 216 Gr. WCB", "A 351 Gr. CF8M"]])
+    chunks = table_chunks(table, "Standards & Materials", OPTIONS)
+    assert [c.model for c in chunks] == ["WCB/ WCC", "CF8M"]
+    assert chunks[0].raw_text == (
+        "Standards & Materials | No.: 1; Components: Body; Materials WCB/ WCC: A 216 Gr. WCB"
+    )
+    assert "CF8M" not in chunks[0].raw_text  # versions never share a chunk
+    assert chunks[1].meta["variant"] == "CF8M"
+    assert chunks[1].meta["raw_row"] == "1 Body A 351 Gr. CF8M"
+
+
+def test_blank_version_cell_gives_no_chunk() -> None:
+    table = _material_table([["2", "Disc", "A 216 Gr. WCB", ""]])
+    assert [c.model for c in table_chunks(table, None, OPTIONS)] == ["WCB/ WCC"]
+
+
+def test_merged_column_with_repeated_label_is_not_split() -> None:
+    header = ["Sl. No.", "Description", "Material", "Material"]
+    rows = [["01", "Body", "A216 WCB", "A216 WCB"], ["02", "Disc", "A105", "A105"]]
+    assert distinct_columns([TableRow(cells=r, bbox=_box(0)) for r in rows], [2, 3]) == [2]
+    chunks = table_chunks(_material_table(rows, header), None, OPTIONS)
+    assert len(chunks) == 2
+    assert all(c.model is None for c in chunks)
 
 
 def test_table_row_text_pairs_header_with_cells_and_skips_blanks() -> None:
@@ -174,7 +247,11 @@ def test_new_heading_starts_a_new_chunk_without_overlap() -> None:
 
 def test_chunks_over_target_overlap_within_a_section() -> None:
     options = ChunkerOptions(
-        target_tokens=10, max_tokens=20, overlap_tokens=2, heading_max_words=10,
+        target_tokens=10,
+        max_tokens=20,
+        overlap_tokens=2,
+        heading_max_words=10,
+        heading_min_latin_ratio=0.5,
         model_header_keywords=("model",),
     )  # fmt: skip
     page = _page("one two three four five six seven eight nine", "ten eleven twelve thirteen")
@@ -233,7 +310,11 @@ def test_options_come_from_settings(settings: Settings) -> None:
 
 def test_block_longer_than_max_is_split_into_several_prose_chunks() -> None:
     options = ChunkerOptions(
-        target_tokens=10, max_tokens=12, overlap_tokens=2, heading_max_words=10,
+        target_tokens=10,
+        max_tokens=12,
+        overlap_tokens=2,
+        heading_max_words=10,
+        heading_min_latin_ratio=0.5,
         model_header_keywords=("model",),
     )  # fmt: skip
     long_block = " ".join(f"word{i}" for i in range(30))
@@ -242,3 +323,117 @@ def test_block_longer_than_max_is_split_into_several_prose_chunks() -> None:
     assert all(c.token_count <= 12 for c in chunks)
     assert [c.position for c in chunks] == list(range(len(chunks)))
     assert chunks[-1].raw_text.endswith("word29")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "सूZम और लघु उ]म मूल उपकरण",  # garbled Hindi from a GeM bid PDF
+        "\N{REPLACEMENT CHARACTER}ववरण Specification",
+        "तकनीकी विवरण",
+    ],
+)
+def test_garbled_or_hindi_lines_are_not_headings(text: str) -> None:
+    assert not is_heading(text, max_words=10, min_latin_ratio=0.5)
+
+
+def test_mostly_english_bilingual_heading_is_kept() -> None:
+    assert is_heading("TECHNICAL SPECIFICATION विवरण", max_words=10, min_latin_ratio=0.5)
+
+
+def test_repeated_pairs_from_merged_cells_are_collapsed() -> None:
+    text = table_row_text(
+        ["Parameter", "Parameter", "Parameter", "Standard"],
+        ["Design", "Design", "Design", "API 609"],
+        None,
+    )
+    assert text == "Parameter: Design; Standard: API 609"
+
+
+def test_punctuation_only_chunks_are_dropped() -> None:
+    # A stray symbol separated from other text by a heading becomes its own chunk otherwise.
+    page = _page("@", "Materials", "Casing in cast iron.")
+    result = chunk_page(page, [], OPTIONS)
+    assert [(c.position, c.raw_text) for c in result.chunks] == [(0, "Casing in cast iron.")]
+
+
+def test_key_value_row_text() -> None:
+    assert key_value_row_text(["EMD Amount", "24000"], (None, "Bid Details")) == (
+        "Bid Details | EMD Amount: 24000"
+    )
+    # Section and title are not repeated when identical; empty cells are skipped.
+    assert key_value_row_text(["Note", ""], ("Bid Details", "Bid Details")) == "Bid Details | Note"
+    assert key_value_row_text(["EMD Amount", "24000"], (None, None)) == "EMD Amount: 24000"
+
+
+# ---------------------------------------------------------------- ordering-code legends
+
+LEGEND_HEADER = ["Pressure Rating", "Body Material", "Liner", "Special"]
+LEGEND_ROWS = [  # L&T Aquaseal "Ordering Information": each column is a list of options
+    ["1 - PN 10", "I - Cast Iron", "N - Black Nitrile", "Long Neck"],
+    ["2 - PN 16", "G - SG Iron", "E - EPDM", "Extended Stem"],
+    ["", "C - Carbon Steel", "V - Viton", ""],
+]
+
+
+def test_ordering_legend_is_chunked_by_column_not_by_row() -> None:
+    from app.ingestion.chunker import is_option_legend
+
+    table = _material_table(LEGEND_ROWS, header=LEGEND_HEADER)
+    assert is_option_legend(table)
+    texts = [c.raw_text for c in table_chunks(table, "Ordering Information", OPTIONS)]
+    assert texts == [
+        "Ordering Information | Pressure Rating: 1 - PN 10; 2 - PN 16",
+        "Ordering Information | Body Material: I - Cast Iron; G - SG Iron; C - Carbon Steel",
+        "Ordering Information | Liner: N - Black Nitrile; E - EPDM; V - Viton",
+        "Ordering Information | Special: Long Neck; Extended Stem",
+    ]
+    # No chunk claims "PN 10 + Black Nitrile" is one product (B10).
+    assert not any("PN 10" in t and "Nitrile" in t for t in texts)
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [["1", "Body", "ASTM A105"], ["2", "Cover", "ASTM A105"]],  # numbered parts list
+        [["1 - PN 10", "Cast Iron", "x"], ["2 - PN 16", "SG Iron", "y"]],  # one coded column
+        [["1 - PN 10", "I - Cast Iron", "x"], ["PN 16", "G - SG Iron", "y"]],  # mixed column
+    ],
+)
+def test_ordinary_tables_are_not_legends(rows: list[list[str]]) -> None:
+    from app.ingestion.chunker import is_option_legend
+
+    assert not is_option_legend(_material_table(rows, header=["A", "B", "C"]))
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("3PHMP-05-2018-01", False),  # synthetic-style document code: mostly digits
+        ("2224776/2026/PE&SD-450", False),  # file-number stamp
+        ("KP4", True),
+        ("1.B", True),
+        ("Class 150/300", True),  # a pressure-class sub-heading, 6 of 11 characters digits
+        ("48-inch Class 150 Gate Valve", True),
+    ],
+)
+def test_is_heading_rejects_codes(text: str, expected: bool) -> None:
+    assert is_heading(text, max_words=10, max_digit_share=0.6) is expected
+
+
+def test_spanning_columns_reach_chunk_meta() -> None:
+    row = TableRow(
+        cells=["Pressure", "Up to 16 bar", "Up to 16 bar"],
+        bbox=BBox(x0=0, y0=0, x1=1, y1=1),
+        spanning_columns=(1, 2),
+    )
+    table = ExtractedTable(
+        page_number=1,
+        index=0,
+        bbox=BBox(x0=0, y0=0, x1=1, y1=1),
+        header=["Data", "A", "B"],
+        rows=[row],
+    )
+    [chunk] = table_chunks(table, None, OPTIONS)
+    assert chunk.meta["spanning_columns"] == [1, 2]
+    assert chunk.raw_text == "Data: Pressure; A: Up to 16 bar; B: Up to 16 bar"

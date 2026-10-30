@@ -104,6 +104,8 @@ def _to_registered(entry: SourceEntry, manufacturer: str, registry_file: Path) -
     return RegisteredSource(
         manufacturer=manufacturer,
         category=entry.category,
+        product_types=entry.product_types,
+        sub_types=entry.sub_types,
         title=entry.title,
         doc_type=entry.doc_type,
         url=entry.url,

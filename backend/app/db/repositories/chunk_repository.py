@@ -6,8 +6,10 @@ from sqlalchemy import delete, func, select
 
 from app.db.models.chunk import Chunk
 from app.db.models.document import Document
+from app.db.models.embedding import TextEmbedding
 from app.db.models.tender import TenderDocument
 from app.db.repositories.base import SqlRepository
+from app.schemas.enums import DocumentSource
 
 
 class ChunkRepository(SqlRepository[Chunk]):
@@ -24,20 +26,30 @@ class ChunkRepository(SqlRepository[Chunk]):
         )
         return list(self._session.scalars(stmt))
 
-    def list_for_manufacturer(self, manufacturer: str, category: str) -> list[Chunk]:
-        """Return every chunk from one manufacturer's documents in a category.
+    def list_for_product(self, manufacturer: str, category: str, product_type: str) -> list[Chunk]:
+        """A manufacturer's chunks that can be evidence for one product type.
+
+        That is chunks tagged with the type, plus untagged ("general") chunks of documents that
+        declare the type. Chunks of other products are never returned (B1/B3), and a document
+        covering the type is never dropped because one of its chunks could not be tagged.
 
         Args:
             manufacturer: Exact manufacturer name.
-            category: Exact product category.
+            category: Ontology category.
+            product_type: Ontology product type, e.g. "butterfly_valve".
 
         Returns:
             Chunks in a stable order (document, page, position).
         """
+        general = Chunk.product_type.is_(None) & Document.product_types.contains([product_type])
         stmt = (
             select(Chunk)
             .join(Document, Chunk.document_id == Document.id)
-            .where(Document.manufacturer == manufacturer, Document.category == category)
+            .where(
+                Document.manufacturer == manufacturer,
+                Document.category == category,
+                (Chunk.product_type == product_type) | general,
+            )
             .order_by(Chunk.document_id, Chunk.page_number, Chunk.position)
         )
         return list(self._session.scalars(stmt))
@@ -58,6 +70,38 @@ class ChunkRepository(SqlRepository[Chunk]):
             .order_by(Chunk.document_id, Chunk.page_number, Chunk.position)
         )
         return list(self._session.scalars(stmt))
+
+    def documents_needing_embedding(
+        self,
+        model_name: str,
+        *,
+        source_kind: DocumentSource | None = None,
+        manufacturer: str | None = None,
+    ) -> list[tuple[uuid.UUID, str]]:
+        """Documents with at least one chunk that has no vector for `model_name` yet.
+
+        Args:
+            model_name: Embedding model identifier.
+            source_kind: Only manufacturer or only tender documents.
+            manufacturer: Only this manufacturer's documents.
+
+        Returns:
+            `(document_id, file_path)` pairs ordered by file path.
+        """
+        joined = (TextEmbedding.text_hash == Chunk.embed_hash) & (TextEmbedding.model == model_name)
+        stmt = (
+            select(Document.id, Document.file_path)
+            .join(Chunk, Chunk.document_id == Document.id)
+            .outerjoin(TextEmbedding, joined)
+            .where(TextEmbedding.id.is_(None))
+            .distinct()
+            .order_by(Document.file_path)
+        )
+        if source_kind is not None:
+            stmt = stmt.where(Document.source_kind == source_kind)
+        if manufacturer is not None:
+            stmt = stmt.where(Document.manufacturer == manufacturer)
+        return [(doc_id, path) for doc_id, path in self._session.execute(stmt)]
 
     def count_for_document(self, document_id: uuid.UUID) -> int:
         """Return how many chunks a document has."""

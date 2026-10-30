@@ -1,0 +1,14 @@
+manufacturer: KSB
+documents:
+- file: ksb_etanorm_brochure.pdf
+  category: valves_pumps
+  product_types: [centrifugal_pump]
+  sub_types: [end_suction]
+  title: Etanorm / Etanorm R - Standardised Water Pumps (product brochure 1311.021/03-EN)
+  doc_type: brochure
+  url: https://www.pumping.com.au/products/KSBEtanorm.pdf
+  fetched_at: '2026-10-29T14:07:08+00:00'
+  publish_date: 2014-12-01
+  sha256: 2bed50a9e056b512a78c7cd102725829d4e6fca297561a86724dd0d3bac23349
+  notes: Official KSB brochure (KSB AG imprint, "12.14") hosted by an Australian distributor;
+    ksb.com serves no direct PDF. 2 pages, only ranges (flow, head, materials), no curves.

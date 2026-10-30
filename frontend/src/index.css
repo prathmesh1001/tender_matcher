@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens: the one place for colours, radii and shadows (CLAUDE.md section 8).
+ * Brand: the warm red-to-orange of the reference dashboard. Status colours are used by the
+ * report view (full / partial / missing / unsupported / not applicable).
+ */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-brand-50: #fdf1ee;
+  --color-brand-100: #fbe0d8;
+  --color-brand-500: #e0563a;
+  --color-brand-600: #c8452c;
+  --color-brand-700: #a93722;
+  --color-accent-500: #f08a24;
+
+  --color-ink-900: #1f2433;
+  --color-ink-600: #4b5163;
+  --color-ink-400: #8a8fa0;
+  --color-line: #e7e8ee;
+  --color-canvas: #f5f6fa;
+
+  --color-status-full: #15803d;
+  --color-status-partial: #b45309;
+  --color-status-missing: #b91c1c;
+  --color-status-unsupported: #4b5563;
+  --color-status-na: #64748b;
+
+  --radius-card: 0.75rem;
+  --shadow-card: 0 1px 2px rgb(31 36 51 / 0.06), 0 1px 8px rgb(31 36 51 / 0.04);
+}
+
+@layer base {
+  body {
+    @apply bg-canvas text-ink-900 antialiased;
+  }
+}

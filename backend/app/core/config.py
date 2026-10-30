@@ -35,6 +35,21 @@ class FileStoreBackend(StrEnum):
     LOCAL = "local"
 
 
+class EmbeddingDevice(StrEnum):
+    """Where the embedding model runs; `auto` uses CUDA when available."""
+
+    AUTO = "auto"
+    CPU = "cpu"
+    CUDA = "cuda"
+
+
+class DenseSearch(StrEnum):
+    """How dense search scores the product-filtered chunks."""
+
+    EXACT = "exact"  # cosine distance to every filtered vector
+    HNSW = "hnsw"  # pgvector HNSW index with iterative scan (approximate)
+
+
 class Settings(BaseSettings):
     """Typed application settings loaded from environment variables and an optional `.env` file."""
 
@@ -82,12 +97,103 @@ class Settings(BaseSettings):
     ONTOLOGY_DIR: Path = Field(
         default=Path("ontology"), description="Folder with one ontology YAML per category."
     )
+    SECTION_CATEGORIES_FILE: Path = Field(
+        default=Path("config/section_categories.yaml"),
+        description="Section categories (costing, eligibility, dimensions, ...) and their phrases.",
+    )
 
+    PRODUCT_PAGE_MIN_TAGGED: int = Field(
+        default=2,
+        ge=1,
+        description="Tagged chunks (all one type) a page needs before untagged ones inherit it.",
+    )
+    TABLE_HEADER_MAX_WORDS: int = Field(
+        default=8,
+        ge=1,
+        description=(
+            "Longest column label in words. A longer header cell with commas is a caption "
+            "('PERFORMANCE CHART FOR ...'): it becomes the table's section, not its header."
+        ),
+    )
+    LAYOUT_RULE_MAX_THICKNESS: float = Field(
+        default=2.0,
+        gt=0,
+        description="Drawn shapes at most this thick (points) are table rules, not areas.",
+    )
+    LAYOUT_RULE_TOLERANCE: float = Field(
+        default=2.0,
+        gt=0,
+        description="Rule positions closer than this (points) are the same edge.",
+    )
+    LAYOUT_GRID_MIN_COLUMNS: int = Field(
+        default=2, ge=2, description="A rule grid needs this many columns to be a table."
+    )
+    LAYOUT_GRID_MIN_ROWS: int = Field(
+        default=3, ge=2, description="A rule grid needs this many row bands to be a table."
+    )
+    LAYOUT_MAX_RULES: int = Field(
+        default=2000,
+        ge=1,
+        description="Pages with more thin shapes are drawings or outlined text, not rule tables.",
+    )
     TABLE_CONTINUATION_EDGE_FRACTION: float = Field(
         default=0.25,
         gt=0,
         lt=0.5,
         description="A table ending/starting this close to a page edge may continue across it.",
+    )
+
+    EMBEDDING_MODEL: str = Field(
+        default="BAAI/bge-m3",
+        min_length=1,
+        description="sentence-transformers model id; changing it needs a matching vector size.",
+    )
+    EMBEDDING_DEVICE: EmbeddingDevice = Field(default=EmbeddingDevice.AUTO)
+    EMBEDDING_FP16: bool = Field(
+        default=True, description="Half precision on CUDA (ignored on CPU)."
+    )
+    EMBEDDING_BATCH_SIZE: int = Field(default=16, ge=1, le=256)
+    EMBEDDING_MAX_TOKENS: int = Field(
+        default=512, ge=32, le=8192, description="Longer chunk text is truncated by the model."
+    )
+
+    QUERY_TYPO_MAX_DISTANCE: int = Field(
+        default=2, ge=0, le=3, description="Edit distance for fixing tender typos (0 = off)."
+    )
+    QUERY_TYPO_MIN_LENGTH: int = Field(
+        default=5, ge=3, description="Shorter query words are never typo-corrected."
+    )
+    BM25_K1: float = Field(default=1.5, ge=0, description="BM25 term-frequency saturation.")
+    BM25_B: float = Field(default=0.75, ge=0, le=1, description="BM25 length normalization.")
+    RETRIEVAL_CANDIDATES: int = Field(
+        default=50, ge=1, description="Candidates taken from each of BM25 and dense search."
+    )
+    DENSE_SEARCH: DenseSearch = Field(default=DenseSearch.EXACT)
+    HNSW_EF_SEARCH: int = Field(
+        default=100, ge=1, le=1000, description="HNSW candidate list size (recall vs speed)."
+    )
+    RRF_K: int = Field(default=60, ge=1, description="Reciprocal rank fusion constant.")
+    RRF_BM25_WEIGHT: float = Field(default=1.0, gt=0, description="BM25 share of the fusion.")
+    RRF_DENSE_WEIGHT: float = Field(default=0.7, ge=0, description="Dense share; 0 = BM25 only.")
+    RERANKER_MODEL: str = Field(
+        default="cross-encoder/ms-marco-MiniLM-L-6-v2",
+        min_length=1,
+        description="sentence-transformers CrossEncoder id (English MiniLM by default).",
+    )
+    RERANKER_DEVICE: EmbeddingDevice = Field(default=EmbeddingDevice.AUTO)
+    RERANKER_FP16: bool = Field(
+        default=False, description="Half precision on CUDA (for large models; ignored on CPU)."
+    )
+    RERANKER_BATCH_SIZE: int = Field(default=32, ge=1, le=256)
+    RERANKER_MAX_TOKENS: int = Field(
+        default=512, ge=32, le=8192, description="Query + chunk longer than this is truncated."
+    )
+    RERANK_TOP_K: int = Field(default=5, ge=1, description="Chunks kept after reranking.")
+    RERANK_MIN_SCORE: float = Field(
+        default=0.3,
+        ge=0,
+        le=1,
+        description="Top rerank score (0-1) below this means insufficient evidence.",
     )
 
     TENDER_LINK_RULES_FILE: Path = Field(
@@ -117,10 +223,55 @@ class Settings(BaseSettings):
     CHUNK_HEADING_MAX_WORDS: int = Field(
         default=10, ge=1, description="Text blocks longer than this are never treated as headings."
     )
+    CHUNK_HEADING_MIN_LATIN_RATIO: float = Field(
+        default=0.5,
+        ge=0,
+        le=1,
+        description="Headings must be at least this share Latin letters (rejects garbled Hindi).",
+    )
+    CHUNK_HEADING_MAX_DIGIT_SHARE: float = Field(
+        default=0.6,
+        ge=0,
+        le=1,
+        description="Lines with a larger share of digits are codes, never headings.",
+    )
+    PAGE_MARGIN_BAND_FRACTION: float = Field(
+        default=0.12,
+        gt=0,
+        lt=0.5,
+        description=(
+            "Top/bottom share of a PDF page where running headers and footers sit. A heading "
+            "in the bottom band does not carry over to the next page."
+        ),
+    )
+    BOILERPLATE_MIN_PAGE_RATIO: float = Field(
+        default=0.5,
+        gt=0,
+        le=1,
+        description="A margin line on at least this share of pages is boilerplate (dropped).",
+    )
+    BOILERPLATE_MIN_PAGES: int = Field(
+        default=2, ge=2, description="...and on at least this many pages (one page is no repeat)."
+    )
+    BOILERPLATE_MIN_LETTERS: int = Field(
+        default=3,
+        ge=1,
+        description="Lines with fewer letters (page numbers, lone digits) are never boilerplate.",
+    )
     CHUNK_MODEL_HEADER_KEYWORDS: list[str] = Field(
-        default_factory=lambda: ["model", "type", "size"],
+        default_factory=lambda: ["model"],
         min_length=1,
-        description="Table header words that mark the model column, as a JSON list.",
+        description=(
+            'Table header words that mark the model column, as a JSON list. Not "size" or '
+            '"type": those columns hold sizes and product types, never model names.'
+        ),
+    )
+    CHUNK_VARIANT_HEADER_KEYWORDS: list[str] = Field(
+        default_factory=lambda: ["material", "materials", "specification"],
+        description=(
+            "First words of header labels that mark version columns (one material grade per "
+            "column). Two or more such columns -> one chunk per row and version, as a JSON list."
+        ),
     )
 
     OCR_ENABLED: bool = Field(default=True, description="OCR pages that have no text layer.")

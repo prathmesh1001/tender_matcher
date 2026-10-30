@@ -22,6 +22,7 @@ def _entry(file: str, sha256: str, **overrides: Any) -> dict[str, Any]:
     entry: dict[str, Any] = {
         "file": file,
         "category": "valves_pumps",
+        "product_types": ["centrifugal_pump"],
         "title": "Synthetic datasheet",
         "doc_type": "datasheet",
         "url": "https://example.invalid/datasheet.pdf",

@@ -12,6 +12,7 @@ from app.schemas.enums import DocType, DocumentSource
 
 if TYPE_CHECKING:
     from app.db.models.chunk import Chunk
+    from app.db.models.section import DocumentSection
 
 
 class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -38,6 +39,10 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     doc_type: Mapped[DocType | None] = mapped_column(str_enum(DocType))
     url: Mapped[str | None] = mapped_column(Text)
     file_path: Mapped[str] = mapped_column(Text, comment="FileStore reference.")
+    product_types: Mapped[list[str]] = mapped_column(
+        default=list, comment="Declared in sources.yaml; empty for tender files."
+    )
+    sub_types: Mapped[list[str]] = mapped_column(default=list)
     sha256: Mapped[str] = mapped_column(String(64), unique=True)
     fetched_at: Mapped[datetime]
     publish_date: Mapped[date | None]
@@ -48,6 +53,9 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     chunks: Mapped[list[Chunk]] = relationship(
         back_populates="document", cascade="all, delete-orphan"
+    )
+    sections: Mapped[list[DocumentSection]] = relationship(
+        back_populates="document", cascade="all, delete-orphan", order_by="DocumentSection.position"
     )
 
 

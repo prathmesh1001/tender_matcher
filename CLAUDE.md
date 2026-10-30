@@ -190,10 +190,18 @@ tender-matcher/
 
 **Manufacturer documents**
 - Every document must be registered in `data/manufacturers/<mfr>/sources.yaml` with:
-  `manufacturer, category, title, doc_type, url, fetched_at, publish_date, sha256`.
+  `manufacturer, category, product_types, (sub_types), title, doc_type, url, fetched_at, publish_date, sha256`.
+- `product_types` is checked by hand per document. Every chunk is tagged with a product type
+  (`product_tagger.py`): only a declared type, from a section heading on the chunk's page or the
+  chunk's own text, never guessed; unclear chunks stay untagged ("general"). A spec-table page
+  naming no product continues the clear product of the page before it (catalogues put a
+  product's tables on the page after its introduction); prose pages and pages whose text
+  names another product never inherit.
 - Parse **page by page**; every chunk and fact carries `doc_id` + `page`.
 - Detect scanned pages (very little text layer) → OCR, mark `ocr=true`.
 - Tables: each row becomes its own chunk **with header and product family/model repeated**.
+  Exception: an ordering-code legend (columns of "1 - PN 10", "I - Cast Iron" options) gives one
+  chunk per column, because its rows are not products.
 - Prose: section-aware chunks, ~300–500 tokens, small overlap.
 - **Every chunk keeps two versions of its text:**
   - `raw_text`: original, verbatim. Used for quotes and evidence verification. Never modified.
@@ -207,20 +215,56 @@ tender-matcher/
 - Normalize units with `pint` to canonical units defined in the ontology.
 - Keep conflicting facts; mark `conflict=true`. Source priority: datasheet > catalogue > brochure, then newest date.
 - Ingestion must be **idempotent**: re-running on the same sha256 does not duplicate data.
+- **Sections** (`document_sections`, both sides): a section is a run of chunks under one heading,
+  with parent (heading numbers "10.1" → "10"), page range and a category from
+  `config/section_categories.yaml` (costing, eligibility, financial, experience, certificates,
+  delivery, warranty, legal, submission, buyer, quality, size, material, performance, technical).
+  Every chunk stores its `section_id` and `section_category`: heading phrase first, else the
+  chunk's own text (GeM bid rows have no heading), else `other`. Categories route requirements to
+  evidence; they never decide compliance. `classify-sections` rebuilds them without re-parsing.
 
 **Tender documents**
-- Extract the GeM specification tables and free-text sections with page numbers.
+- Extract the GeM specification tables and free-text sections with page numbers. Two-column
+  tables in tender files are `label: value` pairs (GeM bid layout), not header + rows.
+- **Every** requirement is extracted, not only technical ones. Each category says where vendor
+  evidence comes from (`evidence` in `section_categories.yaml`): `catalogue` (checked now),
+  `vendor_documents` (costing, turnover, experience, certificates, delivery, warranty: no vendor
+  documents are ingested, so these report "no evidence" → `unsupported` + `needs_review`, never a
+  failure), `none` (buyer details, bid schedule → `not_applicable`).
 - Classify each line: `technical | commercial | legal | compliance_doc | vague`.
 - Split compound lines into atomic requirements linked by `parent_id`.
 - Normalize to `Requirement {id, parent_id, attribute, operator(=,>=,<=,range,in,bool,text), value, unit, raw_text, page, type}`.
 
 ## 7. Retrieval & matching rules
 
-- Per requirement × manufacturer:
-  1. Structured lookup in `spec_facts` by canonical attribute (filtered by manufacturer + category).
-  2. Hybrid search: BM25 + dense, filtered by manufacturer/category, query expanded with ontology synonyms, fused with RRF.
-  3. Cross-encoder rerank → top-k (config).
-  4. If top rerank score < threshold → status `unsupported` (insufficient evidence), skip LLM.
+- Section mapping first: only requirements whose category has `evidence: catalogue` are searched
+  in catalogues; the category's `vendor_categories` rank catalogue sections (a hint, not a filter).
+  Other categories are reported without searching (see section 6, tender documents).
+- Per requirement × manufacturer, in this order:
+  1. **Product filter first** (cheap, by keyword): find the tender item's product type with ontology
+     synonyms; keep only that manufacturer's chunks of that type plus untagged chunks of documents
+     declaring it (`ChunkRepository.list_for_product`). No document for the type → `unsupported`
+     for every requirement of the item; nothing else is searched.
+  2. Structured lookup in `spec_facts` by canonical attribute within that product.
+  3. Hybrid search inside the filtered set: BM25 on `search_text` (weighted first) + dense on the
+     stored vectors, query expanded with ontology synonyms, fused with RRF.
+  4. Cross-encoder rerank → top-k (config). A hit is evidence if its score ≥ threshold **or** it
+     contains one of the requirement's codes (`en593`, `pn10`, or a grade code of a material it
+     names via ontology `equivalents`, e.g. SGI → `a536`); bare numbers never count (B4).
+     Code-only hits keep their low score, so confidence goes down. No evidence hit →
+     `unsupported`, skip LLM.
+  5. Numbers via the comparator, then per-manufacturer scoring (below).
+- Sub-type is never a filter (B2): a sub-type mismatch lowers the status, it does not hide evidence.
+- **Like-for-like comparison (always):** a tender requirement is compared only with the vendor
+  value for the **same attribute, same component and same condition**, mapped through the ontology:
+  - same attribute: tender `pressure_rating` vs catalogue `pressure_rating` (never vs `test_pressure`
+    or another number on the same row)
+  - same component: tender "Disc MOC" vs catalogue "Disc", never "Body" or "Seat"
+  - same condition: same model/variant column, and same basis (duty point vs max, 50 Hz vs 60 Hz,
+    working vs test pressure)
+  If the catalogue has no value for that exact attribute + component, the result is `unsupported`
+  (no evidence), never a match taken from a different attribute that happens to share a number or word.
+  The evidence quote must contain the attribute label (or its ontology synonym) and the value.
 - **Rules before LLM**: numeric/enum/bool requirements are decided by `comparator.py` (units + direction aware).
 - LLM judge only for free-text/ambiguous cases; must return JSON with `status, capability, chunk_id, quote, reasoning`.
 - `evidence_verifier` re-checks every quote against the page. Failed verification → downgrade to `unsupported` + `needs_review`.
@@ -234,6 +278,7 @@ tender-matcher/
 | `partial_match` | Some sub-conditions met, only some models, optional accessory, or near-miss | 0.5 |
 | `missing_capability` | Catalogue covers the attribute and the value fails | 0.0 |
 | `unsupported` | Not technically verifiable, or no evidence in catalogues | excluded |
+| `not_applicable` | Nothing to compare (buyer details, bid dates, procedure) | excluded |
 
 - Overall % = Σ(score × weight) / Σ(weight) over verifiable technical requirements. Also report evidence coverage %.
 - Confidence goes down for LLM decisions, OCR, brochure-only sources, conflicts, and low rerank scores. Below the threshold → `needs_review=true`.
@@ -269,7 +314,7 @@ tender-matcher/
 5. **Ontology + unit normalization**: valves_pumps.yaml, pint helpers.
 6. **Spec fact extraction + quote verifier** (LLM client interface + provider).
 7. **Indexing**: embeddings, vector index, BM25; ingestion pipeline + CLI/endpoint. Source files are read through a `FileStore` interface (`LocalFileStore` for now; files live on the dev machine, never in git).
-8. **Tender parsing**: link fetcher (follow spec/BOQ/ATC links in `bid.pdf`, depth ≤ 3, see D1), parser, classifier, splitter, normalizer, tender pipeline.
+8. **Tender parsing**: link fetcher (follow spec/BOQ/ATC links in `bid.pdf`, depth ≤ 3, see D1), document sections + categories (done, both sides), parser, classifier, splitter, normalizer, tender pipeline. Requirements of every category are extracted, with category, product type and mandatory flag.
 9. **Retrieval**: query builder, hybrid search with RRF, reranker.
 10. **Matching**: comparator, LLM judge, evidence verifier, confidence, model selection.
 11. **Scoring & reporting**: scorer, JSON report, Excel report.

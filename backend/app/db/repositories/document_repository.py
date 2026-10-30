@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.db.models.document import Document, Page
 from app.db.repositories.base import SqlRepository
@@ -58,3 +58,16 @@ class DocumentRepository(SqlRepository[Document]):
         """Return one page of a document by its 1-based page number, or None."""
         stmt = select(Page).where(Page.document_id == document_id, Page.page_number == page_number)
         return self._session.scalar(stmt)
+
+    def delete_pages(self, document_id: uuid.UUID) -> int:
+        """Delete all pages of a document (before re-parsing it; delete its chunks first).
+
+        Args:
+            document_id: The document whose pages to remove.
+
+        Returns:
+            Number of rows deleted.
+        """
+        result = self._session.execute(delete(Page).where(Page.document_id == document_id))
+        self._session.flush()
+        return int(result.rowcount)  # type: ignore[attr-defined]

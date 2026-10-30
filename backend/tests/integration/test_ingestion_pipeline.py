@@ -11,9 +11,20 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import TenderParseError
 from app.db.models import Document
-from app.db.repositories import ChunkRepository, DocumentRepository, TenderRepository
-from app.ingestion.pipeline import IngestStatus, ingest_manufacturer_source
+from app.db.repositories import (
+    ChunkRepository,
+    DocumentRepository,
+    SectionRepository,
+    TenderRepository,
+)
+from app.ingestion.pipeline import (
+    IngestStatus,
+    ReprocessPolicy,
+    ingest_manufacturer_source,
+    rebuild_sections,
+)
 from app.ingestion.processing import ProcessingOptions
+from app.ingestion.product_tagger import ProductMatcher
 from app.ingestion.registry import load_registry
 from app.ontology.loader import load_ontologies
 from app.retrieval.text_normalizer import SearchVocabulary
@@ -29,8 +40,10 @@ ONTOLOGY_DIR = Path(__file__).resolve().parents[2] / "ontology"
 @pytest.fixture(scope="module")
 def options() -> ProcessingOptions:
     settings = make_test_settings()
-    vocabulary = SearchVocabulary.from_ontologies(load_ontologies(ONTOLOGY_DIR))
-    return ProcessingOptions.from_settings(settings, vocabulary, ocr_engine=None)
+    ontologies = load_ontologies(ONTOLOGY_DIR)
+    vocabulary = SearchVocabulary.from_ontologies(ontologies)
+    matcher = ProductMatcher.from_ontologies(ontologies, vocabulary)
+    return ProcessingOptions.from_settings(settings, vocabulary, matcher, ocr_engine=None)
 
 
 def _sha(path: Path) -> str:
@@ -47,6 +60,7 @@ def _manufacturer_root(root: Path) -> Path:
             {
                 "file": pdf.name,
                 "category": "valves_pumps",
+                "product_types": ["centrifugal_pump"],
                 "title": "Acme ETN pumps (synthetic)",
                 "doc_type": "datasheet",
                 "url": "https://example.invalid/acme.pdf",
@@ -77,6 +91,7 @@ def test_manufacturer_ingest_is_idempotent(
     chunks = ChunkRepository(db_session).list_for_document(doc.id)
     assert len(chunks) == first.chunks > 0
     assert all(c.raw_text and c.search_text for c in chunks)
+    assert {c.product_family for c in chunks} == {"Acme ETN pumps (synthetic)"}
 
 
 def _tender_folder(root: Path, name: str, shared_spec: Path) -> Path:
@@ -181,3 +196,62 @@ def test_manufacturer_documents_require_manufacturer_fields(db_session: Session)
     )
     with pytest.raises(IntegrityError):
         db_session.flush()
+
+
+def test_reprocess_rebuilds_content_in_place(
+    db_session: Session, tmp_path: Path, options: ProcessingOptions
+) -> None:
+    store = LocalFileStore(tmp_path)
+    shared = write_text_pdf(tmp_path / "spec.pdf", [["Body: SS 316", "Pressure: PN 16"]])
+    folders = [_tender_folder(tmp_path, n, shared) for n in ("5", "6")]
+    first = [ingest_tender_folder(db_session, store, f, options) for f in folders]
+    chunks = ChunkRepository(db_session)
+    before = {
+        o.document_id: chunks.count_for_document(o.document_id)
+        for o in first[0].files
+        if o.document_id
+    }
+
+    policy = ReprocessPolicy(enabled=True)
+    again = [ingest_tender_folder(db_session, store, f, options, policy) for f in folders]
+
+    spec_statuses = [
+        next(o.status for o in t.files if o.file_ref.endswith("buyer_spec.pdf")) for t in again
+    ]
+    assert spec_statuses == [IngestStatus.REPROCESSED, IngestStatus.SKIPPED_EXISTING]
+    after = {
+        o.document_id: chunks.count_for_document(o.document_id)
+        for o in again[0].files
+        if o.document_id
+    }
+    assert after == before
+    tenders = TenderRepository(db_session)
+    assert all(len(tenders.list_documents(t.tender_id)) == 3 for t in again)
+
+
+def test_ingest_stores_sections_and_chunk_categories(
+    db_session: Session, tmp_path: Path, options: ProcessingOptions
+) -> None:
+    store = LocalFileStore(tmp_path)
+    shared = write_text_pdf(tmp_path / "spec.pdf", [["Body: SS 316", "Pressure: PN 16"]])
+    folder = _tender_folder(tmp_path, "7", shared)
+    outcome = ingest_tender_folder(db_session, store, folder, options)
+    sections = SectionRepository(db_session)
+    chunks = ChunkRepository(db_session)
+    for file in (o for o in outcome.files if o.document_id):
+        assert file.document_id is not None
+        stored = sections.list_for_document(file.document_id)
+        assert stored
+        assert [s.position for s in stored] == list(range(len(stored)))
+        doc_chunks = chunks.list_for_document(file.document_id)
+        assert all(c.section_id is not None and c.section_category for c in doc_chunks)
+        assert sum(s.chunk_count for s in stored) == len(doc_chunks)
+
+    # Rebuilding (backfill) and reprocessing replace sections instead of adding more.
+    spec_id = next(o.document_id for o in outcome.files if o.file_ref.endswith("buyer_spec.pdf"))
+    assert spec_id is not None
+    count = len(sections.list_for_document(spec_id))
+    document = DocumentRepository(db_session).get_or_raise(spec_id)
+    assert rebuild_sections(db_session, document, options) == count
+    ingest_tender_folder(db_session, store, folder, options, ReprocessPolicy(enabled=True))
+    assert len(sections.list_for_document(spec_id)) == count

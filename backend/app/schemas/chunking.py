@@ -15,6 +15,14 @@ class TableRow(BaseModel):
 
     cells: list[str]
     bbox: BBox
+    stacked_unresolved: bool = Field(
+        default=False,
+        description="Holds several stacked items that could not be split safely; review it.",
+    )
+    spanning_columns: tuple[int, ...] = Field(
+        default=(),
+        description="Columns holding one value that was printed across them and re-joined.",
+    )
 
 
 class ExtractedTable(BaseModel):
@@ -30,6 +38,13 @@ class ExtractedTable(BaseModel):
     continued_from_page: int | None = Field(
         default=None, description="Set when this table continues one from an earlier page."
     )
+    key_value: bool = Field(
+        default=False, description="Rows are `label | value` pairs; there is no column header."
+    )
+    title: str | None = Field(default=None, description="Title row spanning the whole table.")
+    from_rules: bool = Field(
+        default=False, description="Rebuilt from drawn rules (layout.py), not found by PyMuPDF."
+    )
 
 
 class ChunkDraft(BaseModel):
@@ -44,6 +59,8 @@ class ChunkDraft(BaseModel):
     search_text: str = Field(default="", description="normalize_for_search(raw_text).")
     section: str | None = None
     product_family: str | None = None
+    product_type: str | None = Field(default=None, description="None = general.")
+    product_sub_type: str | None = None
     model: str | None = None
     token_count: int = Field(ge=1)
     meta: dict[str, Any] = Field(default_factory=dict)

@@ -2,6 +2,8 @@ manufacturer: Delval
 documents:
 - file: delval_series_50_52_centric_bfv_spec.pdf
   category: valves_pumps
+  product_types: [butterfly_valve]
+  sub_types: [concentric]
   title: Technical Bulletin 098 R1 - Product Specification Series 50/52 Centric Butterfly
     Valve
   doc_type: datasheet
@@ -10,6 +12,8 @@ documents:
   sha256: 8b95bfa0e98b21227ccc7e2d0ab659ad00de08f4cb57cd916ff15dda089507db
 - file: delval_series_44_49_hpbfv_spec.pdf
   category: valves_pumps
+  product_types: [butterfly_valve]
+  sub_types: [double_offset]
   title: Technical Bulletin 097 - Product Specification Series 44/49 High Performance
     Butterfly Valve
   doc_type: datasheet
@@ -18,6 +22,8 @@ documents:
   sha256: c4d8e5eed32c851d64d6a81e22f70a423375f7d1e45dfbb879219513cd36149d
 - file: delval_series_65_72_ball_valve_spec.pdf
   category: valves_pumps
+  product_types: [ball_valve]
+  sub_types: [floating_ball]
   title: Technical Bulletin 117 R1 - Product Specification Series 65/72 Ball Valve
   doc_type: datasheet
   url: https://www.delvalflow.com/media/uploads/brochures/1692719501-Technical-Bulletin---117-PRODUCT-SPECIFICATION-SERIES-65-72-BLV-R1.pdf

@@ -96,3 +96,18 @@ def test_pn_class_mapping_is_table_only(ontology: Ontology) -> None:
     assert class_to_pn(ontology, 150) == 20
     assert pn_to_class(ontology, 20) == 150
     assert pn_to_class(ontology, 16) is None
+
+
+def test_equivalent_terms_must_not_be_bare_numbers() -> None:
+    from pydantic import ValidationError
+
+    from app.ontology.schema import EquivalentGroup
+
+    with pytest.raises(ValidationError, match="bare numbers"):
+        EquivalentGroup(name="cast_iron", terms=["cast iron", "IS 210"])  # "210" alone
+    assert EquivalentGroup(name="cast_iron", terms=["cast iron", "IS210"]).terms[1] == "IS210"
+
+
+def test_shipped_ontology_has_material_equivalents(ontology: Ontology) -> None:
+    names = {g.name for g in ontology.equivalents}
+    assert {"cast_iron", "ductile_iron"} <= names

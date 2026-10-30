@@ -17,6 +17,12 @@ class SourceEntry(BaseModel):
 
     file: str = Field(min_length=1, description="PDF filename, relative to the manufacturer dir.")
     category: str = Field(min_length=1, pattern=r"^[a-z0-9_]+$")
+    product_types: list[str] = Field(
+        min_length=1, description="Product types this document covers (ontology names)."
+    )
+    sub_types: list[str] = Field(
+        default_factory=list, description="Sub-types it is limited to, if any."
+    )
     title: str = Field(min_length=1)
     doc_type: DocType
     url: HttpUrl = Field(description="Public URL the document was downloaded from.")
@@ -42,6 +48,8 @@ class RegisteredSource(BaseModel):
 
     manufacturer: str
     category: str
+    product_types: list[str]
+    sub_types: list[str]
     title: str
     doc_type: DocType
     url: HttpUrl

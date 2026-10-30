@@ -1,0 +1,23 @@
+manufacturer: Kirloskar Brothers
+documents:
+- file: kbl_monobloc_kds_ks_kdt_srf_kdi.pdf
+  category: valves_pumps
+  product_types: [centrifugal_pump]
+  sub_types: [monoblock]
+  title: KBL monobloc pumps KDS / KS / KDT / SRF / KDI - performance charts and technical specification
+  doc_type: catalogue
+  url: https://cdn.shopify.com/s/files/1/0029/0131/1537/files/KBL_Catalouge_KDS-KS-KDT-SRF-KDI.pdf
+  fetched_at: '2026-10-29T14:07:08+00:00'
+  sha256: 45aedd14a7cd92b4fcc565ec88d87f98066c4cab8c029c6a92432620f955e5f8
+  notes: KBL catalogue hosted on a dealer's Shopify store; kirloskarpumps.com blocks scripted
+    downloads. Performance charts are head-vs-discharge grids (one value per cell) and the
+    material table has per-series sub-columns.
+- file: kbl_kp4_borewell_submersible.pdf
+  category: valves_pumps
+  product_types: [submersible_pump]
+  title: KP4 oil-filled 4" borewell submersible pumps
+  doc_type: brochure
+  url: https://document.moglix.com/catalog/product/documents/MSN2R93I3GHMA9_1634042259207.pdf
+  fetched_at: '2026-10-29T14:07:08+00:00'
+  sha256: e1f89ae832ccb0b9d18bdf8207241cb47354315f8d95377c95cfc37631a11616
+  notes: KBL brochure hosted by the Moglix marketplace.

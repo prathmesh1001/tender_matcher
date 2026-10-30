@@ -84,3 +84,49 @@ def test_variant_set_shares_the_same_normal_form(vocab: SearchVocabulary) -> Non
         "BUTTERFLY VALVE 316 SS",
     ]
     assert len({normalize_for_search(q, vocab) for q in queries}) == 1
+
+
+def test_garbled_hindi_words_do_not_leak_latin_letters(vocab: SearchVocabulary) -> None:
+    # GeM bid PDFs extract Hindi as broken glyphs mixed with Latin letters and U+FFFD.
+    raw = "सूZम और लघु 3दाता को | \N{REPLACEMENT CHARACTER}ववरण/Specification: Power"
+    assert normalize_for_search(raw, vocab) == "specif power"
+
+
+@pytest.mark.parametrize("variant", ["EN593", "EN 593", "EN-593", "BS EN 593", "BS-EN 593"])
+def test_en_standard_variants_share_one_code(vocab: SearchVocabulary, variant: str) -> None:
+    # "BS EN 593" is EN 593 adopted by BSI; a tender writing "EN593" must match it.
+    assert normalize_for_search(variant, vocab) == "en593"
+
+
+def test_plain_bs_standard_stays_bs(vocab: SearchVocabulary) -> None:
+    assert normalize_for_search("BS 5155", vocab) == "bs5155"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Valve Size - 450MM", "valv size 450 mm"),
+        ("7.5kW 1450RPM", "7.5 kw 1450 rpm"),
+        ("10bar", "10 bar"),
+        ("2in", "2 in"),
+    ],
+)
+def test_number_glued_to_a_unit_is_split(vocab: SearchVocabulary, text: str, expected: str) -> None:
+    # "450MM" must match a catalogue "Valve Size: 450" / "450 mm".
+    assert normalize_for_search(text, vocab) == expected
+
+
+@pytest.mark.parametrize(("text", "kept"), [("304L", "304l"), ("GG25", "gg25"), ("PN16", "pn16")])
+def test_codes_are_not_split_as_units(vocab: SearchVocabulary, text: str, kept: str) -> None:
+    assert normalize_for_search(text, vocab) == kept
+
+
+def test_is_code() -> None:
+    from app.retrieval.text_normalizer import is_code
+
+    assert all(is_code(t) for t in ["en593", "pn10", "a216_wcb", "17_4ph"])
+    assert not any(is_code(t) for t in ["450", "7.5", "epdm", "valv"])
+
+
+def test_unit_spellings_keep_symbols_and_slashes(vocab: SearchVocabulary) -> None:
+    assert {"bar", "m3/h", "°c", "kg/cm2"} <= vocab.unit_spellings

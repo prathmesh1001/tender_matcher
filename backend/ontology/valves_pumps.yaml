@@ -6,6 +6,8 @@
 #   codes          canonical forms for material/rating/size codes (A4); applied in this order on
 #                  lower-cased, unicode-folded text, so longer codes come before their prefixes
 #   abbreviations  expanded on the query side (A5)
+#   equivalents    names and grade codes meaning the same material; a query naming one also
+#                  searches for the others (catalogues often give only "ASTM A126 Gr B")
 #   units          spellings seen in tenders/catalogues -> pint unit expression (B5)
 #   nps_to_dn      ASME B36.10 nominal pipe size (inch) -> DN (mm)
 #   class_to_pn    EN 1759-1 Class designation -> PN designation (B6); never derive via bar values
@@ -14,27 +16,67 @@ category: valves_pumps
 version: 1
 
 product_types:
+  # Synonyms are phrases matched on normalized text (so plurals and spelling variants match).
+  # A single word is only listed when it cannot mean anything else in a valve/pump document
+  # ("butterfly" yes, "ball" no: ball bearing, float ball; B1). Vendor series/brand names
+  # (e.g. "AquaSeal") are not here: each catalogue declares its product types in sources.yaml.
   - name: ball_valve
     synonyms: [ball valve]
-    sub_types: [floating_ball, trunnion_mounted]
+    sub_types:
+      - name: floating_ball
+        synonyms: [floating ball]
+      - name: trunnion_mounted
+        synonyms: [trunnion mounted, trunnion]
   - name: butterfly_valve
-    synonyms: [butterfly valve, bfv]
-    sub_types: [concentric, double_offset, triple_offset]
+    synonyms: [butterfly valve, butterfly, bfv, hpbfv, tobv]
+    sub_types:
+      - name: concentric
+        synonyms: [concentric, centric, zero offset, resilient seated, rubber lined]
+      - name: double_offset
+        synonyms: [double offset, double eccentric, high performance butterfly, hpbfv]
+      - name: triple_offset
+        synonyms: [triple offset, triple eccentric, tobv]
   - name: gate_valve
     synonyms: [gate valve, sluice valve]
-    sub_types: [wedge_gate, parallel_slide, knife_gate]
+    sub_types:
+      - name: wedge_gate
+        synonyms: [wedge gate, flexible wedge, solid wedge]
+      - name: parallel_slide
+        synonyms: [parallel slide]
+      - name: knife_gate
+        synonyms: [knife gate, knife edge gate]
   - name: globe_valve
     synonyms: [globe valve]
     sub_types: []
   - name: check_valve
-    synonyms: [check valve, non return valve, non-return valve, nrv, reflux valve]
-    sub_types: [swing_check, lift_check, dual_plate_check, piston_check]
+    synonyms: [check valve, non return valve, nrv, reflux valve, dual plate, swing check]
+    sub_types:
+      - name: swing_check
+        synonyms: [swing check, swing type]
+      - name: lift_check
+        synonyms: [lift check]
+      - name: dual_plate_check
+        synonyms: [dual plate, double door, wafer check]
+      - name: piston_check
+        synonyms: [piston check]
   - name: plug_valve
     synonyms: [plug valve]
-    sub_types: [lubricated_plug, sleeved_plug]
+    sub_types:
+      - name: lubricated_plug
+        synonyms: [lubricated plug]
+      - name: sleeved_plug
+        synonyms: [sleeved plug]
   - name: centrifugal_pump
     synonyms: [centrifugal pump, monoblock pump, end suction pump, split case pump]
-    sub_types: [end_suction, split_case, monoblock, multistage]
+    sub_types:
+      - name: end_suction
+        synonyms: [end suction]
+      - name: split_case
+        synonyms: [split case, horizontal split]
+      - name: monoblock
+        synonyms: [monoblock]
+      - name: multistage
+        synonyms: [multistage, multi stage]
   - name: submersible_pump
     synonyms: [submersible pump, borewell pump]
     sub_types: []
@@ -162,7 +204,10 @@ codes:
   # Standards: "API 600", "API-6D", "BS 5351", "IS 14846"
   - pattern: '\bapi\s*-?\s*(\d+[a-z]?)\b'
     canonical: 'api\1'
-  - pattern: '\bbs\s*-?\s*(?:en\s*-?\s*)?(\d{3,5})\b'
+  # "BS EN 593" is EN 593 adopted by BSI: same standard as "EN 593" / "EN593" (before the BS rule)
+  - pattern: '\b(?:bs\s*-?\s*)?en\s*-?\s*(\d{3,5})\b'
+    canonical: 'en\1'
+  - pattern: '\bbs\s*-?\s*(\d{3,5})\b'
     canonical: 'bs\1'
   - pattern: '\bis\s*[:-]?\s*(\d{3,5})\b'
     canonical: 'is\1'
@@ -189,6 +234,16 @@ abbreviations:
   sw: socket weld
   ptfe: polytetrafluoroethylene
   rptfe: reinforced ptfe
+
+equivalents:
+  # Grade codes are written joined ("IS210"): a bare number would match any "210 mm".
+  # Only grades that are unambiguously this material family belong here.
+  - name: cast_iron
+    terms: [cast iron, grey cast iron, gray cast iron, grey iron, ci, A126, A48, IS210, EN1561,
+            GG25, FG260]
+  - name: ductile_iron
+    terms: [ductile iron, sg iron, sgi, spheroidal graphite iron, di, A536, A395, IS1865,
+            EN1563, GGG40, GGG50]
 
 units:
   mm: mm

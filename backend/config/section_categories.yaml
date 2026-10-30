@@ -1,0 +1,171 @@
+# Section categories for tender and manufacturer documents.
+#
+# Every chunk gets one category, every section (a run of chunks under one heading) gets one too.
+# Rules (section_classifier.py), all matching on normalize_for_search() text, so plurals,
+# case, ligatures and code spellings do not matter:
+#   1. the section heading names a category (`headings`)       -> that category
+#   2. else the chunk's own text names one (`text`, more hits wins, ties -> order below)
+#   3. else `default`
+# Order matters: earlier categories win ties, so specific ones come first (an "MSE relaxation
+# for turnover" row is eligibility, not financial capability).
+#
+# kind:      what sort of requirement lives here (technical | commercial | eligibility |
+#            legal | administrative); later steps map it to the requirement type.
+# evidence:  where a vendor's evidence for it comes from:
+#              catalogue         - manufacturer catalogues (ingested)
+#              vendor_documents  - quotations, balance sheets, work orders, certificates
+#                                  (not ingested yet -> reported as "no evidence")
+#              none              - nothing to compare (buyer details, bid schedule)
+# vendor_categories: catalogue section categories that usually hold the evidence (used by
+#            retrieval as a hint; the product filter still decides what is searched).
+#
+# Phrases are examples measured on the real GeM tenders and catalogues in data/; add new
+# headings here, never in Python.
+
+default: other
+
+categories:
+  - name: eligibility_criteria
+    kind: eligibility
+    evidence: vendor_documents
+    description: Who may bid - MII / local content, MSE and startup relaxations, OEM status.
+    headings: [eligibility, make in india, local content, purchase preference, pre qualification,
+               qualifying criteria, qualification criteria]
+    text: [mse relaxation, startup relaxation, mii purchase preference, mse purchase preference,
+           make in india, local content, class 1 local supplier, class 2 local supplier,
+           local supplier, purchase preference, authorised dealer, authorized dealer,
+           oem authorization, oem authorisation, eligible to bid, not eligible to participate]
+
+  - name: financial_capability
+    kind: eligibility
+    evidence: vendor_documents
+    description: Turnover, net worth, solvency of the bidder or OEM.
+    headings: [turnover, financial capability, financial standing, net worth, solvency]
+    text: [average annual turnover, oem average turnover, bidder turnover,
+           turnover eligibility criteria, net worth, solvency certificate, audited balance sheet]
+
+  - name: past_experience
+    kind: eligibility
+    evidence: vendor_documents
+    description: Years of experience, past performance, similar supplies.
+    headings: [past experience, experience criteria, past performance, similar work]
+    text: [years of past experience, past experience, past performance, experience criteria,
+           similar service, similar supply, similar item, work order, completion certificate,
+           supply order]
+
+  - name: certifications_and_licenses
+    kind: eligibility
+    evidence: vendor_documents
+    description: Certificates and approvals asked of the bidder or with the supply.
+    headings: [certificate, certification, approval, license, licence, undertaking]
+    text: [iso 9001, bis licence, bis license, test certificate, mill test certificate,
+           type test, 3.1 certificate, en 10204, certificate of conformity, ibr certificate]
+
+  - name: costing_and_commercial
+    kind: commercial
+    evidence: vendor_documents
+    description: Prices, estimated value, EMD / ePBG, payment, taxes, evaluation method.
+    headings: [price, pricing, price schedule, financial bid, commercial, cost, payment,
+               emd detail, epbg detail, bank guarantee, taxes, price bid]
+    text: [estimated bid value, emd amount, epbg percentage, duration of epbg, payment timeline,
+           payment term, evaluation method, itc on gst, itc available, advisory bank,
+           earnest money deposit, performance security, bank guarantee, price variation,
+           unit price, total value wise evaluation, item wise evaluation, ra qualification rule,
+           bid to ra]
+
+  - name: delivery_and_timeline
+    kind: commercial
+    evidence: vendor_documents
+    description: Delivery period, consignees, packing and shipment.
+    headings: [delivery, consignee, packing, marking, shipment, dispatch, transportation,
+               preparation for shipment]
+    text: [delivery days, delivery period, consignee, reporting officer, packing and marking,
+           preparation for shipment, dispatch instruction, total quantity]
+
+  - name: warranty_and_support
+    kind: commercial
+    evidence: vendor_documents
+    description: Warranty, guarantee period, after-sales support, spares.
+    headings: [warranty, guarantee period, after sales, spare part, maintenance support]
+    text: [warranty period, warranty, defect liability, guarantee period, after sales service,
+           replacement free of cost]
+
+  - name: legal_and_contract
+    kind: legal
+    evidence: none
+    description: Arbitration, breach, termination, penalties, general contract terms.
+    headings: [arbitration, mediation, breach, termination, penalty, liquidated damage,
+               force majeure, jurisdiction, definition, general terms and conditions,
+               legal, dispute]
+    text: [arbitration clause, mediation clause, breach of contract, liquidated damage,
+           force majeure, termination for default, risk purchase]
+
+  - name: submission_requirements
+    kind: administrative
+    evidence: none
+    description: Bid dates, bid type, documents the seller must upload, auto-extension rules.
+    headings: [bid detail, instruction to bidder, bid submission, document required]
+    text: [bid end date, bid opening date, bid offer validity, document required from seller,
+           type of bid, two packet bid, single packet bid, auto extension, automatic bid
+           extension, auto extended, technical clarification, show documents uploaded by bidders]
+
+  - name: buyer_details
+    kind: administrative
+    evidence: none
+    description: Ministry, organisation, office, contacts, competent authority approval.
+    headings: [buyer detail, contact, competent authority]
+    text: [ministry state name, department name, organisation name, office name,
+           grievance redressal, competent authority, ca approval number, buyer email]
+
+  - name: quality_and_inspection
+    kind: technical
+    evidence: catalogue
+    description: Inspection, tests, NDE, standards the product must comply with.
+    headings: [inspection, test, testing, nde, quality, compliance standard, standard,
+               governing standard, tests & inspection, quality assurance]
+    text: [inspection required, hydrostatic test, shell test, seat test, seat leakage, api 598,
+           nde, radiography, governing standards and certification, inspection authority]
+    vendor_categories: [quality_and_inspection, technical_specifications]
+
+  - name: size_and_dimensions
+    kind: technical
+    evidence: catalogue
+    description: Sizes, dimensions, weights, face-to-face, end connections.
+    headings: [dimension, size, weight, face to face, end connection, construction and dimension,
+               ordering information]
+    text: [face to face, nominal size, end connection, flanged end, butt weld end, socket weld,
+           construction and dimensions, physical characteristics]
+    vendor_categories: [size_and_dimensions, technical_specifications]
+
+  - name: material_and_construction
+    kind: technical
+    evidence: catalogue
+    description: Body, trim, seat, stem, gasket and other materials; construction details.
+    headings: [material, materials, trim, construction, parts list, part list, components,
+               stem packing, bonnet, gasket, bearing, body liner]
+    text: [body material, trim material, seat material, disc material, stem material,
+           material of construction, moc]
+    vendor_categories: [material_and_construction, technical_specifications]
+
+  - name: performance_requirements
+    kind: technical
+    evidence: catalogue
+    description: Pressure rating, temperature, flow, torque, operating conditions.
+    headings: [pressure rating, pressure temperature, temperature range, torque, flow coefficient,
+               performance, operating condition, climatic condition, service condition,
+               design condition, test pressure]
+    text: [performance parameters, pressure rating, working pressure, design pressure,
+           operating temperature, design temperature, flow coefficient, torque, cv value]
+    vendor_categories: [performance_requirements, technical_specifications]
+
+  - name: technical_specifications
+    kind: technical
+    evidence: catalogue
+    description: Item description and technical specification not covered above.
+    headings: [technical specification, specification, technical parameter, scope of supply,
+               technical information, technical detail, product portfolio, features, design,
+               item detail, boq]
+    text: [technical specification, specification document, item category, primary product
+           category, boq title, scope of supply, specification]
+    vendor_categories: [technical_specifications, size_and_dimensions, material_and_construction,
+                        performance_requirements]

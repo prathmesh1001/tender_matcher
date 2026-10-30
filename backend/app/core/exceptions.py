@@ -77,6 +77,13 @@ class OntologyError(AppError):
     code = "ontology_error"
 
 
+class ConfigFileError(AppError):
+    """A rules/config YAML file (e.g. section categories) is missing or invalid."""
+
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    code = "config_file_error"
+
+
 class UnitConversionError(AppError):
     """A value's unit is unknown or cannot be converted to the attribute's canonical unit."""
 
