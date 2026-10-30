@@ -135,18 +135,21 @@ def _inline_value(
 
     Only numeric requirements are read this way ("Size range 80 mm to 2500 mm"); the label
     is the digit-free start of the line. A code needs a labelled field: in a sentence
-    ("Ends shall be ...") the words after a label are not its value.
+    ("Ends shall be ...") the words after a label are not its value. A label ending in a
+    designation keeps it with the number ("ASME Class 150 to 1500" -> "class 150 to 1500").
     """
     if requirement.kind is not ValueKind.NUMERIC:
         return None
-    tokens = fold_text(line).split()
+    tokens = line.split()  # verbatim: the value is cited as printed
     for end in range(1, min(len(tokens), options.fields.label_max_words) + 1):
         prefix = " ".join(tokens[:end])
         if any(ch.isdigit() for ch in prefix):
             return None
         if label_names(requirement, prefix, ctx, options):
-            rest = " ".join(tokens[end:])
-            return rest or None
+            last = fold_text(tokens[end - 1]).strip()
+            start = end - 1 if last in options.designation_prefixes else end
+            rest = " ".join(tokens[start:])
+            return rest if rest != tokens[end - 1] else None
     return None
 
 

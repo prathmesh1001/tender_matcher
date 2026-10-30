@@ -359,3 +359,20 @@ def test_words_found_among_codes_still_match(valves: Ontology, with_ontology: bo
     assert result.status is FULL
     alone = _compare("END CONNECTION : WAFER", [pressure], _ontology(valves, with_ontology))
     assert alone.status is UNSUPPORTED  # "Class 125" is not an end-connection option
+
+
+@BOTH
+def test_designation_label_stays_with_its_number(valves: Ontology, with_ontology: bool) -> None:
+    # L&T TOBV cover line shape: "Class" is both the label and the designation.
+    cover = _prose("ASME Class 150 to 1500")
+    result = _compare("PRESSURE RATING : CLASS #150", [cover], _ontology(valves, with_ontology))
+    assert result.status is (FULL if with_ontology else UNSUPPORTED)  # no "pressure rating" words
+    higher = _compare("RATING : CLASS #300", [cover], _ontology(valves, with_ontology))
+    assert higher.status is (FULL if with_ontology else UNSUPPORTED)
+
+
+def test_inline_evidence_value_is_verbatim(valves: Ontology) -> None:
+    cover = _prose("ASME Class 150 to 1500 | 3” to 100”")
+    [evidence] = _compare("PRESSURE RATING : CLASS #150", [cover], valves).evidence
+    assert evidence.value == "Class 150 to 1500 | 3” to 100”"
+    assert evidence.value in cover.chunk.raw_text

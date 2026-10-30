@@ -248,6 +248,22 @@ class Settings(BaseSettings):
     COMPARATOR_MAX_EVIDENCE: int = Field(
         default=3, ge=1, description="Evidence rows kept per requirement and manufacturer."
     )
+    QUOTE_MATCH_THRESHOLD: float = Field(
+        default=0.9,
+        ge=0,
+        le=1,
+        description="Every piece of a cited quote must match its page at least this well "
+        "(normalized fuzzy partial ratio).",
+    )
+    STATUS_SCORES: dict[str, float] = Field(
+        default_factory=lambda: {
+            "full_match": 1.0,
+            "partial_match": 0.5,
+            "missing_capability": 0.0,
+        },
+        description="Score per decided status (CLAUDE.md section 7); other statuses are "
+        "excluded from scores (JSON object).",
+    )
     TABLE_CONTINUATION_EDGE_FRACTION: float = Field(
         default=0.25,
         gt=0,

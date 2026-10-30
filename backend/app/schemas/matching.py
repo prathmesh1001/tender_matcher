@@ -34,6 +34,21 @@ class Evidence(BaseModel):
         default=None, description="What this field alone decides; None if it decides nothing."
     )
     reason: str = ""
+    verified: bool | None = Field(
+        default=None, description="Quote found on the cited page; None if not checked yet."
+    )
+    match_score: float | None = Field(
+        default=None, description="Lowest fuzzy score of the quote's pieces on the page."
+    )
+
+
+class SubTypeFit(StrEnum):
+    """How a catalogue's declared sub-types relate to the tender item's sub-type (B2)."""
+
+    MATCH = "match"  # the document declares the item's sub-type
+    GENERAL = "general"  # the document declares no sub-type for this product
+    UNKNOWN = "unknown"  # the item names no sub-type
+    MISMATCH = "mismatch"  # the document declares other sub-types only
 
 
 class Comparison(BaseModel):
@@ -51,4 +66,36 @@ class Comparison(BaseModel):
         default_factory=list,
         description="Fields behind the status; for unsupported, labelled fields that decided "
         "nothing (cited so a reviewer can look).",
+    )
+
+
+class DocumentResult(BaseModel):
+    """One catalogue document evaluated on its own for one tender item (never pooled)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    document: str = Field(description="Catalogue file name.")
+    sha256: str
+    title: str
+    declared_sub_types: list[str]
+    sub_type_fit: SubTypeFit
+    fit_score: float = Field(description="Sum of status scores over decided requirements.")
+    decided: int = Field(ge=0, description="Requirements with a rule decision.")
+    comparisons: list[Comparison]
+
+
+class ManufacturerItemResult(BaseModel):
+    """All candidate documents of one manufacturer for one item, and the one chosen."""
+
+    model_config = ConfigDict(frozen=True)
+
+    manufacturer: str
+    item_no: str
+    product_type: str | None
+    item_sub_type: str | None
+    chosen: str | None = Field(
+        default=None, description="sha256 of the chosen document; None if there is none."
+    )
+    documents: list[DocumentResult] = Field(
+        default_factory=list, description="Candidates, best first."
     )

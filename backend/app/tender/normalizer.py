@@ -9,6 +9,7 @@ Raw pint is never applied to printed units: it reads "MM" as megamolar.
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Final
 
 from app.ontology.schema import Attribute, Ontology
@@ -31,6 +32,8 @@ _CODE: Final = re.compile(
 )
 _WORD: Final = re.compile(r"[a-z0-9]+")
 _COMPOUND: Final = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+# Labels and synonyms repeat across thousands of catalogue fields; stemming is pure.
+_STEMS_CACHE_SIZE: Final = 65536
 # Direction words. In a label, "MAX FLOW : 650" is a duty the product must reach (>=).
 _AT_LEAST_LABEL: Final = frozenset({"max", "maximum"})
 _AT_MOST_LABEL: Final = frozenset({"min", "minimum"})
@@ -61,13 +64,14 @@ def words(text: str) -> list[str]:
     return _WORD.findall(fold_text(text))
 
 
-def stems(text: str) -> list[str]:
+@lru_cache(maxsize=_STEMS_CACHE_SIZE)
+def stems(text: str) -> tuple[str, ...]:
     """Stemmed folded label words ("Body Materials" -> "bodi", "materi").
 
     A hyphenated compound stays one word ("Dead-End" -> "deadend"), so its parts never
     match on their own: "Dead-End Service" is not an end connection.
     """
-    return [stem_token(w.replace("-", "")) for w in _COMPOUND.findall(fold_text(text))]
+    return tuple(stem_token(w.replace("-", "")) for w in _COMPOUND.findall(fold_text(text)))
 
 
 def has_code(text: str) -> bool:
@@ -143,7 +147,7 @@ def parse_value(
     return ParsedValue(kind=ValueKind.TEXT, operator=Operator.TEXT)
 
 
-def _synonym_spans(label_words: list[str], attribute: Attribute) -> list[tuple[int, int]]:
+def _synonym_spans(label_words: tuple[str, ...], attribute: Attribute) -> list[tuple[int, int]]:
     """(end index, length) of every synonym of `attribute` found as a word run in the label."""
     spans: list[tuple[int, int]] = []
     for synonym in attribute.synonyms:
