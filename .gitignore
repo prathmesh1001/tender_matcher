@@ -25,6 +25,7 @@ Thumbs.db
 .idea/
 
 # Local runtime data
+backend/.cache/
 *.sqlite3
 *.db
 

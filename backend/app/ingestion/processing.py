@@ -83,6 +83,7 @@ class ProcessingOptions:
             table_cleanup=TableCleanupOptions(
                 units=vocabulary.unit_spellings,
                 max_label_words=settings.TABLE_HEADER_MAX_WORDS,
+                paragraph_gap=settings.TABLE_PARAGRAPH_GAP_FACTOR,
             ),
             layout=LayoutOptions.from_settings(settings),
             vocabulary=vocabulary,

@@ -19,6 +19,13 @@ class TableRow(BaseModel):
         default=False,
         description="Holds several stacked items that could not be split safely; review it.",
     )
+    cell_lines: list[list[str]] = Field(
+        default_factory=list,
+        description=(
+            "Each cell's text lines in reading order, kept only when a cell has several "
+            '(one "KEY : value" per line in tender specs). Empty otherwise.'
+        ),
+    )
     spanning_columns: tuple[int, ...] = Field(
         default=(),
         description="Columns holding one value that was printed across them and re-joined.",

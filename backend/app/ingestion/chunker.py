@@ -313,6 +313,7 @@ def _row_chunk(
             "continued_from_page": table.continued_from_page,
             **({"stacked_unresolved": True} if row.stacked_unresolved else {}),
             **({"rule_grid": True} if table.from_rules else {}),
+            **({"cell_lines": row.cell_lines} if row.cell_lines else {}),
             # A value printed across these columns was re-joined (V5); check the row bbox.
             **({"spanning_columns": list(row.spanning_columns)} if row.spanning_columns else {}),
             **extra,

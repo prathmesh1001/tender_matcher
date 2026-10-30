@@ -6,6 +6,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Dimension = Literal["none", "length", "pressure", "temperature", "flow", "power", "speed"]
+# What a catalogue value of the attribute means: an exact value, or a limit the product reaches
+# ("max": a rating; a tender value at or below it is met, e.g. 10 bar against "16 bar").
+Limit = Literal["exact", "max", "min"]
 
 
 class SubType(BaseModel):
@@ -40,6 +43,12 @@ class Attribute(BaseModel):
     canonical_unit: str | None = None
     synonyms: list[str] = Field(min_length=1)
     values: list[str] = Field(default_factory=list, description="Allowed enum values, if any.")
+    limit: Limit = Field(
+        default="exact", description="Catalogue value is exact, a maximum or a minimum."
+    )
+    nominal_pipe_size: bool = Field(
+        default=False, description="Sizes in inch map to DN through `nps_to_dn`, not by pint."
+    )
 
 
 class CodeRule(BaseModel):
@@ -96,6 +105,9 @@ class Ontology(BaseModel):
     abbreviations: dict[str, str] = Field(default_factory=dict)
     equivalents: list[EquivalentGroup] = Field(default_factory=list)
     units: dict[str, str] = Field(default_factory=dict, description="Spelling -> pint unit.")
+    prefix_units: dict[str, str] = Field(
+        default_factory=dict, description='Units written before the number ("DN 50") -> pint.'
+    )
     nps_to_dn: dict[str, int] = Field(default_factory=dict)
     class_to_pn: dict[int, int] = Field(default_factory=dict)
 

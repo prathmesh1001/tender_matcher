@@ -29,7 +29,9 @@ on pages where it finds nothing, the grid is rebuilt from the drawn rules (`layo
 failure case T1) and read the same way.
 """
 
+import itertools
 import re
+import statistics
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
@@ -232,6 +234,51 @@ class PageWords:
     def text(self, box: BBox) -> str | None:
         """Single-line text inside `box`, or None if it holds no words."""
         return normalize_cell(" ".join(text for _, text in self.lines(box))) or None
+
+
+def with_paragraph_breaks(lines: Sequence[tuple[float, str]], gap_factor: float) -> list[str]:
+    """Line texts, with "" where the gap to the previous line is a paragraph break.
+
+    A break is a gap more than `gap_factor` times the cell's median line pitch (8119613: the
+    closing sentence sits 17 pt below the last "KEY : value" line, lines are 8.6 pt apart).
+
+    Args:
+        lines: `(y0, text)` of one cell's lines, top to bottom.
+        gap_factor: Multiple of the median pitch that starts a new paragraph.
+
+    Returns:
+        The texts, with "" between paragraphs.
+    """
+    gaps = [b[0] - a[0] for a, b in itertools.pairwise(lines)]
+    pitch = statistics.median(gaps) if gaps else 0.0
+    out: list[str] = []
+    for i, (_, text) in enumerate(lines):
+        if i and pitch and gaps[i - 1] > gap_factor * pitch:
+            out.append("")
+        out.append(text)
+    return out
+
+
+def cell_lines(
+    words: PageWords, boxes: Sequence[BBox | None], gap_factor: float
+) -> list[list[str]]:
+    """Text lines of each cell box, or [] when no cell holds more than one line.
+
+    `cells` joins a cell's lines with spaces; tender specs print one "KEY : value" per
+    line, so the lines are kept as well for splitting requirements by position.
+
+    Args:
+        words: The page's words.
+        boxes: One box per cell (None for a merged-cell continuation).
+        gap_factor: Paragraph-break gap (see `with_paragraph_breaks`).
+
+    Returns:
+        Lines per cell ("" marks a paragraph break), or [] if every cell is a single line.
+    """
+    lines = [
+        with_paragraph_breaks(words.lines(b), gap_factor) if b is not None else [] for b in boxes
+    ]
+    return lines if any(len(cell) > 1 for cell in lines) else []
 
 
 def _cell_text(words: PageWords, cell: tuple[float, float, float, float] | None) -> Cell:
@@ -570,6 +617,7 @@ def rule_grid_table(
     index: int,
     key_value: bool,
     header_max_words: int,
+    paragraph_gap: float = 0.0,
 ) -> ExtractedTable | None:
     """Read one rule grid (see `layout`) as a table: title band, header band, body rows.
 
@@ -583,6 +631,7 @@ def rule_grid_table(
         index: Order of the table on its page.
         key_value: Read a two-column grid as label/value pairs.
         header_max_words: Longest header label, in words (see `is_header_band`).
+        paragraph_gap: Paragraph-break gap for `cell_lines`; 0 = no breaks.
 
     Returns:
         The table, or None if it has no body rows.
@@ -602,7 +651,10 @@ def rule_grid_table(
         header, bands = header_names(bands[0][1]), bands[1:]
     else:  # the first band is already data (a numbered row, a clause)
         header = [f"Column {i + 1}" for i in range(width)]
-    rows = [TableRow(cells=texts, bbox=box) for _, texts, box in bands]
+    rows = [
+        TableRow(cells=texts, bbox=box, cell_lines=cell_lines(words, boxes, paragraph_gap))
+        for boxes, texts, box in bands
+    ]
     rows = [r for r in rows if not repeats_header(header, r.cells)]
     if not rows:
         return None
@@ -619,7 +671,7 @@ def rule_grid_table(
 
 
 def rule_grid_tables(
-    page: pymupdf.Page, key_value_pairs: bool, layout: LayoutOptions
+    page: pymupdf.Page, key_value_pairs: bool, layout: LayoutOptions, paragraph_gap: float = 0.0
 ) -> list[ExtractedTable]:
     """Tables rebuilt from drawn rules, for pages where PyMuPDF finds none (failure case T1).
 
@@ -627,6 +679,7 @@ def rule_grid_tables(
         page: A PyMuPDF page with a text layer.
         key_value_pairs: Read two-column grids as label/value pairs (tender files).
         layout: Rule-grid thresholds.
+        paragraph_gap: Paragraph-break gap for `cell_lines`; 0 = no breaks.
 
     Returns:
         The tables, top to bottom.
@@ -639,7 +692,13 @@ def rule_grid_tables(
     for grid in grids:
         key_value = key_value_pairs and len(grid.xs) - 1 == KEY_VALUE_COLUMNS
         table = rule_grid_table(
-            words, grid, page.number + 1, len(tables), key_value, layout.header_max_words
+            words,
+            grid,
+            page.number + 1,
+            len(tables),
+            key_value,
+            layout.header_max_words,
+            paragraph_gap,
         )
         if table is not None:
             tables.append(table)
@@ -671,14 +730,22 @@ def extract_page_tables(
     tables: list[ExtractedTable] = []
     found = page.find_tables().tables
     if not found and layout is not None:
-        return [_repaired(t, repair) for t in rule_grid_tables(page, key_value_pairs, layout)]
+        grids = rule_grid_tables(page, key_value_pairs, layout, repair.paragraph_gap)
+        return [_repaired(t, repair) for t in grids]
     words = PageWords.of(page) if found else PageWords(words=())
     for table in found:
         grid_rows = _grid_rows(words, table, split_stacked)
         boxes = [row.box for row in grid_rows]
         filled = fill_merged_cells([row.cells for row in grid_rows], boxes)
         rows = [
-            TableRow(cells=cells, bbox=row.box, stacked_unresolved=row.stacked_unresolved)
+            TableRow(
+                cells=cells,
+                bbox=row.box,
+                stacked_unresolved=row.stacked_unresolved,
+                cell_lines=cell_lines(
+                    words, [c.bbox if c else None for c in row.cells], repair.paragraph_gap
+                ),
+            )
             for cells, row in zip(filled, grid_rows, strict=True)
             if any(cells)
         ]

@@ -110,6 +110,19 @@ def _union(a: BBox, b: BBox) -> BBox:
     return BBox(x0=min(a.x0, b.x0), y0=min(a.y0, b.y0), x1=max(a.x1, b.x1), y1=max(a.y1, b.y1))
 
 
+def _merge_lines(above: TableRow, below: TableRow, width: int) -> list[list[str]]:
+    """Cell lines of two merged rows, the lower row's lines after the upper's."""
+    if not above.cell_lines and not below.cell_lines:
+        return []
+
+    def lines(row: TableRow, i: int) -> list[str]:
+        if row.cell_lines:
+            return row.cell_lines[i] if i < len(row.cell_lines) else []
+        return [row.cells[i]] if i < len(row.cells) and row.cells[i] else []
+
+    return [lines(above, i) + lines(below, i) for i in range(width)]
+
+
 def merge_rows(above: TableRow, below: TableRow) -> TableRow:
     """Merge `below` into `above` cell by cell; the box grows to cover both.
 
@@ -127,6 +140,7 @@ def merge_rows(above: TableRow, below: TableRow) -> TableRow:
         cells=[_join(a, b) for a, b in zip(top, bottom, strict=True)],
         bbox=_union(above.bbox, below.bbox),
         stacked_unresolved=above.stacked_unresolved or below.stacked_unresolved,
+        cell_lines=_merge_lines(above, below, width),
     )
 
 
@@ -222,6 +236,7 @@ class TableCleanupOptions:
 
     units: frozenset[str] = frozenset()  # folded unit spellings; empty = no split-value join
     max_label_words: int = 0  # longest column label in words; 0 = no caption detection
+    paragraph_gap: float = 0.0  # line gap (x median pitch) marking a paragraph; 0 = none
 
 
 def _word_count(text: str) -> int:

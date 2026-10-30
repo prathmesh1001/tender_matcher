@@ -76,6 +76,28 @@ def to_canonical(ontology: Ontology, attribute: str, value: float, unit: str) ->
     return CanonicalValue(value=float(converted.magnitude), unit=spec.canonical_unit)
 
 
+def convert(value: float, unit: str, target: str) -> float:
+    """Convert a value between two pint unit expressions ("psi" -> "bar").
+
+    Args:
+        value: The number.
+        unit: Its pint unit expression.
+        target: The pint unit expression wanted.
+
+    Returns:
+        The converted number.
+
+    Raises:
+        UnitConversionError: If either unit does not parse or the dimensions differ.
+    """
+    try:
+        return float(_REGISTRY.Quantity(value, unit).to(target).magnitude)
+    except (pint.errors.PintError, AttributeError, TypeError, ValueError) as exc:
+        raise UnitConversionError(
+            f"Cannot convert {value} {unit} to {target}", details={"unit": unit, "target": target}
+        ) from exc
+
+
 def _nps_value(nps: str) -> Fraction:
     """Parse "2", "1/2", "1-1/2" or "1.5" into an exact number of inches."""
     whole, _, frac = nps.strip().partition("-")
@@ -115,3 +137,19 @@ def class_to_pn(ontology: Ontology, pressure_class: int) -> int | None:
 def pn_to_class(ontology: Ontology, pn: int) -> int | None:
     """Return the ASME Class equivalent to a PN designation (EN 1759-1), if one is defined."""
     return next((cls for cls, value in ontology.class_to_pn.items() if value == pn), None)
+
+
+def units_compatible(unit: str, other: str) -> bool:
+    """True if two pint unit expressions measure the same dimension ("m**3/h" and "L/s").
+
+    Args:
+        unit: A pint unit expression.
+        other: Another pint unit expression.
+
+    Returns:
+        Whether one converts to the other; False if either does not parse.
+    """
+    try:
+        return bool(_REGISTRY.parse_units(unit).is_compatible_with(_REGISTRY.parse_units(other)))
+    except pint.errors.PintError, AttributeError, TypeError, ValueError:
+        return False

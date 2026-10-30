@@ -2,13 +2,16 @@
 #
 # All category knowledge lives here, never in Python (CLAUDE.md section 5):
 #   product_types  what is being bought; sub-types are distinct (B2: triple-offset != concentric)
-#   attributes     canonical attribute names, their unit dimension and the words tenders use
+#   attributes     canonical attribute names, their unit dimension and the words tenders use;
+#                  `limit: max` = a catalogue value is a rating the product reaches (16 bar
+#                  meets a 10 bar requirement); `nominal_pipe_size` = inch sizes go via nps_to_dn
 #   codes          canonical forms for material/rating/size codes (A4); applied in this order on
 #                  lower-cased, unicode-folded text, so longer codes come before their prefixes
 #   abbreviations  expanded on the query side (A5)
 #   equivalents    names and grade codes meaning the same material; a query naming one also
 #                  searches for the others (catalogues often give only "ASTM A126 Gr B")
 #   units          spellings seen in tenders/catalogues -> pint unit expression (B5)
+#   prefix_units   units written before the number ("DN 50" = 50 mm)
 #   nps_to_dn      ASME B36.10 nominal pipe size (inch) -> DN (mm)
 #   class_to_pn    EN 1759-1 Class designation -> PN designation (B6); never derive via bar values
 
@@ -86,10 +89,12 @@ attributes:
     dimension: length
     canonical_unit: mm
     synonyms: [size, nominal size, nominal bore, nominal diameter, nb, dn, nps, valve size]
+    nominal_pipe_size: true
   - name: pressure_rating
     dimension: pressure
     canonical_unit: bar
     synonyms: [pressure rating, working pressure, design pressure, max pressure, rated pressure, pn]
+    limit: max
   - name: pressure_class
     dimension: none
     synonyms: [class, pressure class, rating, asme class, ansi class]
@@ -101,18 +106,22 @@ attributes:
     dimension: temperature
     canonical_unit: degC
     synonyms: [max temperature, maximum temperature, design temperature, operating temperature]
+    limit: max
   - name: min_temperature
     dimension: temperature
     canonical_unit: degC
     synonyms: [min temperature, minimum temperature]
+    limit: min
   - name: flow_rate
     dimension: flow
     canonical_unit: m**3/h
     synonyms: [flow, flow rate, capacity, discharge]
+    limit: max
   - name: head
     dimension: length
     canonical_unit: m
     synonyms: [head, total head, delivery head, total dynamic head]
+    limit: max
   - name: power
     dimension: power
     canonical_unit: kW
@@ -288,6 +297,10 @@ units:
   hp: hp
   horsepower: hp
   rpm: rpm
+
+prefix_units:
+  dn: mm
+  nb: mm
 
 nps_to_dn:
   '1/2': 15

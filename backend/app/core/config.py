@@ -101,6 +101,10 @@ class Settings(BaseSettings):
         default=Path("config/section_categories.yaml"),
         description="Section categories (costing, eligibility, dimensions, ...) and their phrases.",
     )
+    CHUNK_CACHE_DIR: Path = Field(
+        default=Path(".cache/chunks"),
+        description="Processed catalogue files for in-memory matching, one JSON per sha256.",
+    )
 
     PRODUCT_PAGE_MIN_TAGGED: int = Field(
         default=2,
@@ -135,6 +139,114 @@ class Settings(BaseSettings):
         default=2000,
         ge=1,
         description="Pages with more thin shapes are drawings or outlined text, not rule tables.",
+    )
+    TABLE_PARAGRAPH_GAP_FACTOR: float = Field(
+        default=1.5,
+        gt=1,
+        description="A line gap this many times a cell's median line pitch starts a paragraph.",
+    )
+    TENDER_ITEM_NO_HEADERS: list[str] = Field(
+        default_factory=lambda: ["item no", "sl no", "s no", "sr no", "item number"],
+        description="Header labels of a tender schedule's item-number column (JSON list).",
+    )
+    TENDER_ITEM_TITLE_HEADERS: list[str] = Field(
+        default_factory=lambda: ["item title", "item name"],
+        description="Header labels of the item-title column (JSON list).",
+    )
+    TENDER_ITEM_DESCRIPTION_HEADERS: list[str] = Field(
+        default_factory=lambda: ["description", "specification", "critical dimension"],
+        description="Header labels of the columns holding an item's specification (JSON list).",
+    )
+    TENDER_ITEM_QUANTITY_HEADERS: list[str] = Field(
+        default_factory=lambda: ["quant", "qty"],
+        description="Prefixes of quantity-column header words ('Quantity', 'Qty.').",
+    )
+    TENDER_ITEM_UNIT_HEADERS: list[str] = Field(
+        default_factory=lambda: ["unit", "uom"],
+        description="Header labels of the unit-of-measure column (JSON list).",
+    )
+    TENDER_LABEL_MAX_WORDS: int = Field(
+        default=6,
+        ge=1,
+        description="A 'KEY : value' line's key has at most this many words.",
+    )
+    TENDER_ENUM_MAX_WORDS: int = Field(
+        default=2,
+        ge=1,
+        description="Values this short with no code ('WAFER') are options; longer ones are text.",
+    )
+    COMPARATOR_GENERIC_LABEL_WORDS: list[str] = Field(
+        default_factory=lambda: [
+            "valve",
+            "moc",
+            "material",
+            "of",
+            "construction",
+            "type",
+            "the",
+            "for",
+            "and",
+            "max",
+            "maximum",
+            "min",
+            "minimum",
+            "range",
+            "at",
+        ],
+        description=(
+            "Label words that do not name the attribute; without an ontology the other label "
+            "words must all appear in a catalogue field's label (JSON list)."
+        ),
+    )
+    COMPARATOR_CODE_NOISE_WORDS: list[str] = Field(
+        default_factory=lambda: [
+            "astm",
+            "asme",
+            "gr",
+            "grade",
+            "type",
+            "or",
+            "and",
+            "equivalent",
+            "eqv",
+            "with",
+            "of",
+            "the",
+            "to",
+            "as",
+            "per",
+        ],
+        description="Words ignored when comparing codes ('ASTM A216 Gr. WCB' -> a216, wcb).",
+    )
+    COMPARATOR_DESIGNATION_PREFIXES: list[str] = Field(
+        default_factory=lambda: ["pn", "class", "dn", "nb"],
+        description="Designations written before their number ('PN 16', 'DN 50') (JSON list).",
+    )
+    COMPARATOR_DIMENSION_WORDS: list[str] = Field(
+        default_factory=lambda: ["dimension", "dimensions", "weight", "wt", "face to face"],
+        description="A table whose header or section names one of these is a dimension table.",
+    )
+    COMPARATOR_DIMENSION_MIN_LETTER_COLUMNS: int = Field(
+        default=2,
+        ge=1,
+        description=(
+            "A header with this many one-letter columns (A, B, H: drawing callouts) is a "
+            "dimension table."
+        ),
+    )
+    COMPARATOR_REL_TOLERANCE: float = Field(
+        default=0.001,
+        ge=0,
+        description="Relative tolerance for numeric comparison after unit conversion.",
+    )
+    COMPARATOR_VALUE_MAX_WORDS: int = Field(
+        default=4,
+        ge=1,
+        description="A catalogue value this short without codes ('Flanged') states an option; "
+        "a longer one without codes is a sentence and never makes a requirement missing.",
+    )
+    COMPARATOR_MAX_EVIDENCE: int = Field(
+        default=3, ge=1, description="Evidence rows kept per requirement and manufacturer."
     )
     TABLE_CONTINUATION_EDGE_FRACTION: float = Field(
         default=0.25,
