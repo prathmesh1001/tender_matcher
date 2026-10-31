@@ -269,8 +269,8 @@ def test_item_text_does_not_reach_other_items(
         ),
     ]
     first, second = parse_tender_files(files, options, [ontology]).items
-    assert [r.value_text for r in leaves(first.requirements)] == ["Screwed female NPT"]
-    assert [r.value_text for r in leaves(second.requirements)] == ["Flanged"]
+    assert [r.value_text for r in leaves(first.requirements)] == ["Screwed female NPT", "dn40"]
+    assert [r.value_text for r in leaves(second.requirements)] == ["Flanged", "dn50"]
 
 
 def test_repeated_text_gives_one_requirement(

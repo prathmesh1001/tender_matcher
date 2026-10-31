@@ -34,6 +34,7 @@ from app.tender.pipeline import (
     item_entry,
     tender_general_requirements,
     tender_requirements,
+    with_title_size,
 )
 from app.tender.segments import Segment, SegmentRules, item_clause, segment_file
 from app.tender.splitter import leaves
@@ -215,7 +216,7 @@ def _category_entry(
         page_number=page,
     )
     base = item_entry(item, options, ontologies)
-    requirements: list[Requirement] = []
+    requirements = list(base.requirements)
     used: set[str] = set()
     for file in (f for f in files if f.role in options.spec_roles):
         used.add(file.name)
@@ -237,10 +238,14 @@ def _category_entry(
 def _without_repeats(
     new: Sequence[Requirement], existing: Sequence[Requirement]
 ) -> list[Requirement]:
-    """New requirements not already stated; a parent stays only if a child of it stays."""
+    """New requirements not already stated (same label and value, or stated twice in `new`).
+
+    A parent stays only if a child of it stays.
+    """
 
     def key(requirement: Requirement) -> tuple[str, str]:
-        return fold_text(requirement.label or ""), fold_text(requirement.value_text)
+        value = fold_text(requirement.value_text).rstrip(" ,.;")
+        return fold_text(requirement.label or ""), value
 
     seen = {key(r) for r in leaves(existing)}
     kept_children: set[str] = set()
@@ -252,6 +257,16 @@ def _without_repeats(
             if leaf.parent_id:
                 kept_children.add(leaf.parent_id)
     return [r for r in new if r.id in kept_leaves or r.id in kept_children]
+
+
+def _once(entry: ItemRequirements) -> ItemRequirements:
+    """The item with each requirement stated once."""
+    return ItemRequirements(
+        entry.item,
+        entry.category,
+        _without_repeats(entry.requirements, []),
+        entry.product_type,
+    )
 
 
 def _segment_requirements(
@@ -366,10 +381,12 @@ def parse_tender_files(
         attached, held = _attach_segments(entries, files, options, ontologies)
         items = _unique_numbers(attached)
         general = _general(files, set(), set(chosen), options, held)
-        return TenderRequirements([_with_title(e) for e in items], general, source)
+        sized = [with_title_size(_once(e), options, ontologies) for e in items]
+        return TenderRequirements([_with_title(e) for e in sized], general, source)
     category = _category_entry(files, options, ontologies)
     if category is None:
         return TenderRequirements([], _general(files, set(), set(), options), ItemSource.NONE)
     entry, used = category
     general = _general(files, used, set(), options)
-    return TenderRequirements([_with_title(entry)], general, ItemSource.ITEM_CATEGORY)
+    sized_entry = with_title_size(_once(entry), options, ontologies)
+    return TenderRequirements([_with_title(sized_entry)], general, ItemSource.ITEM_CATEGORY)

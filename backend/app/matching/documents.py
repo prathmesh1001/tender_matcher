@@ -2,10 +2,13 @@
 
 A manufacturer's documents are never pooled: specs of one catalogue (Aquaseal, concentric)
 must not decide a requirement of another (triple offset), CLAUDE.md B10. Each document
-declaring the item's product type is compared separately; the best document is the one
-whose declared sub-type fits the item (B2: match > general/unknown > mismatch), then the
-higher fit score (Σ status score over decided requirements), then more decided
-requirements. Choosing a model or version column inside the document is a later step.
+declaring the item's product type is compared separately. The best document is chosen by what
+the product is before how much is known about it: its declared sub-type fits the item (B2:
+match > general/unknown > mismatch), then the most critical requirements met and the fewest
+contradicted (attributes the ontology marks `critical`: a catalogue of the wrong standard or
+size is the wrong catalogue, however much else it states), then coverage (more decided
+requirements), then the higher fit score (Σ status score). Choosing a model or version column
+inside the document is a later step.
 """
 
 from collections.abc import Sequence
@@ -117,6 +120,12 @@ def _fit(comparisons: Sequence[Comparison], scores: dict[MatchStatus, float]) ->
     return sum(scores[c.status] for c in decided), len(decided)
 
 
+def _is_critical(requirement: Requirement, ctx: MatchContext) -> bool:
+    """True if the ontology marks the requirement's attribute as identifying the product."""
+    attribute = ctx.attribute(requirement)
+    return attribute is not None and attribute.critical
+
+
 def evaluate_document(
     requirements: Sequence[Requirement],
     document: CatalogueDocument,
@@ -138,21 +147,39 @@ def evaluate_document(
         for r in requirements
     ]
     score, decided = _fit(comparisons, options.status_scores)
+    critical = [c for r, c in zip(requirements, comparisons, strict=True) if _is_critical(r, ctx)]
     return DocumentResult(
         document=document.file,
         sha256=document.sha256,
         title=document.title,
         declared_sub_types=list(document.sub_types),
         sub_type_fit=fit,
+        critical_met=_fit(critical, options.status_scores)[0],
+        critical_failed=sum(1 for c in critical if c.status is MatchStatus.MISSING_CAPABILITY),
         fit_score=score,
         decided=decided,
         comparisons=comparisons,
     )
 
 
-def rank_key(result: DocumentResult) -> tuple[int, float, int, str]:
-    """Sort key, best first: sub-type fit, fit score, decided count, then file name."""
-    return (-_FIT_RANK[result.sub_type_fit], -result.fit_score, -result.decided, result.document)
+def rank_key(result: DocumentResult) -> tuple[int, bool, float, int, int, float, str]:
+    """Sort key, best first: identity, then coverage, then fit, then file name.
+
+    Identity is the product (its sub-type fit), then the critical requirements met, then the
+    fewest it contradicts: a catalogue stating another standard is further from the item
+    than one that states none. A catalogue deciding nothing never wins on that alone, so it
+    comes after any that decides something. Decided count is coverage, as every candidate has
+    the same requirements.
+    """
+    return (
+        -_FIT_RANK[result.sub_type_fit],
+        result.decided == 0,
+        -result.critical_met,
+        result.critical_failed,
+        -result.decided,
+        -result.fit_score,
+        result.document,
+    )
 
 
 @dataclass(frozen=True, slots=True)

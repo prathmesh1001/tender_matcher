@@ -28,13 +28,27 @@ mandatory: [shall, must, mandatory, compulsory, is required, are required, liabl
 optional: [may, optional, if required, preferably, preferred, advised, advisable]
 
 # D4: another make or grade is acceptable. Recorded on the requirement; it never fails a make.
-or_equivalent: [or equivalent, or equal, or similar, or eqv]
+or_equivalent: [or equivalent, or equivelent, or equal, or similar, or eqv]
 
 # T9 and D4: a make named by the tender. The group `make` is what gets recorded.
 make_patterns:
   - '\bmake\s*:\s*(?:m/s\.?\s*)?(?P<make>[^.,;)\n]+)'
   - '\bmake\s+like\s+(?P<make>[^.,;)\n]+?)(?:\s+make)?\s*(?:[.,;)\n]|$)'
   - '\bsingle\s+tender\s+enquiry\s+on\s+(?:m/s\.?\s*)?(?P<make>[^.,;\n]+)'
+
+# The tender says only one firm is acceptable: shown as a warning above the results. GeM prints
+# "Single Bid / Proprietary Article Certificate" on every bid, so these must stay this narrow.
+single_firm_patterns:
+  - '\bsingle\s+tender\s+enquiry\b'
+  - '\bonly\s+this\s+firm\b'
+  - '\bsingle\s+tender\s+applicable\s*:\s*yes\b'
+  - '\bproprietary\s+tender\b'
+
+# An acceptable-make list: the line naming it, each entry, and what ends the list. Roman
+# markers (i, v, x) number the entries; any other letter ("b)") is the next clause.
+make_list_pattern: 'following\s+makes?\b[^:]*:\s*(?P<list>.*)'
+make_list_item_pattern: '(?:^|(?<=\s))[ivx]+\)\s*(?:m/s\.?\s*)?(?P<make>.+?)(?=\s+[ivx]+\)|\s*$)'
+make_list_end_pattern: '\s[a-hj-uwyz]\)\s'
 
 # T1: where one item's text starts in a specification file ("Item 4 - CS0108 - Cast Steel ...").
 item_start_pattern: '(?:^|(?<=\s))item\s+(?P<no>\d{1,3})\s*[-–]\s*(?:[A-Z]{2}\d{5,}\s*[-–]\s*)?'

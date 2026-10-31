@@ -49,6 +49,9 @@ class Attribute(BaseModel):
     nominal_pipe_size: bool = Field(
         default=False, description="Sizes in inch map to DN through `nps_to_dn`, not by pint."
     )
+    critical: bool = Field(
+        default=False, description="Identifies the product: decides which catalogue is chosen."
+    )
 
 
 class CodeRule(BaseModel):
@@ -104,6 +107,10 @@ class Ontology(BaseModel):
     label_generic_words: list[str] = Field(
         default_factory=list,
         description="Words that may follow a synonym in a label without changing what it names.",
+    )
+    material_names: list[str] = Field(
+        default_factory=list,
+        description='Words that start a material value: they end a merged key ("Shaft Bronze").',
     )
     codes: list[CodeRule] = Field(default_factory=list)
     abbreviations: dict[str, str] = Field(default_factory=dict)

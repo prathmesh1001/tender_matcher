@@ -49,15 +49,15 @@ Items without gold: 20.
 |---|---|---|---|---|---|
 | 10 | LnT_Valves | `lt_triple_offset_butterfly.pdf` | full | match, chosen: agree | match, chosen: agree |
 | 10 | LnT_Valves | `lt_aquaseal_butterfly_check.pdf` | least | general: **differs** | mismatch: agree |
-| 10 | Delval | `delval_series_44_49_hpbfv_spec.pdf` | least | mismatch: agree | unknown, chosen: **differs** |
-| 10 | Delval | `delval_series_50_52_centric_bfv_spec.pdf` | least | mismatch, chosen: agree | unknown: **differs** |
+| 10 | Delval | `delval_series_44_49_hpbfv_spec.pdf` | least | mismatch, chosen: agree | unknown, chosen: **differs** |
+| 10 | Delval | `delval_series_50_52_centric_bfv_spec.pdf` | least | mismatch: agree | unknown: **differs** |
 
 ## Ranking (not in gold, shown only)
 
 ontology:
 
 1. LnT_Valves: compatibility 71.4 %, coverage 38.9 %, low coverage
-2. Delval: compatibility 41.7 %, coverage 33.3 %, low coverage
+2. Delval: compatibility 50.0 %, coverage 27.8 %, low coverage
 3. KSB: compatibility -, coverage 0.0 %, low coverage
 4. Kirloskar Brothers: compatibility -, coverage 0.0 %, low coverage
 

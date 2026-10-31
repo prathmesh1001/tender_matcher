@@ -17,12 +17,16 @@ from app.retrieval.text_normalizer import SearchVocabulary, fold_text, search_to
 
 _NUM: Final = r"-?\d+(?:\.\d+)?"
 # A unit right after a number: '"', or a word starting with a letter or "°" ("mm", "m3/hr").
-_UNIT: Final = r'(?:"|(?!to\b|and\b|or\b)[a-z°][a-z0-9°/²³]*)'
+_UNIT: Final = r"""(?:"|''|(?!to\b|and\b|or\b)[a-z°][a-z0-9°/²³]*)"""
 _RANGE_SEP: Final = r"\s*(?:to|-|~)\s*"
 _NUMBER_VALUE: Final = re.compile(
     rf"(?<![\w.])(?P<a>{_NUM})\s*(?P<ua>{_UNIT})?(?:{_RANGE_SEP}(?P<b>{_NUM})\s*(?P<ub>{_UNIT})?)?"
 )
 _THOUSANDS: Final = re.compile(r"(?<=\d),(?=\d{3}\b)")
+# An inch size printed as a fraction: 3/8" is 0.375 inch, never 8 inch; 1-1/2" is 1.5 inch.
+_INCH_FRACTION: Final = re.compile(
+    r"(?<![\w./-])(?:(?P<whole>\d+)\s*-\s*)?(?P<top>\d+)/(?P<bottom>[1-9]\d*)(?=\s*(?:\"|''|inch))"
+)
 # "up to 100" (2500 mm)": an upper limit with no printed lower end.
 _UP_TO: Final = re.compile(r"\b(?:up\s*to|upto)\s*$")
 _WORD: Final = re.compile(r"[a-z0-9_]+")
@@ -71,6 +75,12 @@ def _prefixed(text: str, prefixes: tuple[str, ...]) -> tuple[list[Quantity], str
     return found, blanked
 
 
+def _decimal_inches(match: re.Match[str]) -> str:
+    """A printed inch fraction as a decimal number."""
+    whole = int(match.group("whole") or 0)
+    return f"{whole + int(match.group('top')) / int(match.group('bottom')):g}"
+
+
 def quantities(text: str, prefixes: Sequence[str]) -> list[Quantity]:
     """Every quantity printed in `text`, in order (designations first).
 
@@ -81,7 +91,7 @@ def quantities(text: str, prefixes: Sequence[str]) -> list[Quantity]:
     Returns:
         The quantities. A range's unit is the unit printed with either end.
     """
-    folded = _THOUSANDS.sub("", fold_text(text))
+    folded = _INCH_FRACTION.sub(_decimal_inches, _THOUSANDS.sub("", fold_text(text)))
     found, rest = _prefixed(folded, tuple(p.lower() for p in prefixes))
     open_end = -1  # end of the last "up to" value: its bracketed equivalent is open too
     for m in _NUMBER_VALUE.finditer(rest):

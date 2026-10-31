@@ -19,6 +19,7 @@ from app.schemas.enums import DecisionSource, MatchStatus
 from app.schemas.matching import Comparison, DocumentResult, LabelBasis, ManufacturerItemResult
 from app.schemas.report import CandidateSummary, ItemReport, ManufacturerItemReport
 from app.schemas.requirements import LineItem, Requirement
+from app.tender.pipeline import product_types_named
 from app.tender.splitter import leaves
 
 
@@ -35,7 +36,10 @@ def item_product_type(title: str, declared: Sequence[str], ctx: MatchContext) ->
     """The one declared product type the item title names, or None (none or several)."""
     if ctx.ontology is not None and ctx.vocabulary is not None:
         matcher = ProductMatcher.from_ontologies([ctx.ontology], ctx.vocabulary)
-        found = matcher.types_in(normalize_for_search(title, ctx.vocabulary), frozenset(declared))
+        wanted = frozenset(declared)
+        found = matcher.types_in(normalize_for_search(title, ctx.vocabulary), wanted) or set(
+            wanted.intersection(product_types_named(title, ctx.ontology))
+        )
     else:
         found = declared_types_named(title, declared)
     return next(iter(found)) if len(found) == 1 else None
@@ -47,6 +51,8 @@ def _summary(result: DocumentResult) -> CandidateSummary:
         sha256=result.sha256,
         title=result.title,
         sub_type_fit=result.sub_type_fit,
+        critical_met=result.critical_met,
+        critical_failed=result.critical_failed,
         fit_score=result.fit_score,
         decided=result.decided,
     )

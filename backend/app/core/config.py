@@ -208,6 +208,11 @@ class Settings(BaseSettings):
         ge=1,
         description="A 'KEY : value' line's key has at most this many words.",
     )
+    TENDER_INLINE_KEY_MAX_WORDS: int = Field(
+        default=3,
+        ge=1,
+        description="Longest key inside a value ('MATERIAL: Body: WCB'), in words.",
+    )
     TENDER_ENUM_MAX_WORDS: int = Field(
         default=2,
         ge=1,
@@ -246,6 +251,7 @@ class Settings(BaseSettings):
             "or",
             "and",
             "equivalent",
+            "equivelent",
             "eqv",
             "with",
             "of",

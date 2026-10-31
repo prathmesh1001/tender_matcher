@@ -39,6 +39,8 @@ class LineClass:
     mandatory: bool | None  # None: the line does not say
     named_make: str | None
     or_equivalent: bool
+    acceptable_makes: tuple[str, ...] = ()
+    single_firm: bool = False
 
 
 def load_requirement_rules(path: Path) -> RequirementRules:
@@ -76,6 +78,10 @@ class RequirementClassifier:
     optional: PhrasePatterns
     or_equivalent: PhrasePatterns
     makes: tuple[re.Pattern[str], ...]
+    single_firm: tuple[re.Pattern[str], ...]
+    make_list: re.Pattern[str]
+    make_list_item: re.Pattern[str]
+    make_list_end: re.Pattern[str]
 
     @classmethod
     def from_settings(cls, settings: Settings) -> RequirementClassifier:
@@ -100,6 +106,10 @@ class RequirementClassifier:
             optional=phrase_patterns(rules.optional, _NEUTRAL),
             or_equivalent=phrase_patterns(rules.or_equivalent, _NEUTRAL),
             makes=tuple(re.compile(p, re.IGNORECASE) for p in rules.make_patterns),
+            single_firm=tuple(re.compile(p, re.IGNORECASE) for p in rules.single_firm_patterns),
+            make_list=re.compile(rules.make_list_pattern, re.IGNORECASE),
+            make_list_item=re.compile(rules.make_list_item_pattern, re.IGNORECASE),
+            make_list_end=re.compile(rules.make_list_end_pattern),
         )
 
     def named_make(self, text: str) -> str | None:
@@ -109,6 +119,23 @@ class RequirementClassifier:
             if found:
                 return found.group("make").strip() or None
         return None
+
+    def acceptable_makes(self, text: str) -> tuple[str, ...]:
+        """The makes of an acceptable-make list ("following make ...: i) M/s. X ii) M/s. Y").
+
+        Args:
+            text: A printed line.
+
+        Returns:
+            The makes as printed, without "M/s." and a closing full stop; empty if no list.
+        """
+        found = self.make_list.search(text)
+        if found is None:
+            return ()
+        listed = self.make_list_end.split(found.group("list"), maxsplit=1)[0]
+        return tuple(
+            m.group("make").strip().rstrip(".") for m in self.make_list_item.finditer(listed)
+        )
 
     def _mandatory(self, normalized: str, is_item: bool) -> bool | None:
         """Mandatory phrase, else optional phrase, else what an item line means: required."""
@@ -151,4 +178,6 @@ class RequirementClassifier:
             mandatory=self._mandatory(normalized, is_item),
             named_make=make,
             or_equivalent=_hit(self.or_equivalent, normalized),
+            acceptable_makes=self.acceptable_makes(text),
+            single_firm=any(p.search(text) for p in self.single_firm),
         )

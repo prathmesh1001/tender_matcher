@@ -1,0 +1,232 @@
+# Hand labels for tender GEM/2026/B/8017367 (multi-item), copied from
+# docs/manual_match_check.md section 5. That section labels the dual-plate check DN50 (item 1), the
+# DN300 size (item 5), the ball valve DN25 (item 11) and the butterfly DN100 (item 20). Requirements
+# and items it does not label are left out and reported as such by the diff.
+# 20.2 is one merged statement here but several manual rows, so it has no single label.
+#
+# A LEAST below can come from a critical MISSING, not only another sub-type; the diff compares a
+# product label only with the sub-type fit, so such a row can read "differs" without being wrong.
+#
+# Status: full_match | partial_match | missing_capability | unsupported (manual "NONE").
+tender: GEM_2026_B_8017367
+source: docs/manual_match_check.md (section 5)
+
+evaluations:
+  - item_no: "1"
+    manufacturer: LnT_Valves
+    document: lt_aquaseal_butterfly_check.pdf
+    manual_fit: 0.72
+    requirements:
+      - id: "1.1.1"
+        manual_row: Dual-plate check, API 594
+        status: full_match
+        pages: [24]
+        evidence: 'p24 "soft-seated dual-plate check valve that conforms to API 594"'
+      - id: "1.1.2"
+        manual_row: DN50, PN16
+        status: full_match
+        pages: [24]
+        evidence: 'p24 "2" (50 mm) to 8" (200 mm), in PN 10, PN 16"'
+      - id: "1.1.3"
+        manual_row: DN50, PN16
+        status: full_match
+        pages: [24]
+        evidence: 'p24 "2" (50 mm) to 8" (200 mm), in PN 10, PN 16"'
+      - id: "1.2.1"
+        manual_row: Dual-plate check, API 594
+        status: full_match
+        pages: [24]
+        evidence: 'p24 "soft-seated dual-plate check valve that conforms to API 594"'
+      - id: "1.3"
+        manual_row: DN50, PN16
+        status: full_match
+        pages: [24]
+        evidence: 'p24 "2" (50 mm) to 8" (200 mm), in PN 10, PN 16"'
+      - id: "1.4"
+        manual_row: Dual-plate check, API 594
+        status: full_match
+        pages: [24]
+        evidence: 'p24 "soft-seated dual-plate check valve that conforms to API 594"'
+      - id: "1.5.1"
+        manual_row: Body WCB or equivalent
+        status: missing_capability
+        pages: [25]
+        evidence: p25 "Cast Iron EN1561 (BS 1452) Gr. 200" (cast iron is not equivalent to cast steel)
+      - id: "1.5.2"
+        manual_row: Disc CF8M or equivalent
+        status: partial_match
+        pages: [25]
+        evidence: 'p25 "Closure Plate · Stainless Steel A 217 Gr. CA15"'
+      - id: "1.5.3"
+        manual_row: Seat nitrile or SS
+        status: missing_capability
+        pages: [25]
+        evidence: 'p25 "Seat · EPDM"'
+      - id: "1.5.4"
+        manual_row: Spring / pins SS316
+        status: partial_match
+        pages: [25]
+        evidence: 'p25 "Spring · Stainless Steel 316"; pins "A 276 Type 410"'
+      - id: "1.5.5"
+        manual_row: Spring / pins SS316
+        status: partial_match
+        pages: [25]
+        evidence: 'p25 "Spring · Stainless Steel 316"; pins "A 276 Type 410"'
+      - id: "1.6"
+        manual_row: Wafer for ASME B16.5 CL150
+        status: partial_match
+        pages: [25]
+        evidence: p25 end connection "EN 1092" (PN) / "ASME B16.1" (Class 125)
+      - id: "1.7.1"
+        manual_row: Max F-F 60 mm, max OD 109 mm
+        status: full_match
+        pages: [25]
+        evidence: p25 DN50 "54 · 109"
+      - id: "1.7.2"
+        manual_row: Max F-F 60 mm, max OD 109 mm
+        status: full_match
+        pages: [25]
+        evidence: p25 DN50 "54 · 109"
+
+  - item_no: "5"
+    manufacturer: LnT_Valves
+    document: lt_aquaseal_butterfly_check.pdf
+    requirements:
+      - id: "5.1.2"
+        manual_row: DN300
+        status: missing_capability
+        pages: [24]
+        evidence: DN300 outside 50-200 mm, size MISSING
+
+  - item_no: "11"
+    manufacturer: LnT_Valves
+    document: lt_process_ball_valves.pdf
+    manual_fit: 0.95
+    manual_coverage: "8/8"
+    requirements:
+      - id: "11.title.1"
+        manual_row: Ball valve DN25, Class 800
+        status: full_match
+        pages: [3]
+        evidence: '"sizes DN 8 to DN 50 are offered in Class 800" (p3)'
+      - id: "11.1.2"
+        manual_row: Ball valve DN25, Class 800
+        status: full_match
+        pages: [3]
+        evidence: '"sizes DN 8 to DN 50 are offered in Class 800" (p3)'
+      - id: "11.2.2"
+        manual_row: Ball valve DN25, Class 800
+        status: full_match
+        pages: [3]
+        evidence: '"sizes DN 8 to DN 50 are offered in Class 800" (p3)'
+      - id: "11.3.1"
+        manual_row: ISO 17292
+        status: full_match
+        pages: [1]
+        evidence: ISO 17292 (p1)
+      - id: "11.3.2"
+        manual_row: API 598
+        status: full_match
+        pages: [6]
+        evidence: '"Pressure testing ISO 5208/ API 598" (p6)'
+      - id: "11.4"
+        manual_row: WCB body
+        status: full_match
+        pages: [6]
+        evidence: body "ASTM A216 Gr. WCB" (p6)
+      - id: "11.5"
+        manual_row: SS ball/stem (A182)
+        status: full_match
+        pages: [6]
+        evidence: ball "ASTM A351 Gr. CF8M/ ASTM A182 Gr. F316" (p6)
+      - id: "11.6"
+        manual_row: Screwed female NPT
+        status: partial_match
+        pages: [3]
+        evidence: ends "Screwed/ Socket-weld" (p3; NPT not named)
+
+  - item_no: "11"
+    manufacturer: Delval
+    document: delval_series_65_72_ball_valve_spec.pdf
+    requirements:
+      - id: "11.1.2"
+        manual_row: class 800
+        status: unsupported
+        evidence: class 800 not stated
+      - id: "11.2.2"
+        manual_row: class 800
+        status: unsupported
+        evidence: class 800 not stated
+      - id: "11.4"
+        manual_row: WCB body
+        status: full_match
+        pages: [1]
+        evidence: floating ball, WCB body, CF8M ball (p1)
+      - id: "11.5"
+        manual_row: CF8M ball
+        status: full_match
+        pages: [1]
+        evidence: floating ball, WCB body, CF8M ball (p1)
+      - id: "11.6"
+        manual_row: screwed ends
+        status: missing_capability
+        pages: [1]
+        evidence: '"two-piece body flanged" (p1) vs screwed ends'
+
+  - item_no: "20"
+    manufacturer: LnT_Valves
+    document: lt_aquaseal_butterfly_check.pdf
+    requirements:
+      - id: "20.title.1"
+        manual_row: Butterfly DN100
+        status: unsupported
+        evidence: size range for Aquaseal 16 not stated (critical NONE)
+      - id: "20.1.2"
+        manual_row: PN16
+        status: full_match
+        pages: [8]
+        evidence: Aquaseal 16 (p8) PN16
+
+  - item_no: "20"
+    manufacturer: Delval
+    document: delval_series_50_52_centric_bfv_spec.pdf
+    requirements:
+      - id: "20.1.2"
+        manual_row: PN16
+        status: partial_match
+        pages: [1]
+        evidence: DN 50-300 rated "175 psi (12.0 barg)" (p1) < PN16 rating; the 9.8 bar working pressure is met
+
+# Product labels per catalogue (Layer 2 of the manual check). `(none)` = no such document exists.
+products:
+  - item_no: "1"
+    manufacturer: LnT_Valves
+    document: lt_aquaseal_butterfly_check.pdf
+    label: least
+    note: critical MISSING, not another sub-type
+  - item_no: "1"
+    manufacturer: Delval
+    document: (none)
+    label: not_found
+  - item_no: "5"
+    manufacturer: LnT_Valves
+    document: lt_aquaseal_butterfly_check.pdf
+    label: least
+    note: size MISSING
+  - item_no: "11"
+    manufacturer: LnT_Valves
+    document: lt_process_ball_valves.pdf
+    label: full
+  - item_no: "11"
+    manufacturer: Delval
+    document: delval_series_65_72_ball_valve_spec.pdf
+    label: partial
+  - item_no: "20"
+    manufacturer: LnT_Valves
+    document: lt_aquaseal_butterfly_check.pdf
+    label: partial
+    note: also INSUFFICIENT EVIDENCE
+  - item_no: "20"
+    manufacturer: Delval
+    document: delval_series_50_52_centric_bfv_spec.pdf
+    label: partial

@@ -11,9 +11,22 @@ from app.schemas.chunking import ChunkDraft
 from app.schemas.enums import ChunkType, Operator
 from app.schemas.requirements import LineItem, ValueKind
 from app.tender.line_items import ItemColumnOptions, find_columns, header_key, line_items
-from app.tender.normalizer import parse_value, resolve_attribute
+from app.tender.normalizer import (
+    parse_value,
+    resolve_attribute,
+    size_form,
+    temperature_form,
+    title_size,
+)
 from app.tender.pipeline import ontology_for
-from app.tender.splitter import SplitOptions, group_lines, item_requirements, leaves, split_parts
+from app.tender.splitter import (
+    SplitOptions,
+    group_lines,
+    item_requirements,
+    leaves,
+    merged_line_key,
+    split_parts,
+)
 
 ONTOLOGY_DIR = Path(__file__).resolve().parents[3] / "ontology"
 COLUMNS = ItemColumnOptions(
@@ -205,7 +218,7 @@ def test_or_higher_stays_a_direction() -> None:
     ("label", "value", "attribute"),
     [
         # The whole label decides: a synonym followed by another word names something else.
-        ("Design Temp.", "-40 Deg. C to +40 Deg. C", None),  # never design_standard
+        ("Design Temp.", "-40 Deg. C to +40 Deg. C", "max_temperature"),  # not design_standard
         ("Body / Bonnet Construction", "Bolted Bonnet", "bonnet_type"),  # never body_material
         ("STEM LENGTH", "ROUND", None),
         ("SEAT LEAKAGE", "CLASS VI", None),
@@ -250,7 +263,7 @@ def test_a_unit_may_follow_the_attribute(ontology: Ontology) -> None:
 
 def test_a_temperature_value_never_fits_a_material_label(ontology: Ontology) -> None:
     parsed = parse_value("Body Temperature", "120 degC", ontology, 2)
-    assert resolve_attribute("Body Temperature", parsed, ontology) is None
+    assert resolve_attribute("Body Temperature", parsed, ontology) == "max_temperature"
 
 
 def test_units_resolve_only_through_the_ontology(ontology: Ontology) -> None:
@@ -287,3 +300,286 @@ def test_no_ontology_means_no_attribute() -> None:
 def test_ontology_chosen_by_item_title(ontology: Ontology) -> None:
     assert ontology_for("TRIPLE OFFSET BUTTERFLY VALVE,250MM", [ontology]) is ontology
     assert ontology_for("THERMOCOUPLE K TYPE", [ontology]) is None
+
+
+# ---------------------------------------------------------------- sizes and ratings are numeric
+
+
+@pytest.mark.parametrize(
+    ("value", "number", "unit"),
+    [
+        ("DN25 MM", 25.0, "mm"),
+        ("DN 80", 80.0, "mm"),
+        ("DN-50", 50.0, "mm"),
+        ("40 NB", 40.0, "mm"),
+        ("NB 40", 40.0, "mm"),
+        ("6 inch", 6.0, "inch"),
+        ("3/4 inch", 0.75, "inch"),
+        ('3/4"', 0.75, "inch"),
+        ("1-1/2 inch", 1.5, "inch"),
+        ('2.5"', 2.5, "inch"),
+        ("3”", 3.0, "inch"),
+        ("1’’", 1.0, "inch"),  # noqa: RUF001
+        ("2 inches", 2.0, "inch"),
+    ],
+)
+def test_size_forms_are_numeric(value: str, number: float, unit: str, ontology: Ontology) -> None:
+    parsed = parse_value("SIZE", value, ontology, 2)
+    assert (parsed.kind, parsed.number, parsed.unit) == (ValueKind.NUMERIC, number, unit)
+    assert resolve_attribute("SIZE", parsed, ontology) == "nominal_size"
+
+
+@pytest.mark.parametrize(
+    ("value", "number"),
+    [("# 300", 300.0), ("#800", 800.0), ("150#", 150.0), ("150 lbs", 150.0), ("Class 800", 800.0),
+     ("# 300 Class", 300.0), ("300 Class", 300.0), ("CLASS #150", 150.0)],
+)  # fmt: skip
+def test_rating_forms_are_a_class(value: str, number: float, ontology: Ontology) -> None:
+    parsed = parse_value("Rating", value, ontology, 2)
+    assert (parsed.kind, parsed.number, parsed.unit) == (ValueKind.NUMERIC, number, "class")
+    assert resolve_attribute("Rating", parsed, ontology) == "pressure_class"
+
+
+def test_bare_number_under_a_class_label_is_a_class(ontology: Ontology) -> None:
+    parsed = parse_value("CLASS", "800 OR HIGHER", ontology, 2)
+    assert (parsed.number, parsed.unit, parsed.operator) == (800.0, "class", Operator.GTE)
+
+
+@pytest.mark.parametrize("value", ["250", "DN25 valve", "A216", "3/4 Bore", "SCH 160"])
+def test_other_values_are_not_a_size(value: str) -> None:
+    assert size_form(value) is None
+
+
+def _sized(line: str, title: str = "GATE VALVE") -> LineItem:
+    return LineItem(
+        item_no="1", title=title, description_lines=[line], document="b.pdf", page_number=1
+    )
+
+
+def test_size_and_rating_in_one_value_become_two(ontology: Ontology) -> None:
+    reqs = item_requirements(_sized("Size: 6 inch # 300 Class"), ontology, SPLIT)
+    size, rating = leaves(reqs)
+    assert (size.attribute, size.value_num, size.unit) == ("nominal_size", 6.0, "inch")
+    assert (rating.label, rating.attribute, rating.value_num, rating.unit) == (
+        "CLASS", "pressure_class", 300.0, "class",
+    )  # fmt: skip
+    assert size.parent_id == rating.parent_id == "1.1"
+
+
+def test_fractional_size_and_rating(ontology: Ontology) -> None:
+    size, rating = leaves(item_requirements(_sized("Size: 3/4 inch # 800 Class"), ontology, SPLIT))
+    assert (size.value_num, rating.value_num) == (0.75, 800.0)
+
+
+def test_parts_of_a_size_line_do_not_all_become_sizes(ontology: Ontology) -> None:
+    line = 'SIZE:2", PN50, BW ENDS, STEM LENGTH 220 MM MIN, BODY A351CF8'
+    size, rating, ends, stem, body = leaves(item_requirements(_sized(line), ontology, SPLIT))
+    assert (size.label, size.attribute, size.value_num) == ("SIZE", "nominal_size", 2.0)
+    assert (rating.label, rating.attribute, rating.unit) == ("CLASS", "pressure_class", "pn")
+    assert (ends.label, ends.value_text) == (None, "BW ENDS")
+    assert (stem.label, stem.attribute) == (None, None)  # a length is not the stem material
+    assert (body.label, body.attribute, body.value_text) == ("BODY", "body_material", "A351CF8")
+
+
+def test_flanged_ended_under_size_is_no_size(ontology: Ontology) -> None:
+    size, rating, ends = leaves(
+        item_requirements(_sized("Size: 6 inch # 300 Class, Flanged Ended"), ontology, SPLIT)
+    )
+    assert (size.value_num, rating.value_num) == (6.0, 300.0)
+    assert ends.label is None
+
+
+def test_a_bare_size_in_a_list_is_labelled(ontology: Ontology) -> None:
+    line = "THE VALVE SHALL BE WAFER TYPE, DN50, CLASS 150 OR HIGHER, 150#"
+    parts = leaves(item_requirements(_sized(line), ontology, SPLIT))
+    by_value = {p.value_text: p for p in parts}
+    assert by_value["DN50"].attribute == "nominal_size"
+    assert by_value["CLASS 150 OR HIGHER"].operator is Operator.GTE
+    assert by_value["150#"].attribute == "pressure_class"
+
+
+@pytest.mark.parametrize(
+    ("title", "size"),
+    [
+        ("BALL VALVE DN20 MM", "dn20 mm"),
+        ("BUTTERFLY VALVE DN 80 MM", "dn 80 mm"),
+        ("TRIPLE OFFSET BUTTERFLY VALVE,250MM", "250mm"),
+        ("Globe Valve of size 3inches with full bore", "3inches"),
+        ("Check Valve 40 NB", "40 nb"),
+        ("Globe Valve Size 25mm", "25mm"),
+        ('Gate valve 1-1/2" flanged', '1-1/2"'),
+        ("GATE VALVE", None),
+        ("GLOBE VALVE STEM LENGTH 220 MM", None),  # a length, not a size
+        ("Globe Valve 40 NB , Globe Valve 50 NB", None),  # two sizes: never guessed
+        ("Globe Valve A182 F316-1.5 Inch", None),  # inside a code
+    ],
+)
+def test_title_size(title: str, size: str | None) -> None:
+    assert title_size(title) == size
+
+
+# ---------------------------------------------------------------- temperature ranges
+
+
+@pytest.mark.parametrize(
+    ("value", "low", "high"),
+    [
+        ("-40 Deg. C to +40 Deg. C", -40.0, 40.0),
+        ("(-196 DEG C) TO 120 DEG C", -196.0, 120.0),
+        ("-29 to 120 degC", -29.0, 120.0),
+        ("0 degrees C - 80 degrees C", 0.0, 80.0),
+        ("356\u00b0C", 356.0, None),
+    ],
+)
+def test_temperature_is_numeric(
+    value: str, low: float, high: float | None, ontology: Ontology
+) -> None:
+    parsed = parse_value("Design Temp.", value, ontology, 2)
+    assert (parsed.kind, parsed.number, parsed.number_max) == (ValueKind.NUMERIC, low, high)
+    assert parsed.canonical_unit == "degC"
+    assert resolve_attribute("Design Temp.", parsed, ontology) == "max_temperature"
+
+
+def test_a_range_of_temperatures_has_the_range_operator(ontology: Ontology) -> None:
+    assert parse_value("T", "-40 Deg. C to +40 Deg. C", ontology, 2).operator is Operator.RANGE
+
+
+def test_up_to_a_temperature_is_an_upper_limit(ontology: Ontology) -> None:
+    parsed = parse_value("Temperature", "Up to 80\u00b0 C", ontology, 2)
+    assert (parsed.number, parsed.operator) == (80.0, Operator.LTE)
+    assert resolve_attribute("Temperature", parsed, ontology) == "max_temperature"
+
+
+@pytest.mark.parametrize("value", ["Low Temperature Test", "40 mm", "Ambient", "1020 - 1070"])
+def test_other_values_are_no_temperature(value: str) -> None:
+    assert temperature_form(value) is None
+
+
+def test_temperature_part_of_a_list_is_labelled(ontology: Ontology) -> None:
+    line = "GLOBE VALVE, TEMP DESIGN (-196 DEG C) TO 120 DEG C, BODY A351CF8"
+    parts = leaves(item_requirements(_sized(line), ontology, SPLIT))
+    temperature = next(p for p in parts if p.label == "TEMP DESIGN")
+    assert temperature.attribute == "max_temperature"
+    assert (temperature.value_min, temperature.value_max) == (-196.0, 120.0)
+
+
+# ---------------------------------------------------------------- keys inside a value
+
+
+@pytest.mark.parametrize(
+    ("line", "label", "value"),
+    [
+        ("MATERIAL: Body: ASTM A216 Grade WCB", "Body", "ASTM A216 Grade WCB"),
+        ("TRIM: DISC/BONNET: CI", "DISC/BONNET", "CI"),
+        ("MoC & other details: DESIGN SPEC: BS 5152", "DESIGN SPEC", "BS 5152"),
+        # Not keys: a sentence, a digit in the key, a web address.
+        (
+            "Inspection: shall be carried out as per standard IS: 14220",
+            "Inspection",
+            "shall be carried out as per standard IS: 14220",
+        ),
+        ("BODY: EN 1561 NOMINAL SIZE: 50 MM", "BODY", "EN 1561 NOMINAL SIZE: 50 MM"),
+        ("website: https://example.invalid", "website", "https://example.invalid"),
+    ],
+)
+def test_inline_keys(line: str, label: str, value: str) -> None:
+    [group] = group_lines([line], "TITLE", 6)
+    assert (group.label, group.value) == (label, value)
+
+
+def test_inline_key_gives_the_attribute(ontology: Ontology) -> None:
+    [body] = leaves(item_requirements(_sized("MATERIAL: Body: ASTM A216 WCB"), ontology, SPLIT))
+    assert (body.label, body.attribute) == ("Body", "body_material")
+
+
+def test_inline_keys_in_a_list(ontology: Ontology) -> None:
+    line = "MATERIAL: Body: ASTM A216 WCB, Disc: CF8M, Seat: EPDM"
+    parts = leaves(item_requirements(_sized(line), ontology, SPLIT))
+    assert [p.attribute for p in parts] == ["body_material", "disc_material", "seat_material"]
+
+
+# ---------------------------------------------------------------- bare millimetres
+
+
+def test_bare_mm_right_after_the_item_name_is_its_size(ontology: Ontology) -> None:
+    parts = leaves(item_requirements(_sized("GATE VALVE, 15MM, CLASS: 800"), ontology, SPLIT))
+    by_value = {p.value_text: p for p in parts}
+    assert (by_value["15MM"].label, by_value["15MM"].attribute) == ("SIZE", "nominal_size")
+    assert by_value["15MM"].value_num == 15.0
+
+
+def test_bare_mm_anywhere_else_stays_unlabelled(ontology: Ontology) -> None:
+    parts = leaves(item_requirements(_sized("WAFER TYPE, 28 mm, CLASS: 800"), ontology, SPLIT))
+    assert {p.value_text: p for p in parts}["28 mm"].label is None
+
+
+# ---------------------------------------------------------------- key merged into its value
+
+
+@pytest.mark.parametrize(
+    ("line", "label", "attribute", "value"),
+    [
+        ("Pump Shaft Carbon Steel", "Pump Shaft", "stem_material", "Carbon Steel"),
+        ("Casing CAST IRON IS 210: FG 2", "Casing", "casing_material", "CAST IRON IS 210: FG 2"),
+        ("shaft SS ASTM A276-410ANLD", "shaft", "stem_material", "SS ASTM A276-410ANLD"),
+        ("impeller BRONZE IS:318 GR", "impeller", "impeller_material", "BRONZE IS:318 GR"),
+    ],
+)
+def test_key_merged_into_a_material_is_split(
+    line: str, label: str, attribute: str, value: str, ontology: Ontology
+) -> None:
+    [part] = item_requirements(_sized(line), ontology, SPLIT)
+    assert (part.label, part.attribute, part.value_text) == (label, attribute, value)
+    assert part.raw_text == line  # the quote stays as printed
+
+
+def test_a_colon_inside_the_material_is_no_key_when_a_list_follows(ontology: Ontology) -> None:
+    parts = leaves(item_requirements(_sized("impeller BRONZE IS:318, CLOSED"), ontology, SPLIT))
+    assert (parts[0].label, parts[0].value_text) == ("impeller", "BRONZE IS:318")
+    assert parts[0].raw_text == "BRONZE IS:318"
+
+
+def test_a_merged_key_starts_a_new_requirement(ontology: Ontology) -> None:
+    item = LineItem(
+        item_no="1",
+        title="PUMP",
+        description_lines=["Casing : CAST IRON", "enclosed", "shaft SS ASTM A276"],
+        document="b.pdf",
+        page_number=1,
+    )
+    casing, shaft = item_requirements(item, ontology, SPLIT)
+    assert casing.value_text == "CAST IRON enclosed"
+    assert shaft.attribute == "stem_material"
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Shaft Nut - 1 No.",
+        "Stem Length 220 mm",
+        "Bronze impeller is required",
+        "Cast Iron",
+        "Casing : CAST IRON",
+        "Casing - CAST IRON",
+    ],
+)
+def test_lines_that_are_not_a_merged_key(line: str, ontology: Ontology) -> None:
+    assert merged_line_key(line, ontology, SPLIT.label_max_words) is None
+
+
+def test_a_part_that_is_no_material_does_not_keep_a_merged_key(ontology: Ontology) -> None:
+    parts = leaves(
+        item_requirements(_sized("impeller BRONZE IS:318, Type -enclosed"), ontology, SPLIT)
+    )
+    by_value = {p.value_text: p for p in parts}
+    assert by_value["BRONZE IS:318"].attribute == "impeller_material"
+    assert by_value["Type -enclosed"].attribute is None
+
+
+def test_no_ontology_no_merged_key() -> None:
+    assert merged_line_key("Pump Shaft Carbon Steel", None, SPLIT.label_max_words) is None
+
+
+def test_motor_body_is_not_the_pump_body(ontology: Ontology) -> None:
+    parsed = parse_value("Motor Body", "Cast Iron", ontology, SPLIT.enum_max_words)
+    assert resolve_attribute("Motor Body", parsed, ontology) == "motor_body_material"

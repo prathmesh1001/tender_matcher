@@ -35,6 +35,8 @@ class CandidateSummary(BaseModel):
     sha256: str
     title: str
     sub_type_fit: SubTypeFit
+    critical_met: float = 0.0
+    critical_failed: int = 0
     fit_score: float
     decided: int
 
@@ -82,6 +84,25 @@ class RankingEntry(BaseModel):
     )
 
 
+class Citation(BaseModel):
+    """A tender line behind a statement: file, page, words as printed."""
+
+    model_config = ConfigDict(frozen=True)
+
+    document: str
+    page_number: int = Field(ge=1)
+    quote: str
+
+
+class SingleFirmWarning(BaseModel):
+    """The tender says only one firm is acceptable. The reader must see this first."""
+
+    model_config = ConfigDict(frozen=True)
+
+    makes: list[str] = Field(description="The firm, if the tender says which.")
+    citations: list[Citation]
+
+
 class TenderReport(BaseModel):
     """Everything one match run produced for one tender."""
 
@@ -89,6 +110,10 @@ class TenderReport(BaseModel):
 
     tender: str = Field(description="Tender folder name (bid number with underscores).")
     bid_number: str
+    single_firm: SingleFirmWarning | None = Field(
+        default=None,
+        description="Set if only one firm is acceptable; separate from `named_makes`.",
+    )
     tender_files: list[str]
     generated_at: datetime
     ontology_used: bool

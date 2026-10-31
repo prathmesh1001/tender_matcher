@@ -79,6 +79,12 @@ class DocumentResult(BaseModel):
     title: str
     declared_sub_types: list[str]
     sub_type_fit: SubTypeFit
+    critical_met: float = Field(
+        default=0.0, description="Sum of status scores over critical requirements."
+    )
+    critical_failed: int = Field(
+        default=0, ge=0, description="Critical requirements the document states and fails."
+    )
     fit_score: float = Field(description="Sum of status scores over decided requirements.")
     decided: int = Field(ge=0, description="Requirements with a rule decision.")
     comparisons: list[Comparison]

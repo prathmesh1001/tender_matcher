@@ -8,7 +8,7 @@ schedule become general requirements, so nothing a tender asks for is silently i
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Final
 
 from app.core.config import Settings
@@ -23,8 +23,8 @@ from app.tender.classifier import RequirementClassifier
 from app.tender.general import general_requirements
 from app.tender.line_items import ItemColumnOptions, is_schedule_row, line_items
 from app.tender.link_fetcher import BID_ROLE
-from app.tender.normalizer import words
-from app.tender.splitter import SplitOptions, item_requirements
+from app.tender.normalizer import stems, title_size, words
+from app.tender.splitter import SIZE_LABEL, SplitOptions, item_requirements
 
 SIZE_DIFFERS_FROM_TITLE: Final = "size_differs_from_title"
 MAKE_LABEL: Final = "MAKE"
@@ -51,6 +51,7 @@ class RequirementOptions:
             split=SplitOptions(
                 label_max_words=settings.TENDER_LABEL_MAX_WORDS,
                 enum_max_words=settings.TENDER_ENUM_MAX_WORDS,
+                inline_key_max_words=settings.TENDER_INLINE_KEY_MAX_WORDS,
             ),
             classifier=RequirementClassifier.from_settings(settings),
             designation_prefixes=tuple(settings.COMPARATOR_DESIGNATION_PREFIXES),
@@ -80,20 +81,41 @@ def _named(title_words: list[str], product: ProductType) -> bool:
     return False
 
 
+def product_types_named(title: str, ontology: Ontology) -> list[str]:
+    """Product types a title names: as a phrase, else with its words in any order.
+
+    "CENTRIFUGAL HORIZONTAL PUMP" names `centrifugal_pump`. The exact phrase goes first, so
+    a title naming a phrase is not also read as every type sharing its words.
+
+    Args:
+        title: The item title.
+        ontology: Its product types and synonyms.
+
+    Returns:
+        The names of the types found.
+    """
+    title_words = words(fold_text(title))
+    exact = [p.name for p in ontology.product_types if _named(title_words, p)]
+    if exact:
+        return exact
+    in_title = set(stems(title))
+    return [
+        p.name
+        for p in ontology.product_types
+        if any(set(stems(synonym)) <= in_title for synonym in p.synonyms)
+    ]
+
+
 def ontology_for(title: str, ontologies: Sequence[Ontology]) -> Ontology | None:
     """The first ontology whose product types the item title names, or None."""
-    title_words = words(fold_text(title))
-    return next(
-        (o for o in ontologies if any(_named(title_words, p) for p in o.product_types)), None
-    )
+    return next((o for o in ontologies if product_types_named(title, o)), None)
 
 
 def product_type_for(title: str, ontology: Ontology | None) -> str | None:
     """The one product type the item title names; None for none or several (never guessed)."""
     if ontology is None:
         return None
-    title_words = words(fold_text(title))
-    found = [p.name for p in ontology.product_types if _named(title_words, p)]
+    found = product_types_named(title, ontology)
     return found[0] if len(found) == 1 else None
 
 
@@ -146,6 +168,8 @@ def _classified(
             "evidence": line.evidence,
             "mandatory": line.mandatory,
             "named_make": line.named_make,
+            "single_firm": line.single_firm,
+            "acceptable_makes": list(line.acceptable_makes),
             "or_equivalent": line.or_equivalent,
             "product_type": product_type,
             "flags": [SIZE_DIFFERS_FROM_TITLE] if conflict else [],
@@ -169,6 +193,7 @@ def _header_make(
         product_type=product_type,
         mandatory=True,
         named_make=make,
+        single_firm=True,
         kind=ValueKind.TEXT,
         operator=Operator.TEXT,
         value_text=make,
@@ -195,6 +220,40 @@ def item_entry(
         requirements=[*requirements, make] if make else requirements,
         product_type=product_type,
     )
+
+
+def with_title_size(
+    entry: ItemRequirements, options: RequirementOptions, ontologies: Sequence[Ontology]
+) -> ItemRequirements:
+    """An item with its title's size as a requirement, if the title is all that states one.
+
+    Only for an item of a known product type: a size in any other title may mean anything.
+
+    Args:
+        entry: The item and its requirements.
+        options: Splitting thresholds and classifier.
+        ontologies: Loaded ontologies.
+
+    Returns:
+        The item, with one more requirement if none states the size and the title states one.
+    """
+    ontology = ontology_for(entry.item.title, ontologies)
+    size = title_size(entry.item.title)
+    if ontology is None or entry.product_type is None or size is None:
+        return entry
+    for requirement in entry.requirements:
+        attribute = ontology.attribute(requirement.attribute) if requirement.attribute else None
+        if attribute is not None and attribute.nominal_pipe_size:
+            return entry
+    item_no = entry.item.item_no
+    line = entry.item.model_copy(
+        update={"item_no": f"{item_no}.title", "description_lines": [f"{SIZE_LABEL} : {size}"]}
+    )
+    added = [
+        r.model_copy(update={"item_no": item_no, "raw_text": entry.item.title})
+        for r in item_entry(line, options, ontologies).requirements
+    ]
+    return replace(entry, requirements=[*entry.requirements, *added])
 
 
 def tender_requirements(

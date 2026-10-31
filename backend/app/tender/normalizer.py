@@ -9,6 +9,7 @@ Raw pint is never applied to printed units: it reads "MM" as megamolar.
 
 import re
 from dataclasses import dataclass
+from fractions import Fraction
 from functools import lru_cache
 from typing import Final
 
@@ -44,6 +45,106 @@ _OPTION_OR: Final = re.compile(
     r"\s+or\s+(?!(?:equivalent|equal|similar|better|higher|above|more|lower|less)\b)",
     re.IGNORECASE,
 )
+
+
+_TEMPERATURE_UNIT: Final = "degc"
+# Sizes and ratings are matched on folded text, so curly quotes are already straight.
+_INCH_NUMBER: Final = r"\d+\s*-\s*\d+/\d+|\d+/\d+|\d+(?:\.\d+)?"
+_INCH_UNIT: Final = r"(?:\"|''|inch(?:es)?\b|in\b)"
+_SIZE_PATTERN: Final = (
+    rf"(?:dn|nb)\s*-?\s*(?P<dn>\d+)(?:\s*mm\b)?|(?P<nb>\d+)\s*nb\b"
+    rf"|(?P<inch>{_INCH_NUMBER})\s*{_INCH_UNIT}"
+)
+_SIZE_VALUE: Final = re.compile(_SIZE_PATTERN)
+_RATING_VALUE: Final = re.compile(
+    r"class\s*[#:]?\s*(?P<a>\d+)|#\s*(?P<b>\d+)(?:\s*class\b)?|(?P<c>\d+)\s*(?:#|lbs?\b|class\b)"
+)
+# The rating at the end of a size + rating value: "6 inch # 300 Class".
+_RATING_SUFFIX: Final = re.compile(
+    r"(?:#\s*\d+(?:\s*class)?|class\s*[#:]?\s*\d+)\s*$", re.IGNORECASE
+)
+# A size in an item title, where words surround it. A title's "mm" needs "size" or a comma before
+# it: "STEM LENGTH 220 MM" is not a size. "(?<![\w.-])" keeps "F316-1.5 Inch" codes out.
+_TITLE_SIZE: Final = re.compile(
+    rf"(?<![\w.-])(?P<size>(?:dn|nb)\s*-?\s*\d+(?:\s*mm\b)?|\d+\s*nb\b"
+    rf"|(?:{_INCH_NUMBER})\s*{_INCH_UNIT})"
+    r"|(?:\bsize\s*:?\s*|,\s*)(?P<mm>\d+(?:\.\d+)?\s*mm\b)"
+)
+
+# A temperature: "-40 Deg. C", "(-196 DEG C)", "80° C"; a range joins two with "to" or a dash.
+_DEGREES: Final = r"(?:deg(?:ree)?s?\.?\s*c(?:elsius)?\b|°\s*c\b)"
+_TEMPERATURE: Final = rf"\(?\s*(?P<{{name}}>[+-]?\d+(?:\.\d+)?)\s*{_DEGREES}\s*\)?"
+_TEMPERATURE_VALUE: Final = re.compile(
+    _TEMPERATURE.format(name="low")
+    + r"(?:\s*(?:to|~|-)\s*"
+    + _TEMPERATURE.format(name="high")
+    + ")?"
+)
+
+
+def temperature_form(value: str) -> tuple[float, float | None] | None:
+    """The numbers of a value that is only a temperature or a temperature range.
+
+    Args:
+        value: A value as printed ("-40 Deg. C to +40 Deg. C").
+
+    Returns:
+        `(low, high)`, `high` None for one temperature; None if the value is anything else.
+    """
+    found = _TEMPERATURE_VALUE.fullmatch(fold_text(value).strip())
+    if found is None:
+        return None
+    high = found.group("high")
+    return float(found.group("low")), float(high) if high else None
+
+
+def _inches(text: str) -> float:
+    """Inches as printed: "3/4", "1-1/2" or "1.5"."""
+    whole, _, rest = text.replace(" ", "").partition("-")
+    return float(Fraction(whole) + Fraction(rest)) if rest else float(Fraction(whole))
+
+
+def size_form(value: str) -> tuple[float, str] | None:
+    """The number and unit of a value that is only a pipe size.
+
+    DN and NB are millimetres (DN25 MM -> 25 mm); inches keep their fractions (3/4" -> 0.75).
+
+    Args:
+        value: A value as printed.
+
+    Returns:
+        `(number, "mm" | "inch")`, or None if the value is anything else.
+    """
+    found = _SIZE_VALUE.fullmatch(fold_text(value).strip())
+    if found is None:
+        return None
+    if found.group("inch"):
+        return _inches(found.group("inch")), "inch"
+    return float(found.group("dn") or found.group("nb")), "mm"
+
+
+def rating_form(value: str) -> float | None:
+    """The class number of a value that is only a rating ("# 300", "150#", "Class 800"), or None."""
+    found = _RATING_VALUE.fullmatch(fold_text(value).strip())
+    return float(found.group("a") or found.group("b") or found.group("c")) if found else None
+
+
+def split_size_rating(value: str) -> tuple[str, str] | None:
+    """A compound value's size and rating ("6 inch # 300 Class" -> "6 inch", "# 300 Class")."""
+    found = _RATING_SUFFIX.search(value)
+    if found is None:
+        return None
+    size, rating = value[: found.start()].strip(), value[found.start() :].strip()
+    return (size, rating) if size_form(size) and rating_form(rating) else None
+
+
+def title_size(title: str) -> str | None:
+    """The one size an item title states, as printed; None for none or several (never guessed)."""
+    found = {
+        " ".join((m.group("size") or m.group("mm")).split())
+        for m in _TITLE_SIZE.finditer(fold_text(title))
+    }
+    return next(iter(found)) if len(found) == 1 else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +233,8 @@ def _numeric(
     canonical = None
     if unit and not designation and ontology is not None:
         canonical = ontology.units.get(unit)
+    if unit is None and "class" in words(label or ""):
+        unit = "class"  # "CLASS : 800 OR HIGHER": the label says what the bare number is
     number2 = match.group("num2")
     operator = Operator.RANGE if number2 else operator_for(label, value)
     return ParsedValue(
@@ -161,6 +264,35 @@ def parse_value(
     stripped = value.strip().rstrip(".")
     # "PN 16 OR HIGHER": the direction words set the operator, the rest is the number.
     bare = _AT_MOST_VALUE.sub("", _AT_LEAST_VALUE.sub("", fold_text(stripped))).strip()
+    size = size_form(bare)
+    if size is not None:
+        canonical = ontology.units.get(size[1]) if ontology is not None else None
+        return ParsedValue(
+            kind=ValueKind.NUMERIC,
+            operator=operator_for(label, stripped),
+            number=size[0],
+            unit=size[1],
+            canonical_unit=canonical,
+        )
+    temperature = temperature_form(bare)
+    if temperature is not None:
+        low, high = temperature
+        return ParsedValue(
+            kind=ValueKind.NUMERIC,
+            operator=Operator.RANGE if high is not None else operator_for(label, stripped),
+            number=low,
+            number_max=high,
+            unit=_TEMPERATURE_UNIT,
+            canonical_unit=ontology.units.get(_TEMPERATURE_UNIT) if ontology is not None else None,
+        )
+    rating = rating_form(bare)
+    if rating is not None:
+        return ParsedValue(
+            kind=ValueKind.NUMERIC,
+            operator=operator_for(label, stripped),
+            number=rating,
+            unit="class",
+        )
     match = _NUMERIC_VALUE.match(bare)
     if match:
         return _numeric(match, label, stripped, ontology)

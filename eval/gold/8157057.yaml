@@ -1,0 +1,104 @@
+# Hand labels for tender GEM/2026/B/8157057, copied from docs/manual_match_check.md section 2.
+# Requirements the section does not label are left out and reported as "not labelled" by the diff.
+# Its rows on the butterfly type and the worm gear + handwheel have no atomic requirement here:
+# they are in the item title, so they cannot be compared.
+#
+# Status: full_match | partial_match | missing_capability | unsupported (manual "NONE").
+tender: GEM_2026_B_8157057
+source: docs/manual_match_check.md (section 2)
+
+evaluations:
+  - item_no: "1"
+    manufacturer: LnT_Valves
+    document: lt_aquaseal_butterfly_check.pdf
+    manual_fit: 0.90
+    manual_coverage: "9/9"
+    requirements:
+      - id: "1.1.2"
+        manual_row: Size 450 mm
+        status: full_match
+        pages: [4]
+        evidence: 'p4 "sizes from 50 mm (2") to 600 mm (24"), in PN 10" (range)'
+      - id: "1.1.3"
+        manual_row: PN10
+        status: full_match
+        pages: [4]
+        evidence: p4 same sentence
+      - id: "1.1.4"
+        manual_row: Body cast iron
+        status: full_match
+        pages: [4]
+        evidence: 'p4 "Body Cast Iron EN 1561 (BS 1452) Gr. 200, Gr. 250"'
+      - id: "1.1.5"
+        manual_row: Disc SG iron
+        status: partial_match
+        pages: [4, 8]
+        evidence: Aquaseal 10 disc is cast iron / CF8M (p4); SG iron disc only in Aquaseal 16 (p8), another model
+      - id: "1.1.6"
+        manual_row: Seat EPDM
+        status: full_match
+        pages: [4]
+        evidence: 'p4 "Body Liner Nitrile, EPDM"'
+      - id: "1.1.7"
+        manual_row: Design EN 593
+        status: full_match
+        pages: [4]
+        evidence: 'p4 "Valve Design EN 593 (BS 5155)"'
+      - id: "1.1.8"
+        manual_row: Service water
+        status: full_match
+        pages: [4]
+        evidence: 'p4 "reliable sealing in water and air lines"'
+
+  - item_no: "1"
+    manufacturer: Delval
+    document: delval_series_50_52_centric_bfv_spec.pdf
+    manual_fit: 1.00
+    manual_coverage: "7/9"
+    requirements:
+      - id: "1.1.2"
+        manual_row: 450 mm, PN10
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "14"-24" (DN 350 – DN 600) 150 psi (10.0 barg)"'
+      - id: "1.1.3"
+        manual_row: 450 mm, PN10
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "14"-24" (DN 350 – DN 600) 150 psi (10.0 barg)"'
+        note: 'Manual check needs review: p2 "*Max. pressure rating limited to 6 Bar" applies to some options.'
+      - id: "1.1.4"
+        manual_row: Body cast iron
+        status: full_match
+        pages: [2]
+        evidence: 'p2 "Body: ASTM A126 Gr B" (grey cast iron)'
+      - id: "1.1.5"
+        manual_row: Disc SG iron
+        status: full_match
+        pages: [2]
+        evidence: 'p2 "Disc: ASTM A536 Gr. 65-45-12" (ductile = SG iron)'
+      - id: "1.1.6"
+        manual_row: Seat EPDM
+        status: full_match
+        pages: [2]
+        evidence: 'p2 "Seat: EPDM / WHITE EPDM …"'
+      - id: "1.1.7"
+        manual_row: Centric butterfly, EN 593
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "Series 50 Wafer or Series 52 Lugged"; "Design: BS EN 593"'
+      - id: "1.1.8"
+        manual_row: Worm gear + handwheel, service water
+        status: unsupported
+        evidence: not in this bulletin
+
+# Product labels per catalogue (Layer 2 of the manual check). Both also carry NAMED MAKE.
+products:
+  - item_no: "1"
+    manufacturer: LnT_Valves
+    document: lt_aquaseal_butterfly_check.pdf
+    label: full
+  - item_no: "1"
+    manufacturer: Delval
+    document: delval_series_50_52_centric_bfv_spec.pdf
+    label: full

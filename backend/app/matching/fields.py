@@ -7,6 +7,8 @@ printed line, so a chunk is cut into fields:
   prose      one field per "Label: value" line group (wrapped lines continue the value), and
              one unlabelled field per other line ("Size range 80 to 2500 mm")
 Only columns printed in the chunk's text are used: a version chunk shows one version column.
+A key cell can swallow the first column's values when the table has no key column of its own
+("Pump Shaft" / "Carbon Steel" on separate lines of one cell): it is split into key and value.
 Rows of a dimension table are flagged; their numbers never decide a requirement.
 """
 
@@ -90,6 +92,46 @@ def _row_key(cells: Sequence[str], shown: Sequence[int]) -> int | None:
     return next((i for i in shown if any(ch.isalpha() for ch in cells[i])), None)
 
 
+def merged_key(lines: Sequence[str], siblings: Sequence[str]) -> tuple[str, str] | None:
+    """Split a key cell holding its row's first values: ("Pump Shaft", "Carbon Steel ...").
+
+    The value starts at the first printed line, after the first, whose words also appear in
+    another cell of the row. Line breaks and siblings are both needed: "Gate Valve" next to
+    "Valve" is one line, and a wrapped key ("Wear" / "Ring") shares nothing with its row. A
+    sibling equal to the cell is that cell spread over merged columns, so it proves nothing. The
+    key must hold a word, and bare numbers never count as a value (B4).
+
+    Args:
+        lines: The cell's lines as printed.
+        siblings: The row's other cells.
+
+    Returns:
+        The key and the value, or None if the cell is not merged.
+    """
+    whole = " ".join(words(" ".join(lines)))
+    others = [f" {' '.join(words(s))} " for s in siblings if " ".join(words(s)) != whole]
+    for n, line in enumerate(lines[1:], start=1):
+        wanted = " ".join(words(line))
+        if any(ch.isalpha() for ch in wanted) and any(f" {wanted} " in o for o in others):
+            key = " ".join(lines[:n])
+            return (key, " ".join(lines[n:])) if any(ch.isalpha() for ch in key) else None
+    return None
+
+
+def _key_parts(chunk: ChunkDraft, cells: Sequence[str], key: int | None) -> tuple[str, str]:
+    """A row's key text and the value its key cell also holds ("" if the cell is only a key)."""
+    if key is None:
+        return "", ""
+    if key != 0:  # only a table's first column can hold a key that has no column of its own
+        return cells[key], ""
+    lines: list[list[str]] = chunk.meta.get("cell_lines", [])
+    siblings = [c for i, c in enumerate(cells) if i != key]
+    split = merged_key(lines[key], siblings) if key < len(lines) else None
+    if split is None or f"{split[0]} {split[1]}" != cells[key]:
+        return cells[key], ""
+    return split
+
+
 def table_fields(chunk: ChunkDraft, options: FieldOptions) -> list[CatalogueField]:
     """Fields of one table-row chunk (see module doc).
 
@@ -114,16 +156,24 @@ def table_fields(chunk: ChunkDraft, options: FieldOptions) -> list[CatalogueFiel
         if c and _pair(h, c) in chunk.raw_text
     ]
     key = _row_key(cells, shown)
+    key_text, key_value = _key_parts(chunk, cells, key)
+    # Cells wrap across columns on the page, so a split row cites its cells line by line.
+    lines: list[list[str]] = chunk.meta.get("cell_lines", []) if key_value else []
     out: list[CatalogueField] = []
     for i in shown:
         own = _pair(header[i], cells[i])
+        printed = tuple(lines[i]) if i < len(lines) and lines[i] else (cells[i],)
+        if key_value and key == i:
+            label = f"{key_text} {header[i]}"
+            out.append(CatalogueField(label, key_value, own, printed, dimension, key_text))
+            continue
         if key is None or key == i:
             out.append(CatalogueField(header[i], cells[i], own, (cells[i],), dimension))
             continue
         quote = _span(chunk.raw_text, _pair(header[key], cells[key]), own)
-        label = f"{cells[key]} {header[i]}"
-        parts = (cells[key], cells[i])
-        out.append(CatalogueField(label, cells[i], quote, parts, dimension, cells[key]))
+        label = f"{key_text} {header[i]}"
+        parts = (key_text, *printed)
+        out.append(CatalogueField(label, cells[i], quote, parts, dimension, key_text))
     return out
 
 

@@ -21,6 +21,10 @@ class RequirementRules(BaseModel):
     optional: list[str] = Field(default_factory=list)
     or_equivalent: list[str] = Field(default_factory=list)
     make_patterns: list[str] = Field(default_factory=list)
+    single_firm_patterns: list[str] = Field(default_factory=list)
+    make_list_pattern: str
+    make_list_item_pattern: str
+    make_list_end_pattern: str
     sentence_abbreviations: list[str] = Field(default_factory=list)
     item_start_pattern: str
     item_group_pattern: str
@@ -75,6 +79,12 @@ class Requirement(BaseModel):
     product_type: str | None = Field(default=None, description="Item's ontology product type.")
     mandatory: bool | None = Field(default=None, description="None if the line does not say.")
     named_make: str | None = Field(default=None, description="Make named by the tender (D4).")
+    single_firm: bool = Field(
+        default=False, description="This line says only one firm is acceptable."
+    )
+    acceptable_makes: list[str] = Field(
+        default_factory=list, description="Makes of an acceptable-make list in this line."
+    )
     or_equivalent: bool = Field(default=False, description='The tender accepts "or equivalent".')
     flags: list[str] = Field(default_factory=list, description="Consistency warnings.")
     kind: ValueKind

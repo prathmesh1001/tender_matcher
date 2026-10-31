@@ -153,6 +153,26 @@ def test_item_without_a_description_keeps_its_title(options: RequirementOptions)
     assert (title.label, title.value_text) == (ITEM_LABEL, "GATE VALVE,100MM")
 
 
+def test_size_stated_in_the_spec_is_not_repeated_from_the_title(
+    options: RequirementOptions, ontology: Ontology
+) -> None:
+    files = [
+        TenderFile("bid.pdf", "bid_document", [CATEGORY_ROW]),
+        TenderFile("spec.pdf", "buyer_spec", [_prose("SIZE : 100 MM")]),
+    ]
+    [entry] = parse_tender_files(files, options, [ontology]).items
+    assert [r.value_text for r in leaves(entry.requirements)] == ["100 MM"]
+
+
+def test_title_size_is_used_when_the_spec_states_none(
+    options: RequirementOptions, ontology: Ontology
+) -> None:
+    files = [TenderFile("bid.pdf", "bid_document", [CATEGORY_ROW])]
+    [entry] = parse_tender_files(files, options, [ontology]).items
+    [size] = leaves(entry.requirements)
+    assert (size.attribute, size.value_num) == ("nominal_size", 100.0)
+
+
 def test_no_item_source_still_reports_everything(options: RequirementOptions) -> None:
     files = [TenderFile("bid.pdf", "bid_document", [_prose("Warranty period is 36 months.")])]
     found = parse_tender_files(files, options)

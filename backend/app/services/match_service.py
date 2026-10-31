@@ -32,9 +32,10 @@ from app.matching.engine import ItemInput, general_result, match_item
 from app.matching.scorer import rank
 from app.ontology.loader import load_ontologies
 from app.ontology.schema import Ontology
+from app.reporting.warnings import single_firm_warning
 from app.retrieval.text_normalizer import SearchVocabulary
 from app.schemas.matching import Comparison
-from app.schemas.report import ItemReport, RankingEntry, TenderReport
+from app.schemas.report import ItemReport, RankingEntry, SingleFirmWarning, TenderReport
 from app.schemas.requirements import Requirement
 from app.storage.file_store import FileStore, build_file_store
 from app.tender.items import ItemSource, TenderFile, parse_tender_files
@@ -57,8 +58,19 @@ class ParsedTender:
     @property
     def named_makes(self) -> list[str]:
         """Every make the tender names, anywhere in it."""
-        from_items = [r.named_make for i in self.items for r in i.requirements]
-        return sorted({m for m in (*from_items, *(r.named_make for r in self.general)) if m})
+        return sorted(
+            {make for r in self.every for make in (r.named_make, *r.acceptable_makes) if make}
+        )
+
+    @property
+    def every(self) -> list[Requirement]:
+        """Every requirement of the tender, items first."""
+        return [*(r for i in self.items for r in i.requirements), *self.general]
+
+    @property
+    def single_firm(self) -> SingleFirmWarning | None:
+        """The warning if the tender says only one firm is acceptable."""
+        return single_firm_warning(self.every)
 
 
 class MatchService:
@@ -144,6 +156,7 @@ class MatchService:
         return TenderReport(
             tender=tender,
             bid_number=parsed.bid_number,
+            single_firm=parsed.single_firm,
             tender_files=parsed.files,
             generated_at=datetime.now(UTC),
             ontology_used=use_ontology,

@@ -3,8 +3,11 @@
 # All category knowledge lives here, never in Python (CLAUDE.md section 5):
 #   product_types  what is being bought; sub-types are distinct (B2: triple-offset != concentric)
 #   attributes     canonical attribute names, their unit dimension and the words tenders use;
+#                  `critical` = identifies the product, so it decides which catalogue is chosen;
 #                  `limit: max` = a catalogue value is a rating the product reaches (16 bar
 #                  meets a 10 bar requirement); `nominal_pipe_size` = inch sizes go via nps_to_dn
+#   material_names words that start a material value, so "Pump Shaft Carbon Steel" reads as
+#                  label + value
 #   codes          canonical forms for material/rating/size codes (A4); applied in this order on
 #                  lower-cased, unicode-folded text, so longer codes come before their prefixes
 #   abbreviations  expanded on the query side (A5)
@@ -92,16 +95,19 @@ label_generic_words: [valve, moc, material, parameter, component, part, sl, "no"
 
 attributes:
   - name: nominal_size
+    critical: true
     dimension: length
     canonical_unit: mm
     synonyms: [size, nominal size, nominal bore, nominal diameter, nb, dn, nps, valve size]
     nominal_pipe_size: true
   - name: pressure_rating
+    critical: true
     dimension: pressure
     canonical_unit: bar
     synonyms: [pressure rating, working pressure, design pressure, max pressure, rated pressure, pn]
     limit: max
   - name: pressure_class
+    critical: true
     dimension: none
     synonyms: [class, pressure class, rating, asme class, ansi class]
   - name: test_pressure
@@ -111,8 +117,8 @@ attributes:
   - name: max_temperature
     dimension: temperature
     canonical_unit: degC
-    synonyms: [max temperature, maximum temperature, design temperature, design temp,
-               operating temperature]
+    synonyms: [temperature, max temperature, maximum temperature, design temperature,
+               design temp, temp design, operating temperature]
     limit: max
   - name: min_temperature
     dimension: temperature
@@ -152,7 +158,17 @@ attributes:
     synonyms: [seat, seat material, seat ring, seal ring, liner, body liner, seat liner]
   - name: stem_material
     dimension: none
-    synonyms: [stem, stem material, shaft, shaft material, spindle, hinge pin]
+    synonyms: [stem, stem material, shaft, shaft material, pump shaft, spindle, hinge pin]
+  - name: impeller_material
+    dimension: none
+    synonyms: [impeller, impeller material, impeller moc, moc of impeller]
+  - name: casing_material
+    dimension: none
+    synonyms: [casing, casing material, casing moc, moc of casing, pump casing, delivery casing,
+               volute casing]
+  - name: motor_body_material  # "Motor Body" is not the pump's body
+    dimension: none
+    synonyms: [motor body]
   - name: trim_material
     dimension: none
     synonyms: [trim, trim material]
@@ -168,6 +184,7 @@ attributes:
     synonyms: [operation, operator, actuation, operated]
     values: [lever, gear, handwheel, electric_actuator, pneumatic_actuator]
   - name: design_standard
+    critical: true
     dimension: none
     synonyms: [design standard, design code, manufacturing standard, design]
   - name: test_standard
@@ -176,6 +193,9 @@ attributes:
   - name: face_to_face_standard
     dimension: none
     synonyms: [face to face, face-to-face, f to f]
+
+material_names: [cast iron, ductile iron, sg iron, cast steel, carbon steel, stainless steel,
+                 alloy steel, ss, bronze, gun metal, gunmetal, brass, noryl]
 
 codes:
   # Stainless grades: "SS 316L", "SS-316", "316 SS", "AISI 316"
@@ -263,6 +283,8 @@ equivalents:
   - name: cast_iron
     terms: [cast iron, grey cast iron, gray cast iron, grey iron, ci, A126, A48, IS210, EN1561,
             GG25, FG260]
+  - name: stainless_steel
+    terms: [stainless steel, ss]
   - name: ductile_iron
     terms: [ductile iron, sg iron, sgi, spheroidal graphite iron, di, A536, A395, IS1865,
             EN1563, GGG40, GGG50]
@@ -275,6 +297,8 @@ units:
   metre: m
   in: inch
   inch: inch
+  inches: inch
+  "''": inch
   '"': inch
   bar: bar
   barg: bar

@@ -177,3 +177,90 @@ def test_no_product_type_means_no_document() -> None:
         _Pages(CHUNKS),
     )
     assert (result.chosen, result.documents) == (None, [])
+
+
+# ---------------------------------------------------------------- choosing by identity
+
+
+def _choice(
+    lines: list[str], documents: dict[str, str], valves: Ontology, title: str = "GATE VALVE"
+) -> list[str]:
+    item = LineItem(
+        item_no="1", title=title, description_lines=lines, document="b.pdf", page_number=1
+    )
+    atomic = leaves(item_requirements(item, valves, SplitOptions(6, 2)))
+    chunks = [_prose(_doc(name, (), ("gate_valve",)), text) for name, text in documents.items()]
+    pages = _Pages(chunks)
+    query = ItemQuery("Acme", "1", title, "gate_valve")
+    result = evaluate_item(query, atomic, chunks, MatchContext.for_ontology(valves), OPTIONS, pages)
+    return [d.document for d in result.documents]
+
+
+def test_critical_requirements_beat_coverage(valves: Ontology) -> None:
+    # The second catalogue decides three things, but has the wrong size range.
+    documents = {
+        "big": "Size: 50 mm to 600 mm",
+        "small": "Size: 8 mm to 50 mm\nBody: A 216 Gr. WCB\nDisc: A 351 Gr. CF8M",
+    }
+    lines = ["SIZE : 150 MM", "BODY MOC : ASTM A216 Gr. WCB", "DISC MOC : CF8M"]
+    assert _choice(lines, documents, valves) == ["big.pdf", "small.pdf"]
+
+
+def test_stating_the_wrong_standard_ranks_below_stating_none(valves: Ontology) -> None:
+    documents = {
+        "alpha": "Design: API 602\nBody: A 216 Gr. WCB\nDisc: A 351 Gr. CF8M",
+        "zeta": "Body: A 216 Gr. WCB",
+    }
+    lines = ["VALVE DESIGN : API 600", "BODY MOC : ASTM A216 Gr. WCB", "DISC MOC : CF8M"]
+    assert _choice(lines, documents, valves) == ["zeta.pdf", "alpha.pdf"]
+
+
+def test_with_critical_equal_coverage_decides_then_fit(valves: Ontology) -> None:
+    documents = {
+        "alpha": "Size: 50 mm to 600 mm",
+        "zeta": "Size: 50 mm to 600 mm\nBody: A 105",
+    }
+    lines = ["SIZE : 150 MM", "BODY MOC : ASTM A216 Gr. WCB"]
+    assert _choice(lines, documents, valves) == ["zeta.pdf", "alpha.pdf"]  # one more decided
+
+
+def test_sub_type_still_comes_first(valves: Ontology) -> None:
+    right = _doc("right", ("triple_offset",))
+    wrong = _doc("wrong", ("concentric",))
+    item = LineItem(
+        item_no="1",
+        title=TITLE,
+        description_lines=["VALVE DESIGN : API 609"],
+        document="b.pdf",
+        page_number=1,
+    )
+    atomic = leaves(item_requirements(item, valves, SplitOptions(6, 2)))
+    chunks = [_prose(right, "Body: WCB"), _prose(wrong, "Design: API 609")]
+    pages = _Pages(chunks)
+    query = ItemQuery("Acme", "1", TITLE, "butterfly_valve")
+    result = evaluate_item(query, atomic, chunks, MatchContext.for_ontology(valves), OPTIONS, pages)
+    assert [d.document for d in result.documents] == ["right.pdf", "wrong.pdf"]
+    assert result.documents[1].critical_met == 1.0  # met more, still the wrong product
+
+
+def test_critical_counts_are_reported(valves: Ontology) -> None:
+    item = LineItem(
+        item_no="1",
+        title="GATE VALVE",
+        description_lines=["VALVE DESIGN : API 600", "SIZE : 150 MM"],
+        document="b.pdf",
+        page_number=1,
+    )
+    atomic = leaves(item_requirements(item, valves, SplitOptions(6, 2)))
+    text = "Design: API 602\nSize: 50 mm to 600 mm"
+    chunks = [_prose(_doc("one", (), ("gate_valve",)), text)]
+    query = ItemQuery("Acme", "1", "GATE VALVE", "gate_valve")
+    result = evaluate_item(
+        query, atomic, chunks, MatchContext.for_ontology(valves), OPTIONS, _Pages(chunks)
+    )
+    assert (result.documents[0].critical_met, result.documents[0].critical_failed) == (1.0, 1)
+
+
+def test_a_catalogue_deciding_nothing_never_wins(valves: Ontology) -> None:
+    documents = {"alpha": "A brochure about cryogenic service", "zeta": "Size: 8 mm to 50 mm"}
+    assert _choice(["SIZE : 150 MM"], documents, valves) == ["zeta.pdf", "alpha.pdf"]

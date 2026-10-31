@@ -412,3 +412,56 @@ def test_inline_evidence_value_is_verbatim(valves: Ontology) -> None:
     [evidence] = _compare("PRESSURE RATING : CLASS #150", [cover], valves).evidence
     assert evidence.value == "Class 150 to 1500 | 3” to 100”"
     assert evidence.value in cover.chunk.raw_text
+
+
+@pytest.mark.parametrize(
+    ("printed", "status"),
+    [
+        ('3/8" 1/2"', MISSING),  # small bore: never 8 inch or 2 inch
+        ('1-1/2"', MISSING),
+        ('8"', FULL),
+        ('2" to 12"', FULL),
+    ],
+)
+def test_inch_fractions_are_not_whole_sizes(
+    printed: str, status: MatchStatus, valves: Ontology
+) -> None:
+    result = _compare("SIZE : 8 INCH", [_prose(f"Size: {printed}")], valves)
+    assert result.status is status
+
+
+def test_fraction_size_matches_itself(valves: Ontology) -> None:
+    assert _compare('SIZE : 3/4"', [_prose('Size: 1/2" to 2"')], valves).status is FULL
+
+
+def test_or_equivelent_typo_does_not_block_a_match(valves: Ontology) -> None:
+    body = _row(PARTS, ["1", "Body", "A 216 Gr. WCB"])
+    assert _compare("BODY MOC : ASTM A216 Grade WCB or equivelent", [body], valves).status is FULL
+
+
+@pytest.mark.parametrize(
+    ("printed", "status"),
+    [
+        ("-46\u00b0C to 343\u00b0C", FULL),
+        ("0\u00b0C to 343\u00b0C", PARTIAL),  # only part of the range
+        ("100\u00b0C to 343\u00b0C", MISSING),
+    ],
+)
+def test_temperature_range_is_compared_with_a_range(
+    printed: str, status: MatchStatus, valves: Ontology
+) -> None:
+    field = _prose(f"Temperature: {printed}")
+    assert _compare("Design Temp. : -40 Deg. C to +40 Deg. C", [field], valves).status is status
+
+
+def test_same_material_named_another_way_is_partial(valves: Ontology) -> None:
+    row = _row(["Part", "Material"], ["Stem", "Stainless Steel"])
+    result = _compare("STEM MOC : SS ASTM A276", [row], valves)
+    assert result.status is MatchStatus.PARTIAL_MATCH
+    assert result.needs_review is True
+
+
+def test_another_material_is_still_missing(valves: Ontology) -> None:
+    row = _row(["Part", "Material"], ["Stem", "Cast Iron"])
+    result = _compare("STEM MOC : SS ASTM A276", [row], valves)
+    assert result.status is MatchStatus.MISSING_CAPABILITY

@@ -131,6 +131,8 @@ def general_requirements(
                     evidence=line.evidence,
                     mandatory=line.mandatory,
                     named_make=line.named_make,
+                    single_firm=line.single_firm,
+                    acceptable_makes=list(line.acceptable_makes),
                     or_equivalent=line.or_equivalent,
                     kind=ValueKind.TEXT,
                     operator=Operator.TEXT,

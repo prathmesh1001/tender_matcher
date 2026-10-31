@@ -1,0 +1,167 @@
+# Hand labels for tender GEM/2026/B/7956201, copied from docs/manual_match_check.md section 3.
+# That section labels item 1 row by row and item 7 in one paragraph. Requirements and items it does
+# not label are left out and reported as such by the diff.
+# One manual row can cover several atomic requirements (the size + class of the BOQ line and the
+# same class in the spec schedule).
+#
+# Status: full_match | partial_match | missing_capability | unsupported (manual "NONE").
+tender: GEM_2026_B_7956201
+source: docs/manual_match_check.md (section 3)
+
+evaluations:
+  - item_no: "1"
+    manufacturer: LnT_Valves
+    document: lt_gate_globe_check_api600.pdf
+    manual_fit: 0.92
+    manual_coverage: "15/18"
+    requirements:
+      - id: "1.1.1"
+        manual_row: Size 6"
+        status: full_match
+        pages: [12]
+        evidence: p12 globe dimensions table, 50 (2") to 300 (12")
+      - id: "1.1.2"
+        manual_row: "Rating #300"
+        status: full_match
+        pages: [9]
+        evidence: 'p9 "3 Class 300"'
+      - id: "1.1.3"
+        manual_row: Flanged ends + tongue & groove companion flanges
+        status: partial_match
+        pages: [9]
+        evidence: 'p9 only "Flanged RF / RTJ / Butt-weld"'
+      - id: "1.s1.p6.1"
+        manual_row: Globe valve, bolted bonnet
+        status: full_match
+        pages: [9]
+        evidence: 'p9 "4 Globe"'
+      - id: "1.s1.p6.2"
+        manual_row: "Rating #300"
+        status: full_match
+        pages: [9]
+        evidence: 'p9 "3 Class 300"'
+      - id: "1.s1.p6.3"
+        manual_row: Globe valve, bolted bonnet
+        status: full_match
+        pages: [6]
+        evidence: 'p6 "bolted-bonnet construction"'
+      - id: "1.s1.p6.4"
+        manual_row: Liquid ammonia service
+        status: unsupported
+        evidence: not stated
+      - id: "1.s1.p6.5"
+        manual_row: Design BS 1873
+        status: full_match
+        pages: [5]
+        evidence: 'p5 standards table "BS 1873"'
+      - id: "1.s1.p6.6"
+        manual_row: Testing API 598
+        status: full_match
+        pages: [5]
+        evidence: 'p5 "API 598"'
+      - id: "1.s1.p6.7"
+        manual_row: Body & bonnet LCB
+        status: full_match
+        pages: [9]
+        evidence: 'p9 "LCB for ASTM A352 Gr. LCB"'
+      - id: "1.s1.p6.8"
+        manual_row: Trim "12 -> 16"
+        status: full_match
+        pages: [9]
+        evidence: p9 trim nos. 12 and 16 offered; the tender wording is ambiguous
+        note: Manual check marks this for review.
+      - id: "1.s1.p6.9"
+        manual_row: Disc LCB + HF
+        status: partial_match
+        pages: [12]
+        evidence: standard disc "ASTM A216 Gr. WCB + 13% Cr. Steel" (p12); LCB disc not shown
+      - id: "1.s1.p6.10"
+        manual_row: Gasket graphite
+        status: partial_match
+        pages: [6]
+        evidence: p6 graphite gasket stated for Class 150 joints; Class 300 joint differs
+      - id: "1.s1.p6.11"
+        manual_row: Packing graphite
+        status: full_match
+        pages: [12]
+        evidence: 'p12 "Graphite with braided end rings"'
+      - id: "1.s1.p6.12"
+        manual_row: Operator gear / handwheel
+        status: full_match
+        pages: [9, 12]
+        evidence: 'p9 "GO for Gear Operation"; p12 "Handwheel"'
+      - id: "1.s1.p6.13"
+        manual_row: Flanged ends + tongue & groove companion flanges
+        status: partial_match
+        pages: [9]
+        evidence: 'p9 only "Flanged RF / RTJ / Butt-weld"'
+      - id: "1.s1.p6.14"
+        manual_row: Bolting B7 / 2H
+        status: full_match
+        pages: [12]
+        evidence: 'p12 "ASTM A193 Gr. B7", "ASTM A194 Gr. 2H"'
+      - id: "1.s1.p6.15"
+        manual_row: Stem SS316
+        status: full_match
+        pages: [9]
+        evidence: 'p9 trim 12/16 stem "SS 316"'
+      - id: "1.s1.p6.16"
+        manual_row: Design temp -40 to +40 °C
+        status: full_match
+        pages: [5]
+        evidence: 'p5 "ASTM A352 Gr. LCB/LCC -46°C to 343°C"'
+      - id: "1.s1.p6.17"
+        manual_row: Low-temperature test
+        status: unsupported
+        evidence: not stated
+      - id: "1.s1.p6.18"
+        manual_row: Design pressure 40 bar
+        status: unsupported
+        evidence: p5 points to "pages 26" for P-T ratings; the PDF has 24 pages
+
+  - item_no: "7"
+    manufacturer: LnT_Valves
+    document: lt_gate_globe_check_api602.pdf
+    requirements:
+      - id: "7.1.2"
+        manual_row: class 800
+        status: full_match
+        pages: [3, 4, 5, 6]
+        evidence: class 800 (p3-6)
+      - id: "7.s2.p6.2"
+        manual_row: class 800
+        status: full_match
+        pages: [3, 4, 5, 6]
+        evidence: class 800 (p3-6)
+      - id: "7.s2.p6.5"
+        manual_row: API 602
+        status: full_match
+        pages: [1]
+        evidence: API 602 (p1)
+      - id: "7.s2.p6.7"
+        manual_row: Stellite seat
+        status: full_match
+        pages: [4]
+        evidence: Stellite seat (p4)
+      - id: "7.s2.p6.8"
+        manual_row: LF2
+        status: partial_match
+        pages: [3]
+        evidence: LF2 appears only in a test-pressure note (p3), not in the body-material codes (A105, F11, F22, F304, F316, F347)
+
+# Product labels per catalogue (Layer 2 of the manual check). `(none)` = no such document exists.
+products:
+  - item_no: "1"
+    manufacturer: LnT_Valves
+    document: lt_gate_globe_check_api600.pdf
+    label: full
+    note: also NEEDS REVIEW
+  - item_no: "7"
+    manufacturer: LnT_Valves
+    document: lt_gate_globe_check_api602.pdf
+    label: partial
+  - item_no: "7"
+    manufacturer: Delval
+    document: (none)
+    label: not_found
+    note: no gate/globe valves in the collected DelVal documents
