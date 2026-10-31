@@ -22,6 +22,12 @@ class RequirementRules(BaseModel):
     or_equivalent: list[str] = Field(default_factory=list)
     make_patterns: list[str] = Field(default_factory=list)
     sentence_abbreviations: list[str] = Field(default_factory=list)
+    item_start_pattern: str
+    item_group_pattern: str
+    item_qualifier_pattern: str
+    item_clause_split_pattern: str
+    segment_end_pattern: str
+    segment_cut_pattern: str
 
 
 class ValueKind(StrEnum):

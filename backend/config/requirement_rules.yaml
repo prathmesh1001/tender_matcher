@@ -36,5 +36,18 @@ make_patterns:
   - '\bmake\s+like\s+(?P<make>[^.,;)\n]+?)(?:\s+make)?\s*(?:[.,;)\n]|$)'
   - '\bsingle\s+tender\s+enquiry\s+on\s+(?:m/s\.?\s*)?(?P<make>[^.,;\n]+)'
 
+# T1: where one item's text starts in a specification file ("Item 4 - CS0108 - Cast Steel ...").
+item_start_pattern: '(?:^|(?<=\s))item\s+(?P<no>\d{1,3})\s*[-–]\s*(?:[A-Z]{2}\d{5,}\s*[-–]\s*)?'
+# A row opening a block shared by several items ("For Item Sl. No.: 1, 2 & 3"), the whole line.
+item_group_pattern: 'for\s+item\s+(?:sl\.?\s*)?no\.?\s*[:.\-]*\s*(?P<nos>\d+(?:\s*[,&]\s*\d+)*)\s*\.?'
+# Inside a block, a part of a value naming its items ("For Item Sl. No-4, 5 & 6").
+item_qualifier_pattern: '(?:only\s+)?for\s+item\s+(?:sl\.?\s*)?no\.?\s*[:.\-]*\s*(?P<nos>\d+(?:\s*[,&]\s*\d+)*)\s*:?'
+# Where one such clause ends and the next begins ("... # 300 & For Item ...", "LCB ... /LF2 only for Item ...").
+item_clause_split_pattern: '\s*[&/]\s*(?=for\s+item|[^&/\s]+(?:\s+[^&/\s]+){0,4}\s+(?:only\s+)?for\s+item)'
+# The specification has ended: a new annexure, or a delivery section.
+segment_end_pattern: '^\s*(?:annexure\b|(?:[ivx]+\.\s*)?delivery\s+period\b)'
+# Form text cut from a line, with everything after it on that line.
+segment_cut_pattern: '\bnull\b|agreed for the above|name of authori[sz]ed signatory|fact or no\b|factor description|vendor response'
+
 # Words ending in "." that do not end a sentence when prose is split into requirements.
 sentence_abbreviations: [m/s, "no", nos, gr, ltd, pvt, dt, sl, sr, rs, inr, govt, dept, viz, etc, e.g, i.e, f.o.r]

@@ -133,8 +133,11 @@ def _part_fields(
     label: str | None, part: str, ontology: Ontology | None, options: SplitOptions
 ) -> tuple[str | None, str]:
     """A compound part's label and value: its own key or attribute words, else the line's."""
-    own = label_of(part, options.label_max_words) or implicit_label(part, ontology, options)
-    return own if own is not None and label is None else (label, part)
+    own = label_of(part, options.label_max_words)
+    if own is not None:
+        return own
+    implicit = implicit_label(part, ontology, options) if label is None else None
+    return implicit or (label, part)
 
 
 def _requirement(
