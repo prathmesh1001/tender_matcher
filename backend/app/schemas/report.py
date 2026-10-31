@@ -42,6 +42,15 @@ class CandidateSummary(BaseModel):
     decided: int
 
 
+class TiedDocumentRows(BaseModel):
+    """One tied catalogue's own result for every requirement, with its evidence."""
+
+    model_config = ConfigDict(frozen=True)
+
+    document: str
+    results: list[Comparison]
+
+
 class ManufacturerItemReport(BaseModel):
     """One manufacturer's results for one item, from its chosen catalogue only."""
 
@@ -56,7 +65,13 @@ class ManufacturerItemReport(BaseModel):
         default_factory=list,
         description="Catalogues nothing tells apart: none is chosen, a reader must decide.",
     )
-    results: list[Comparison] = Field(description="One per atomic requirement, in order.")
+    tied_rows: list[TiedDocumentRows] = Field(
+        default_factory=list, description="Each tied catalogue's rows and evidence."
+    )
+    results: list[Comparison] = Field(
+        description="One per atomic requirement, in order. On a tie these only carry the score "
+        "the tied catalogues share, all flagged; read `tied_rows` for what each one says."
+    )
     score: Score
 
 

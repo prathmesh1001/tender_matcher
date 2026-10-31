@@ -357,15 +357,21 @@ def test_a_file_name_never_decides(valves: Ontology) -> None:
     assert sorted(result.tied_documents) == ["alpha.pdf", "zulu.pdf"]
 
 
-def test_every_requirement_of_a_tie_is_unsupported_and_flagged(valves: Ontology) -> None:
+def test_a_tie_reports_the_shared_score_and_each_documents_rows(valves: Ontology) -> None:
     requirements = _requirements(valves)
-    report = manufacturer_report(_tied_result(valves, ("alpha", "beta")), requirements, OPTIONS)
-    assert report.chosen is None
-    assert len(report.tied_documents) == 2
-    assert {r.status for r in report.results} == {MatchStatus.UNSUPPORTED}
+    result = _tied_result(valves, ("alpha", "beta"))
+    report = manufacturer_report(result, requirements, OPTIONS)
+    assert report.chosen is None  # no document is picked
+    assert report.score.compatibility_pct == 100.0
+    assert report.score.decided == 1
+    assert sorted(t.document for t in report.tied_rows) == ["alpha.pdf", "beta.pdf"]
+    for tied in report.tied_rows:
+        assert all(r.needs_review for r in tied.results)
+        seat = tied.results[1]
+        assert seat.status is MatchStatus.FULL_MATCH
+        assert seat.evidence[0].document == tied.document
+        assert "catalogues tie, none picked" in seat.reason
     assert all(r.needs_review for r in report.results)
-    assert "alpha.pdf" in report.results[0].reason
-    assert report.score.compatibility_pct is None
 
 
 def test_a_clear_winner_is_no_tie(valves: Ontology) -> None:

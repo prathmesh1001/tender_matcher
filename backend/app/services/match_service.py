@@ -176,7 +176,7 @@ class MatchService:
             for m in report.manufacturers:
                 by_manufacturer.setdefault(m.manufacturer, []).extend(m.results)
                 with_catalogue[m.manufacturer] = with_catalogue.get(m.manufacturer, 0) + bool(
-                    m.chosen
+                    m.chosen or m.tied_documents
                 )
         return rank(
             by_manufacturer,

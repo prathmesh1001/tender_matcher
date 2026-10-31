@@ -18,6 +18,7 @@ category has one and is never required.
 """
 
 import math
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
@@ -92,6 +93,10 @@ class MatchContext:
 
 
 _UNREADABLE: Final = "printed value is impossible, so it was misread: ignored"
+_GLUED_DEGREE: Final = "number ending in 0 right before C may be a misread degree sign: ignored"
+_MISREADS: Final = frozenset({_UNREADABLE, _GLUED_DEGREE})
+# "4250C" may print 425 °C with the degree sign extracted as 0; "425 C" and "425C" cannot.
+_ZERO_BEFORE_C: Final = re.compile(r"(?<![\d.])-?\d+0c\b")
 
 
 @dataclass(frozen=True, slots=True)
@@ -281,6 +286,9 @@ def judge_numeric(
     exact = attr is not None or requirement.unit in _DESIGNATIONS
     tol = options.rel_tolerance * max(abs(want[0]), abs(want[1]), 1.0)
     printed = _comparable(quantities(value, options.designation_prefixes), requirement, ctx)
+    temperature = attr is not None and attr.dimension == "temperature"
+    if temperature and _ZERO_BEFORE_C.search(fold_text(value)):
+        return _Outcome(None, _GLUED_DEGREE)
     if attr is not None and _impossible(printed, attr):
         return _Outcome(None, _UNREADABLE)
     statuses = [_judge_range(op, want, have, exact, tol) for have in printed]
@@ -546,9 +554,9 @@ def _decide(
     if not judged:
         return _unsupported(requirement, "no catalogue field names this attribute", LabelBasis.NONE)
     decided = [e for e in judged if e.status is not None]
-    misread = any(e.reason == _UNREADABLE for e in judged)
+    misread = next((e.reason for e in judged if e.reason in _MISREADS), None)
     if not decided:
-        reason = _UNREADABLE if misread else judged[0].reason
+        reason = misread or judged[0].reason
         result = _unsupported(requirement, reason, basis)
         return result.model_copy(update={"evidence": list(judged[: options.max_evidence])})
     best = max(decided, key=lambda e: _RANK[e.status] if e.status else 0)
@@ -557,9 +565,9 @@ def _decide(
     return Comparison(
         requirement_id=requirement.id,
         status=status,
-        needs_review=misread or status is MatchStatus.PARTIAL_MATCH,
+        needs_review=misread is not None or status is MatchStatus.PARTIAL_MATCH,
         decided_by=DecisionSource.RULE,
         basis=basis,
-        reason=f"{best.reason}; {_UNREADABLE}".strip("; ") if misread else best.reason,
+        reason=f"{best.reason}; {misread}".strip("; ") if misread else best.reason,
         evidence=support[: options.max_evidence],
     )

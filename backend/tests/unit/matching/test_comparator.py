@@ -514,12 +514,12 @@ def test_a_temperature_below_absolute_zero_never_fails(valves: Ontology) -> None
 
 
 def test_a_possible_temperature_still_fails(valves: Ontology) -> None:
-    result = _compare(TEMPERATURE, [_prose("Temperature: 100C to 200C")], valves)
+    result = _compare(TEMPERATURE, [_prose("Temperature: 101C to 203C")], valves)
     assert result.status is MatchStatus.MISSING_CAPABILITY
 
 
 def test_absolute_zero_itself_is_readable(valves: Ontology) -> None:
-    result = _compare(TEMPERATURE, [_prose("Temperature: -273C to 100C")], valves)
+    result = _compare(TEMPERATURE, [_prose("Temperature: -273C to 103C")], valves)
     assert result.status is MatchStatus.FULL_MATCH
     assert result.needs_review is False
 
@@ -535,4 +535,28 @@ def test_a_readable_value_still_decides_and_the_misread_flags_it(valves: Ontolog
 
 def test_the_rule_is_only_for_attributes_with_a_limit(valves: Ontology) -> None:
     result = _compare("SIZE : 100 MM", [_prose("Size: -460 mm")], valves)
+    assert "misread" not in result.reason
+
+
+@pytest.mark.parametrize(
+    "value", ["up to 4250C", "-460C to 3430C", "-290C to 6490C", "5400C", "4250C (800F)"]
+)
+def test_a_zero_glued_to_c_can_decide_nothing(value: str, valves: Ontology) -> None:
+    line = "DESIGN TEMP. : 300 Deg. C"
+    result = _compare(line, [_prose(f"Temperature: {value}")], valves)
+    assert result.status is MatchStatus.UNSUPPORTED
+    assert result.needs_review is True
+    assert "misread degree" in result.reason
+
+
+@pytest.mark.parametrize("value", ["425 C", "425C", "-46C to 343C", "400 C", "400 °C"])
+def test_other_temperatures_are_read(value: str, valves: Ontology) -> None:
+    line = "DESIGN TEMP. : 300 Deg. C"
+    result = _compare(line, [_prose(f"Temperature: {value}")], valves)
+    assert "misread" not in result.reason
+    assert result.status is MatchStatus.FULL_MATCH
+
+
+def test_the_glued_zero_rule_is_for_temperatures_only(valves: Ontology) -> None:
+    result = _compare("SIZE : 100 MM", [_prose("Size: 50 to 200C")], valves)
     assert "misread" not in result.reason

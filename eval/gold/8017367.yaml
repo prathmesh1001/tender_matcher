@@ -151,12 +151,19 @@ evaluations:
     requirements:
       - id: "11.1.2"
         manual_row: class 800
-        status: unsupported
-        evidence: class 800 not stated
+        status: full_match
+        pages: [2]
+        evidence: 'p2 "Rating: ASME Class 150, 300, 600, 900" for Series 65-72, "Size Range: 1/2 to 12"'
+        note: >-
+          Corrected from unsupported (manual "class 800 not stated"). The tender says "800 or
+          higher", and this one-series bulletin lists Class 900 for a size range holding DN25. It
+          gives no limit by size.
       - id: "11.2.2"
         manual_row: class 800
-        status: unsupported
-        evidence: class 800 not stated
+        status: full_match
+        pages: [2]
+        evidence: 'p2 "Rating: ASME Class 150, 300, 600, 900" for Series 65-72, "Size Range: 1/2 to 12"'
+        note: Corrected from unsupported, as 11.1.2.
       - id: "11.4"
         manual_row: WCB body
         status: full_match

@@ -29,7 +29,7 @@ Gold source: docs/manual_match_check.md (section 3)
 | 1.s1.p6.13 | Valve Ends : Flanged. | partial_match (p9) | unsupported (p17): **not decided**; quote not found on the cited page (was full_match) | - (-): **other catalogue** |
 | 1.s1.p6.14 | Bolting : B7/2H | full_match (p12) | partial_match (p12, p13): **weaker**; 1 of 2 options found | - (-): **other catalogue** |
 | 1.s1.p6.15 | Stem/Hinge pin : SS316 | full_match (p9) | partial_match (p9, p12, p13, p19): **weaker**; fails in a table, but the document's options list offers it | - (-): **other catalogue** |
-| 1.s1.p6.16 | Design Temp. : -40 Deg. C to +40 Deg. C | full_match (p5) | unsupported (p5, p6, p16): **not decided**; printed value is impossible, so it was misread: ignored | - (-): **other catalogue** |
+| 1.s1.p6.16 | Design Temp. : -40 Deg. C to +40 Deg. C | full_match (p5) | unsupported (p5, p6, p16): **not decided**; number ending in 0 right before C may be a misread degree sign: ignored | - (-): **other catalogue** |
 | 1.s1.p6.17 | Low temperature/Cyro : Low Temperature Test | unsupported (-) | unsupported (-): **agree**; free text: needs the LLM judge (not enabled) | - (-): **other catalogue** |
 | 1.s1.p6.18 | Design Pressure (Bar) : 40 | unsupported (-) | unsupported (-): **agree**; no catalogue field names this attribute | - (-): **other catalogue** |
 
@@ -52,7 +52,7 @@ Notes from gold:
 | 7.s2.p6.8 | Body & Bonnet MOC : LCB -> LF2 | partial_match (p3) | partial_match (p3): **agree**; near miss: only part of the code found | missing_capability (p4): **weaker** |
 
 Manual check: fit None, coverage None (weighted).
-System, ontology: compatibility 77.77777777777777, coverage 40.9 % (9/22, unweighted).
+System, ontology: compatibility 81.25, coverage 36.4 % (8/22, unweighted).
 System, no ontology: compatibility 66.66666666666667, coverage 13.6 % (3/22, unweighted).
 
 Not labelled in gold, so not compared:
@@ -71,7 +71,7 @@ Not labelled in gold, so not compared:
 - 7.s2.p7.1 `Valve Ends : Flanged.` (ontology: full_match, no ontology: full_match)
 - 7.s2.p7.2 `Bolting : B7/2H` (ontology: unsupported, no ontology: unsupported)
 - 7.s2.p7.3 `Stem/Hinge pin : SS316` (ontology: missing_capability, no ontology: unsupported)
-- 7.s2.p7.4 `Design Temp. : -40 Deg. C to +40 Deg. C` (ontology: partial_match, no ontology: unsupported)
+- 7.s2.p7.4 `Design Temp. : -40 Deg. C to +40 Deg. C` (ontology: unsupported, no ontology: unsupported)
 - 7.s2.p7.5 `Low temperature/Cyro : Low Temperature Test` (ontology: unsupported, no ontology: unsupported)
 - 7.s2.p7.6 `Design Pressure (Bar) : 40` (ontology: unsupported, no ontology: unsupported)
 
@@ -89,7 +89,7 @@ Items without gold: 2, 3, 4, 5, 6.
 
 ontology:
 
-1. LnT_Valves: compatibility 70.8 %, coverage 31.8 %, low coverage
+1. LnT_Valves: compatibility 71.3 %, coverage 31.1 %, low coverage
 2. Delval: compatibility -, coverage 0.0 %, low coverage
 3. KSB: compatibility -, coverage 0.0 %, low coverage
 4. Kirloskar Brothers: compatibility -, coverage 0.0 %, low coverage

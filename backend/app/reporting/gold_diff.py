@@ -106,6 +106,14 @@ def _text(requirement: Requirement) -> str:
     )
 
 
+def _rows_of(found: ManufacturerItemReport | None, document: str) -> list[Comparison]:
+    """A manufacturer's rows, a tied catalogue's own if gold labels that one."""
+    if found is None:
+        return []
+    own = next((t.results for t in found.tied_rows if t.document == document), None)
+    return own if own is not None else found.results
+
+
 def _evaluation_diff(
     evaluation: GoldEvaluation, runs: Mapping[str, TenderReport]
 ) -> EvaluationDiff:
@@ -115,10 +123,17 @@ def _evaluation_diff(
         for name, report in runs.items()
     }
     results = {
-        name: {c.requirement_id: c for c in m.results} if m else {} for name, m in reports.items()
+        name: {c.requirement_id: c for c in _rows_of(m, evaluation.document)}
+        for name, m in reports.items()
     }
     same = {
-        name: bool(m and m.chosen and m.chosen.document == evaluation.document)
+        name: bool(
+            m
+            and (
+                (m.chosen and m.chosen.document == evaluation.document)
+                or evaluation.document in m.tied_documents
+            )
+        )
         for name, m in reports.items()
     }
     atomic = _atomic(runs, evaluation.item_no)
@@ -250,7 +265,7 @@ def _evaluation_lines(diff: GoldDiff, evaluation: EvaluationDiff) -> list[str]:
             )
         if evaluation.tied.get(run):
             lines.append(
-                f"System, {run}: catalogues tie, none chosen: {', '.join(evaluation.tied[run])}."
+                f"System, {run}: catalogues tie, none picked: {', '.join(evaluation.tied[run])}."
             )
     notes = [row for row in evaluation.rows if row.gold.note]
     if notes:

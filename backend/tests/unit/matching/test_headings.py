@@ -1,5 +1,6 @@
 """Evidence inside one PDF holding several models. Documents and rows are synthetic."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -152,8 +153,9 @@ def test_evidence_of_a_sibling_model_is_unsupported(valves: Ontology) -> None:
 
 
 def test_evidence_no_heading_owns_is_capped_at_partial(valves: Ontology) -> None:
-    chunks = [*TWO_MODELS, _row("Stem", "ASTM A479 Type 410", "Materials", 3)]
-    chunks[-1] = _row("Stem", "ASTM A479 Type 410", "Butterfly & Check Valves", 3)
+    two = replace(DOC, product_types=("butterfly_valve", "check_valve"))
+    rows = [*TWO_MODELS, _row("Stem", "ASTM A479 Type 410", "Butterfly & Check Valves", 3)]
+    chunks = [CatalogueChunk(two, c.chunk) for c in rows]
     result = _evaluate(
         ["DISC MOC : ASTM A351 Gr. CF8M", "STEM MOC : ASTM A479 Type 410"], chunks, valves
     )
@@ -200,3 +202,40 @@ def test_one_heading_changes_nothing(valves: Ontology) -> None:
     result = _evaluate(["BODY MOC : ASTM A216 Gr. WCB", "SEAT MOC : EPDM"], chunks, valves)
     assert result.product_heading is None
     assert [c.status for c in result.comparisons] == [MatchStatus.FULL_MATCH] * 2
+
+
+# ---------------------------------------------------------------- one product in the document
+
+
+UNHEADED = _row("Stem", "ASTM A479 Type 410", "Butterfly & Check Valves", 3)
+
+
+def test_pages_without_a_heading_belong_to_the_only_product(valves: Ontology) -> None:
+    chunks = [*TWO_MODELS, UNHEADED]
+    result = _evaluate(
+        ["DISC MOC : ASTM A351 Gr. CF8M", "STEM MOC : ASTM A479 Type 410"], chunks, valves
+    )
+    stem = result.comparisons[1]
+    assert (stem.status, stem.needs_review) == (MatchStatus.FULL_MATCH, False)
+
+
+def test_they_are_capped_if_the_document_declares_two_products(valves: Ontology) -> None:
+    two = replace(DOC, product_types=("butterfly_valve", "check_valve"))
+    chunks = [CatalogueChunk(two, c.chunk) for c in [*TWO_MODELS, UNHEADED]]
+    result = _evaluate(
+        ["DISC MOC : ASTM A351 Gr. CF8M", "STEM MOC : ASTM A479 Type 410"], chunks, valves
+    )
+    stem = result.comparisons[1]
+    assert (stem.status, stem.needs_review) == (MatchStatus.PARTIAL_MATCH, True)
+
+
+def test_they_are_capped_if_a_heading_names_another_product(valves: Ontology) -> None:
+    chunks = [
+        *TWO_MODELS,
+        UNHEADED,
+        _row("Disc", "ASTM A351 Gr. CF8", "Delta Check Valve", 4),
+    ]
+    result = _evaluate(
+        ["DISC MOC : ASTM A351 Gr. CF8M", "STEM MOC : ASTM A479 Type 410"], chunks, valves
+    )
+    assert result.comparisons[1].status is MatchStatus.PARTIAL_MATCH

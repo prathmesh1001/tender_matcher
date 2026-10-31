@@ -23,6 +23,7 @@ from app.schemas.report import (
     ItemReport,
     ManufacturerItemReport,
     TenderReport,
+    TiedDocumentRows,
 )
 from app.schemas.requirements import LineItem, Requirement, ValueKind
 
@@ -197,3 +198,45 @@ def test_real_gold_file_is_valid() -> None:
     gold = load_gold(root / "eval" / "gold" / "8119613.yaml")
     assert gold.tender == "GEM_2026_B_8119613"
     assert len(gold.evaluations[0].requirements) == 16
+
+
+# ---------------------------------------------------------------- tied catalogues
+
+
+def _tied_report() -> TenderReport:
+    base = _report([_comparison("1.1", PARTIAL, 3)])
+    item = base.items[0]
+    manufacturer = item.manufacturers[0].model_copy(
+        update={
+            "chosen": None,
+            "tied_documents": [DOC, "other.pdf"],
+            "tied_rows": [
+                TiedDocumentRows(document="other.pdf", results=[_comparison("1.1", PARTIAL, 3)]),
+                TiedDocumentRows(document=DOC, results=[_comparison("1.1", FULL, 7)]),
+            ],
+        }
+    )
+    return base.model_copy(
+        update={"items": [item.model_copy(update={"manufacturers": [manufacturer]})]}
+    )
+
+
+def test_a_tied_catalogue_is_compared_by_its_own_rows() -> None:
+    gold = GoldFile(
+        tender="T",
+        source="s",
+        evaluations=[
+            GoldEvaluation(
+                item_no="1",
+                manufacturer="Acme",
+                document=DOC,
+                requirements=[
+                    GoldRequirement(id="1.1", manual_row="r", status=FULL, pages=[7], evidence="e")
+                ],
+            )
+        ],
+    )
+    diff = gold_diff(gold, {"run": _tied_report()})
+    cell = diff.evaluations[0].rows[0].cells["run"]
+    assert (cell.status, cell.verdict, cell.pages) == (FULL, Verdict.AGREE, [7])
+    assert "catalogues tie, none picked" in render_gold_diff(diff)

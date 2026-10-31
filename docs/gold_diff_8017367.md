@@ -4,8 +4,8 @@ Gold source: docs/manual_match_check.md (section 5)
 
 | Run | agree | not decided | weaker | stronger | other catalogue | other page |
 |---|---|---|---|---|---|---|
-| ontology | 7 | 16 | 2 | 3 | 3 | 5 |
-| no ontology | 6 | 18 | 0 | 3 | 4 | 3 |
+| ontology | 9 | 17 | 3 | 2 | 0 | 5 |
+| no ontology | 4 | 21 | 0 | 3 | 3 | 3 |
 
 ## Item 1, LnT_Valves, `lt_aquaseal_butterfly_check.pdf`
 
@@ -89,8 +89,8 @@ Not labelled in gold, so not compared:
 
 | Req | Tender | Gold | ontology | no ontology |
 |---|---|---|---|---|
-| 11.1.2 | CLASS : 800 OR HIGHER | unsupported (-) | full_match (p2): **stronger** | unsupported (-): **agree**; no catalogue field names this attribute |
-| 11.2.2 | Rating/Class : Class 800 or higher | unsupported (-) | full_match (p2): **stronger** | unsupported (-): **agree**; no catalogue field names this attribute |
+| 11.1.2 | CLASS : 800 OR HIGHER | full_match (p2) | full_match (p2): **agree** | unsupported (-): **not decided**; no catalogue field names this attribute |
+| 11.2.2 | Rating/Class : Class 800 or higher | full_match (p2) | full_match (p2): **agree** | unsupported (-): **not decided**; no catalogue field names this attribute |
 | 11.4 | Body : ASTM A216 Grade WCB or equivelent, | full_match (p1) | full_match (p2): **agree, other page** | full_match (p2): **agree, other page** |
 | 11.5 | Ball & Stem : SS (ASTM A 182 or equivelent), | full_match (p1) | unsupported (-): **not decided**; free text: needs the LLM judge (not enabled) | unsupported (-): **not decided**; free text: needs the LLM judge (not enabled) |
 | 11.6 | End details : Screwed female NPT Threads both ends | missing_capability (p1) | unsupported (-): **not decided**; free text: needs the LLM judge (not enabled) | unsupported (-): **not decided**; free text: needs the LLM judge (not enabled) |
@@ -98,6 +98,11 @@ Not labelled in gold, so not compared:
 Manual check: fit None, coverage None (weighted).
 System, ontology: compatibility 100.0, coverage 40.0 % (4/10, unweighted).
 System, no ontology: compatibility 100.0, coverage 11.1 % (1/9, unweighted).
+
+Notes from gold:
+
+- 11.1.2: Corrected from unsupported (manual "class 800 not stated"). The tender says "800 or higher", and this one-series bulletin lists Class 900 for a size range holding DN25. It gives no limit by size.
+- 11.2.2: Corrected from unsupported, as 11.1.2.
 
 Not labelled in gold, so not compared:
 
@@ -111,12 +116,12 @@ Not labelled in gold, so not compared:
 
 | Req | Tender | Gold | ontology | no ontology |
 |---|---|---|---|---|
-| 20.title.1 | SIZE : dn 100mm | unsupported (-) | - (-): **other catalogue** | - (-): **other catalogue** |
-| 20.1.2 | CLASS : PN 16 Bar | full_match (p8) | - (-): **other catalogue** | - (-): **other catalogue** |
+| 20.title.1 | SIZE : dn 100mm | unsupported (-) | full_match (p6): **stronger**; catalogues tie, none picked: lt_triple_offset_butterfly.pdf, lt_aquaseal_butterfly_check.pdf | - (-): **other catalogue** |
+| 20.1.2 | CLASS : PN 16 Bar | full_match (p8) | partial_match (p3): **weaker**; product heading unclear: capped at partial; catalogues tie, none picked: lt_triple_offset_butterfly.pdf, lt_aquaseal_butterfly_check.pdf | - (-): **other catalogue** |
 
 Manual check: fit None, coverage None (weighted).
-System, ontology: compatibility None, coverage 0.0 % (0/4, unweighted).
-System, ontology: catalogues tie, none chosen: lt_triple_offset_butterfly.pdf, lt_aquaseal_butterfly_check.pdf.
+System, ontology: compatibility 75.0, coverage 50.0 % (2/4, unweighted).
+System, ontology: catalogues tie, none picked: lt_triple_offset_butterfly.pdf, lt_aquaseal_butterfly_check.pdf.
 System, no ontology: compatibility 100.0, coverage 33.3 % (1/3, unweighted).
 
 Not labelled in gold, so not compared:
@@ -128,13 +133,13 @@ Not labelled in gold, so not compared:
 
 | Req | Tender | Gold | ontology | no ontology |
 |---|---|---|---|---|
-| 20.1.2 | CLASS : PN 16 Bar | partial_match (p1) | - (-): **other catalogue** | - (-): **other catalogue** |
+| 20.1.2 | CLASS : PN 16 Bar | partial_match (p1) | unsupported (p2): **not decided**; label found but no value in a comparable unit; catalogues tie, none picked: delval_series_50_52_centric_bfv_spec.pdf, delval_series_44_49_hpbfv_spec.pdf | unsupported (-): **not decided**; no catalogue field names this attribute; catalogues tie, none picked: delval_series_50_52_centric_bfv_spec.pdf, delval_series_44_49_hpbfv_spec.pdf |
 
 Manual check: fit None, coverage None (weighted).
 System, ontology: compatibility None, coverage 0.0 % (0/4, unweighted).
-System, ontology: catalogues tie, none chosen: delval_series_50_52_centric_bfv_spec.pdf, delval_series_44_49_hpbfv_spec.pdf.
+System, ontology: catalogues tie, none picked: delval_series_50_52_centric_bfv_spec.pdf, delval_series_44_49_hpbfv_spec.pdf.
 System, no ontology: compatibility None, coverage 0.0 % (0/3, unweighted).
-System, no ontology: catalogues tie, none chosen: delval_series_50_52_centric_bfv_spec.pdf, delval_series_44_49_hpbfv_spec.pdf.
+System, no ontology: catalogues tie, none picked: delval_series_50_52_centric_bfv_spec.pdf, delval_series_44_49_hpbfv_spec.pdf.
 
 Not labelled in gold, so not compared:
 
@@ -161,13 +166,13 @@ Items without gold: 10, 12, 13, 14, 15, 16, 17, 18, 19, 2, 21, 22, 23, 24, 25, 2
 ontology:
 
 1. Delval: compatibility 77.8 %, coverage 12.8 %, low coverage
-2. LnT_Valves: compatibility 63.9 %, coverage 28.9 %, low coverage
+2. LnT_Valves: compatibility 66.5 %, coverage 37.4 %, low coverage
 3. KSB: compatibility -, coverage 0.0 %, low coverage
 4. Kirloskar Brothers: compatibility -, coverage 0.0 %, low coverage
 
 no ontology:
 
-1. LnT_Valves: compatibility 79.8 %, coverage 24.4 %, low coverage
+1. LnT_Valves: compatibility 79.6 %, coverage 25.4 %, low coverage
 2. Delval: compatibility 71.4 %, coverage 3.6 %, low coverage
 3. KSB: compatibility -, coverage 0.0 %, low coverage
 4. Kirloskar Brothers: compatibility -, coverage 0.0 %, low coverage

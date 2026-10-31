@@ -218,15 +218,21 @@ def _by_heading(
     requirement: Requirement,
     groups: ProductGroups,
     chosen: str | None,
+    one_product: bool,
     ctx: MatchContext,
     options: SelectionOptions,
 ) -> Comparison:
-    """Decide from the chosen product, then from what no heading owns, then report the rest."""
+    """Decide from the chosen product, then from what no heading owns, then report the rest.
+
+    In a document about `one_product`, pages with no heading belong to that product.
+    """
     fields = options.comparator.fields
     decides = options.status_scores
-    if chosen is not None:
-        own = located_fields(groups.by_heading[chosen], fields)
-        result = compare(requirement, own, ctx, options.comparator)
+    own_chunks = groups.by_heading[chosen] if chosen is not None else []
+    if one_product:
+        own_chunks = [*own_chunks, *groups.unclear]
+    if own_chunks:
+        result = compare(requirement, located_fields(own_chunks, fields), ctx, options.comparator)
         if result.status in decides:
             return result
     other = [c for h, chunks in groups.by_heading.items() if h != chosen for c in chunks]
@@ -264,7 +270,10 @@ def evaluate_document(
     chosen = None
     if groups is not None and several:
         chosen = _chosen_heading(requirements, groups, product_type or "", ctx, options, pages)
-        raw = [_by_heading(r, groups, chosen, ctx, options) for r in requirements]
+        one_product = len(document.product_types) == 1 and set(groups.types.values()) == {
+            product_type
+        }
+        raw = [_by_heading(r, groups, chosen, one_product, ctx, options) for r in requirements]
     else:
         fields = located_fields(chunks, options.comparator.fields)
         raw = [compare(r, fields, ctx, options.comparator) for r in requirements]

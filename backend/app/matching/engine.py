@@ -17,7 +17,12 @@ from app.matching.scorer import score
 from app.retrieval.text_normalizer import normalize_for_search
 from app.schemas.enums import DecisionSource, MatchStatus
 from app.schemas.matching import Comparison, DocumentResult, LabelBasis, ManufacturerItemResult
-from app.schemas.report import CandidateSummary, ItemReport, ManufacturerItemReport
+from app.schemas.report import (
+    CandidateSummary,
+    ItemReport,
+    ManufacturerItemReport,
+    TiedDocumentRows,
+)
 from app.schemas.requirements import LineItem, Requirement
 from app.tender.pipeline import product_types_named
 from app.tender.splitter import leaves
@@ -59,15 +64,24 @@ def _summary(result: DocumentResult) -> CandidateSummary:
     )
 
 
+def _flagged(comparisons: Sequence[Comparison], tied: Sequence[str]) -> list[Comparison]:
+    """A tied catalogue's rows, each for review and saying that no catalogue was picked."""
+    note = f"catalogues tie, none picked: {', '.join(tied)}"
+    return [
+        c.model_copy(
+            update={"needs_review": True, "reason": f"{c.reason}; {note}" if c.reason else note}
+        )
+        for c in comparisons
+    ]
+
+
 def _no_catalogue(
-    requirements: Sequence[Requirement], product_type: str | None, tied: Sequence[str] = ()
+    requirements: Sequence[Requirement], product_type: str | None
 ) -> list[Comparison]:
-    """Unsupported for every requirement: no catalogue for the type, or none can be chosen."""
+    """Unsupported for every requirement: the manufacturer has no catalogue for the type."""
     reason = (
         f"no catalogue declares {product_type}" if product_type else "item product type unknown"
     )
-    if tied:
-        reason = f"catalogues tie, none chosen: {', '.join(tied)}"
     return [
         Comparison(
             requirement_id=r.id,
@@ -104,18 +118,30 @@ def general_result(requirement: Requirement) -> Comparison:
 def manufacturer_report(
     result: ManufacturerItemResult, requirements: Sequence[Requirement], options: SelectionOptions
 ) -> ManufacturerItemReport:
-    """Report one manufacturer from its chosen catalogue only."""
+    """Report one manufacturer from its chosen catalogue only.
+
+    Tied catalogues score the same on every ranking step, so the score is theirs together and
+    each one's rows are reported; none is picked.
+    """
     chosen = next((d for d in result.documents if d.sha256 == result.chosen), None)
-    comparisons = (
-        chosen.comparisons
-        if chosen
-        else _no_catalogue(requirements, result.product_type, result.tied_documents)
-    )
+    tied = result.tied_documents
+    tied_rows = [
+        TiedDocumentRows(document=d.document, results=_flagged(d.comparisons, tied))
+        for d in result.documents
+        if d.document in tied
+    ]
+    if tied_rows:
+        comparisons = tied_rows[0].results
+    elif chosen:
+        comparisons = chosen.comparisons
+    else:
+        comparisons = _no_catalogue(requirements, result.product_type)
     return ManufacturerItemReport(
         manufacturer=result.manufacturer,
         chosen=_summary(chosen) if chosen else None,
         candidates=[_summary(d) for d in result.documents],
-        tied_documents=result.tied_documents,
+        tied_documents=tied,
+        tied_rows=tied_rows,
         results=list(comparisons),
         score=score(comparisons, options.status_scores),
     )
