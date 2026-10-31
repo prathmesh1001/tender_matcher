@@ -583,3 +583,33 @@ def test_no_ontology_no_merged_key() -> None:
 def test_motor_body_is_not_the_pump_body(ontology: Ontology) -> None:
     parsed = parse_value("Motor Body", "Cast Iron", ontology, SPLIT.enum_max_words)
     assert resolve_attribute("Motor Body", parsed, ontology) == "motor_body_material"
+
+
+# ---------------------------------------------------------------- mixed inch fractions
+
+
+@pytest.mark.parametrize(
+    ("value", "inches"),
+    [
+        ("1 1/2''", 1.5),
+        ("1 1/2'' Inch", 1.5),
+        ("1 1/2''Inch", 1.5),
+        ('2 1/2"', 2.5),
+        ("1 1/2 Inch", 1.5),
+        ("1-1/2 inch", 1.5),
+        ("3/4 inch", 0.75),
+        ("1.5 inch", 1.5),
+    ],
+)
+def test_mixed_inch_fractions(value: str, inches: float) -> None:
+    assert size_form(value) == (inches, "inch")
+
+
+def test_title_with_a_mixed_fraction_gives_the_whole_size() -> None:
+    assert size_form(title_size("BALL VALVE 1 1/2'' Inch") or "") == (1.5, "inch")
+
+
+def test_a_two_digit_number_before_a_fraction_is_not_part_of_it() -> None:
+    # A DN + NPS table row: DN15 next to 1/2 inch, never 15.5 inch.
+    assert title_size('DN 15 1/2" VALVE') != '15 1/2"'
+    assert size_form('15 1/2"') is None

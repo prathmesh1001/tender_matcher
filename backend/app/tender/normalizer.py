@@ -49,8 +49,9 @@ _OPTION_OR: Final = re.compile(
 
 _TEMPERATURE_UNIT: Final = "degc"
 # Sizes and ratings are matched on folded text, so curly quotes are already straight.
-_INCH_NUMBER: Final = r"\d+\s*-\s*\d+/\d+|\d+/\d+|\d+(?:\.\d+)?"
-_INCH_UNIT: Final = r"(?:\"|''|inch(?:es)?\b|in\b)"
+# A space joins a fraction only to one digit: "1 1/2" is 1.5, "15 1/2" may be DN15 next to 1/2 inch.
+_INCH_NUMBER: Final = r"\d+\s*-\s*\d+/\d+|\d\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?"
+_INCH_UNIT: Final = r"(?:(?:\"|'')(?:\s*inch(?:es)?\b)?|inch(?:es)?\b|in\b)"
 _SIZE_PATTERN: Final = (
     rf"(?:dn|nb)\s*-?\s*(?P<dn>\d+)(?:\s*mm\b)?|(?P<nb>\d+)\s*nb\b"
     rf"|(?P<inch>{_INCH_NUMBER})\s*{_INCH_UNIT}"
@@ -99,9 +100,8 @@ def temperature_form(value: str) -> tuple[float, float | None] | None:
 
 
 def _inches(text: str) -> float:
-    """Inches as printed: "3/4", "1-1/2" or "1.5"."""
-    whole, _, rest = text.replace(" ", "").partition("-")
-    return float(Fraction(whole) + Fraction(rest)) if rest else float(Fraction(whole))
+    """Inches as printed: "3/4", "1-1/2", "1 1/2" or "1.5"."""
+    return float(sum(Fraction(part) for part in re.split(r"[\s-]+", text.strip())))
 
 
 def size_form(value: str) -> tuple[float, str] | None:
