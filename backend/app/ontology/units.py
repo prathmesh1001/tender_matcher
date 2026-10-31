@@ -12,7 +12,7 @@ from typing import Final
 import pint
 
 from app.core.exceptions import UnitConversionError
-from app.ontology.schema import Ontology
+from app.ontology.schema import Attribute, Ontology
 
 _REGISTRY: Final = pint.UnitRegistry()
 
@@ -127,6 +127,33 @@ def nps_to_dn(ontology: Ontology, nps: str) -> int:
     if wanted not in table:
         raise UnitConversionError(f"NPS {nps} not in size table", details={"nps": nps})
     return table[wanted]
+
+
+def canonical_number(
+    number: float, unit: str | None, attribute: Attribute, ontology: Ontology
+) -> float | None:
+    """A printed number in the attribute's canonical unit, or None if it cannot be converted.
+
+    Args:
+        number: The number as printed.
+        unit: Its unit as printed (folded), or None for a bare number.
+        attribute: The attribute it is a value of.
+        ontology: Unit spellings and the NPS table (inch sizes go through it, not pint).
+
+    Returns:
+        The converted number, or None for a bare number, an unknown unit or another dimension.
+    """
+    if unit is None or attribute.canonical_unit is None:
+        return None
+    expr = ontology.units.get(unit) or ontology.prefix_units.get(unit)
+    if expr is None:
+        return None
+    try:
+        if attribute.nominal_pipe_size and expr == "inch":
+            return float(nps_to_dn(ontology, f"{number:g}"))
+        return convert(number, expr, attribute.canonical_unit)
+    except UnitConversionError:
+        return None
 
 
 def class_to_pn(ontology: Ontology, pressure_class: int) -> int | None:

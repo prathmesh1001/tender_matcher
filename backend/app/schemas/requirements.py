@@ -5,6 +5,23 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.enums import Operator, RequirementType
+from app.schemas.sections import EvidenceSource, SectionKind
+
+
+class RequirementRules(BaseModel):
+    """The requirement rules file (`config/requirement_rules.yaml`)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind_types: dict[SectionKind, RequirementType]
+    unclassified_type: RequirementType
+    item_default_category: str
+    vague: list[str] = Field(default_factory=list)
+    mandatory: list[str] = Field(default_factory=list)
+    optional: list[str] = Field(default_factory=list)
+    or_equivalent: list[str] = Field(default_factory=list)
+    make_patterns: list[str] = Field(default_factory=list)
+    sentence_abbreviations: list[str] = Field(default_factory=list)
 
 
 class ValueKind(StrEnum):
@@ -23,6 +40,9 @@ class LineItem(BaseModel):
     item_no: str
     title: str
     description_lines: list[str] = Field(description="Description cell, one printed line each.")
+    description_header: str = Field(
+        default="", description="Header of the description column; it can name a make (T9)."
+    )
     quantity: str | None = None
     unit: str | None = None
     document: str = Field(description="Tender file the item comes from.")
@@ -41,6 +61,16 @@ class Requirement(BaseModel):
     label: str | None = Field(default=None, description='Label as printed ("VALVE BODY MOC").')
     attribute: str | None = Field(default=None, description="Ontology attribute, if one applies.")
     req_type: RequirementType = RequirementType.TECHNICAL
+    category: str | None = Field(default=None, description="Section category of the line.")
+    evidence: EvidenceSource | None = Field(
+        default=EvidenceSource.CATALOGUE,
+        description="Where a vendor's evidence comes from; None if the category is unknown.",
+    )
+    product_type: str | None = Field(default=None, description="Item's ontology product type.")
+    mandatory: bool | None = Field(default=None, description="None if the line does not say.")
+    named_make: str | None = Field(default=None, description="Make named by the tender (D4).")
+    or_equivalent: bool = Field(default=False, description='The tender accepts "or equivalent".')
+    flags: list[str] = Field(default_factory=list, description="Consistency warnings.")
     kind: ValueKind
     operator: Operator
     value_text: str = Field(description="The value as printed.")
@@ -54,7 +84,12 @@ class Requirement(BaseModel):
         default=None, description="pint unit after ontology lookup; None without an ontology."
     )
     alternatives: list[str] = Field(
-        default_factory=list, description='Options separated by "/" ("CA15", "CF8M").'
+        default_factory=list, description='Options separated by "/" ("CA15", "CF8M") or "or".'
+    )
+    any_alternative: bool = Field(
+        default=False,
+        description='The tender wrote "or": one option is enough. With "/" alone, finding only '
+        "some options is a partial match.",
     )
     raw_text: str = Field(description="Verbatim printed line(s); quotes come from here.")
     document: str

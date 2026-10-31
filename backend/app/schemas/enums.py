@@ -62,6 +62,7 @@ class MatchStatus(StrEnum):
     PARTIAL_MATCH = "partial_match"
     MISSING_CAPABILITY = "missing_capability"
     UNSUPPORTED = "unsupported"
+    NOT_APPLICABLE = "not_applicable"
 
 
 class DecisionSource(StrEnum):

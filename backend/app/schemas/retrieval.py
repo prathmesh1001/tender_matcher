@@ -88,6 +88,17 @@ class RetrievalRequest(BaseModel):
     attribute: str | None = Field(default=None, description="Canonical ontology attribute.")
 
 
+class DocumentIndexStatus(BaseModel):
+    """How much of one stored document is searchable."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    file_path: str
+    chunks: int = Field(ge=0)
+    with_vector: int = Field(ge=0)
+    spec_facts: int = Field(ge=0)
+
+
 class RetrievalResult(BaseModel):
     """Top reranked chunks (best first) and the outcome deciding whether they count."""
 

@@ -8,6 +8,7 @@ when an item's category has one, unless the run is told not to use any.
 
 import logging
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -27,18 +28,37 @@ from app.matching.chunk_source import (
 )
 from app.matching.comparator import MatchContext
 from app.matching.documents import SelectionOptions
-from app.matching.engine import ItemInput, match_item
+from app.matching.engine import ItemInput, general_result, match_item
 from app.matching.scorer import rank
 from app.ontology.loader import load_ontologies
 from app.ontology.schema import Ontology
 from app.retrieval.text_normalizer import SearchVocabulary
 from app.schemas.matching import Comparison
 from app.schemas.report import ItemReport, RankingEntry, TenderReport
+from app.schemas.requirements import Requirement
 from app.storage.file_store import FileStore, build_file_store
+from app.tender.items import ItemSource, TenderFile, parse_tender_files
 from app.tender.link_fetcher import MANIFEST_FILENAME, read_manifest
-from app.tender.pipeline import RequirementOptions, ontology_for, tender_requirements
+from app.tender.pipeline import RequirementOptions, ontology_for
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(slots=True)
+class ParsedTender:
+    """One tender read from its files, before any matching."""
+
+    bid_number: str
+    files: list[str] = field(default_factory=list)
+    items: list[ItemInput] = field(default_factory=list)
+    general: list[Requirement] = field(default_factory=list)
+    item_source: ItemSource = ItemSource.NONE
+
+    @property
+    def named_makes(self) -> list[str]:
+        """Every make the tender names, anywhere in it."""
+        from_items = [r.named_make for i in self.items for r in i.requirements]
+        return sorted({m for m in (*from_items, *(r.named_make for r in self.general)) if m})
 
 
 class MatchService:
@@ -60,27 +80,51 @@ class MatchService:
         self._ontologies = list(ontologies)
         self._tender_root = tender_root
 
-    def _items(self, tender_dir: Path, use_ontology: bool) -> tuple[list[str], list[ItemInput]]:
-        """Tender files used and the line items found in them, in manifest order."""
+    def parse_tender(self, tender: str, *, use_ontology: bool = True) -> ParsedTender:
+        """Read one tender's files into line items and general requirements.
+
+        Args:
+            tender: Tender folder name under the tender data root ("GEM_2026_B_8119613").
+            use_ontology: False runs without any ontology (labels and units as printed).
+
+        Returns:
+            The parsed tender, in manifest order.
+
+        Raises:
+            NotFoundError: If the tender folder has no tender.yaml.
+            DocumentParseError: If a tender file cannot be parsed.
+        """
+        tender_dir = self._tender_root / tender
+        if not (tender_dir / MANIFEST_FILENAME).is_file():
+            raise NotFoundError(
+                f"No {MANIFEST_FILENAME} for tender {tender}", details={"tender": tender}
+            )
         manifest = read_manifest(tender_dir / MANIFEST_FILENAME)
         ontologies = self._ontologies if use_ontology else []
-        files: list[str] = []
-        items: list[ItemInput] = []
+        files: list[TenderFile] = []
         for entry in manifest.stored_files():
             path = tender_dir / (entry.file or "")
-            if not is_supported(path) or not path.is_file():
-                continue
-            files.append(path.name)
-            chunks = process_file(path, self._tender_options).chunks
-            for found in tender_requirements(
-                chunks, path.name, self._requirement_options, ontologies
-            ):
-                ctx = MatchContext.for_ontology(ontology_for(found.item.title, ontologies))
-                items.append(ItemInput(found.item, found.requirements, ctx))
-        return files, items
+            if is_supported(path) and path.is_file():
+                chunks = process_file(path, self._tender_options).chunks
+                files.append(TenderFile(path.name, entry.role, chunks))
+        found = parse_tender_files(files, self._requirement_options, ontologies)
+        return ParsedTender(
+            bid_number=manifest.bid_number,
+            files=[f.name for f in files],
+            items=[
+                ItemInput(
+                    e.item,
+                    e.requirements,
+                    MatchContext.for_ontology(ontology_for(e.item.title, ontologies)),
+                )
+                for e in found.items
+            ],
+            general=found.general,
+            item_source=found.source,
+        )
 
     def match_tender(self, tender: str, *, use_ontology: bool = True) -> TenderReport:
-        """Match every line item of one tender.
+        """Match every line item of one tender; report its other requirements alongside.
 
         Args:
             tender: Tender folder name under the tender data root ("GEM_2026_B_8119613").
@@ -93,23 +137,22 @@ class MatchService:
             NotFoundError: If the tender folder has no tender.yaml.
             DocumentParseError: If a tender file cannot be parsed.
         """
-        tender_dir = self._tender_root / tender
-        if not (tender_dir / MANIFEST_FILENAME).is_file():
-            raise NotFoundError(
-                f"No {MANIFEST_FILENAME} for tender {tender}", details={"tender": tender}
-            )
         with log_context(tender_id=tender):
-            files, items = self._items(tender_dir, use_ontology)
-            reports = [match_item(entry, self._source, self._selection) for entry in items]
-            logger.info("tender matched", extra={"items": len(reports), "files": len(files)})
+            parsed = self.parse_tender(tender, use_ontology=use_ontology)
+            reports = [match_item(entry, self._source, self._selection) for entry in parsed.items]
+            logger.info("tender matched", extra={"items": len(reports), "files": len(parsed.files)})
         return TenderReport(
             tender=tender,
-            bid_number=read_manifest(tender_dir / MANIFEST_FILENAME).bid_number,
-            tender_files=files,
+            bid_number=parsed.bid_number,
+            tender_files=parsed.files,
             generated_at=datetime.now(UTC),
             ontology_used=use_ontology,
             items=reports,
             ranking=self._ranking(reports),
+            general_requirements=parsed.general,
+            general_results=[general_result(r) for r in parsed.general],
+            named_makes=parsed.named_makes,
+            item_source=parsed.item_source.value,
         )
 
     def _ranking(self, reports: Sequence[ItemReport]) -> list[RankingEntry]:
@@ -122,7 +165,12 @@ class MatchService:
                 with_catalogue[m.manufacturer] = with_catalogue.get(m.manufacturer, 0) + bool(
                     m.chosen
                 )
-        return rank(by_manufacturer, with_catalogue, self._selection.status_scores)
+        return rank(
+            by_manufacturer,
+            with_catalogue,
+            self._selection.status_scores,
+            self._selection.min_coverage_pct,
+        )
 
 
 def build_match_service(settings: Settings, store: FileStore | None = None) -> MatchService:

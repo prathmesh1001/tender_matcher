@@ -77,6 +77,9 @@ class RankingEntry(BaseModel):
     manufacturer: str
     score: Score
     items_with_catalogue: int = Field(ge=0)
+    low_coverage: bool = Field(
+        description="Coverage is below the configured minimum; listed after the others."
+    )
 
 
 class TenderReport(BaseModel):
@@ -92,3 +95,17 @@ class TenderReport(BaseModel):
     decided_by: str = Field(default="rules", description="Rules only: no LLM judge yet.")
     items: list[ItemReport]
     ranking: list[RankingEntry]
+    general_requirements: list[Requirement] = Field(
+        default_factory=list, description="Requirements outside the item schedule."
+    )
+    general_results: list[Comparison] = Field(
+        default_factory=list,
+        description="One per general requirement; these never enter scores or the ranking.",
+    )
+    item_source: str = Field(
+        default="none",
+        description="Where the items came from: item_list, spec_schedule, item_category, none.",
+    )
+    named_makes: list[str] = Field(
+        default_factory=list, description="Makes the tender names; a reviewer must read these."
+    )

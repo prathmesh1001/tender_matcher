@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from app.ingestion.product_tagger import ProductMatcher
 from app.matching.chunk_source import ChunkSource, declared_types_named
-from app.matching.comparator import MatchContext
+from app.matching.comparator import MatchContext, routed
 from app.matching.documents import ItemQuery, SelectionOptions, evaluate_item
 from app.matching.scorer import score
 from app.retrieval.text_normalizer import normalize_for_search
@@ -70,6 +70,26 @@ def _no_catalogue(
         )
         for r in requirements
     ]
+
+
+def general_result(requirement: Requirement) -> Comparison:
+    """The result of a requirement outside the item schedule.
+
+    Args:
+        requirement: A general requirement.
+
+    Returns:
+        Its routed result; one that catalogues could prove is free text with no product to
+        look in, so it waits for the LLM judge.
+    """
+    return routed(requirement) or Comparison(
+        requirement_id=requirement.id,
+        status=MatchStatus.UNSUPPORTED,
+        needs_review=True,
+        decided_by=DecisionSource.NONE,
+        basis=LabelBasis.NONE,
+        reason="free text: needs the LLM judge (not enabled)",
+    )
 
 
 def manufacturer_report(

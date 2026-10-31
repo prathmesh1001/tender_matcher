@@ -18,7 +18,7 @@ from app.ontology.schema import Ontology
 from app.retrieval.text_normalizer import fold_text
 from app.schemas.enums import Operator
 from app.schemas.requirements import LineItem, Requirement, ValueKind
-from app.tender.normalizer import parse_value, resolve_attribute
+from app.tender.normalizer import has_code, parse_value, resolve_attribute, stems
 
 _LABEL_LINE: Final = re.compile(r"^(?P<label>[^:]+?)\s*:\s*(?P<value>.*)$")
 # Parts of a list: split on commas that are not inside a number ("1,000").
@@ -48,8 +48,8 @@ def label_of(line: str, max_words: int) -> tuple[str, str] | None:
     if not match:
         return None
     label = match.group("label").strip()
-    if not any(ch.isalpha() for ch in label) or len(label.split()) > max_words:
-        return None
+    if not any(ch.isalpha() for ch in label) or len(label.split()) > max_words or "," in label:
+        return None  # a comma means a list that merely has a key inside it
     return label, match.group("value").strip()
 
 
@@ -97,6 +97,46 @@ class SplitOptions:
     enum_max_words: int
 
 
+def implicit_label(
+    part: str, ontology: Ontology | None, options: SplitOptions
+) -> tuple[str, str] | None:
+    """`(label, value)` of a part with no ":" whose first words name an attribute before a code.
+
+    "BODY A351CF8" -> ("BODY", "A351CF8"). Needs an ontology, words that are exactly one of the
+    attribute's synonyms, and a code in the value: otherwise the first words of a sentence
+    are not a label.
+
+    Args:
+        part: One part of a compound value.
+        ontology: Category ontology, or None.
+        options: Splitting thresholds.
+
+    Returns:
+        The label and value, or None.
+    """
+    tokens = part.split()
+    if ontology is None or len(tokens) < 2:
+        return None
+    for end in range(min(options.label_max_words, len(tokens) - 1), 0, -1):
+        prefix, value = " ".join(tokens[:end]), " ".join(tokens[end:])
+        if any(ch.isdigit() for ch in prefix) or not has_code(value):
+            continue
+        parsed = parse_value(prefix, value, ontology, options.enum_max_words)
+        name = resolve_attribute(prefix, parsed, ontology)
+        attribute = ontology.attribute(name) if name else None
+        if attribute and stems(prefix) in {stems(s) for s in attribute.synonyms}:
+            return prefix, value
+    return None
+
+
+def _part_fields(
+    label: str | None, part: str, ontology: Ontology | None, options: SplitOptions
+) -> tuple[str | None, str]:
+    """A compound part's label and value: its own key or attribute words, else the line's."""
+    own = label_of(part, options.label_max_words) or implicit_label(part, ontology, options)
+    return own if own is not None and label is None else (label, part)
+
+
 def _requirement(
     item: LineItem,
     req_id: str,
@@ -106,6 +146,7 @@ def _requirement(
     ontology: Ontology | None,
     options: SplitOptions,
     parent_id: str | None = None,
+    printed: str | None = None,
 ) -> Requirement:
     """One requirement; for a statement the value drops its "THE VALVE SHALL BE" lead."""
     value = _STATEMENT_LEAD.sub("", text).strip() if label is None else text
@@ -126,8 +167,9 @@ def _requirement(
         unit=parsed.unit,
         canonical_unit=parsed.canonical_unit,
         alternatives=list(parsed.alternatives),
+        any_alternative=parsed.any_alternative,
         # Verbatim: "KEY : value" as printed; a part of a compound value is quoted alone.
-        raw_text=text if label is None or parent_id else f"{label} : {text}",
+        raw_text=printed or (text if label is None or parent_id else f"{label} : {text}"),
         document=item.document,
         page_number=item.page_number,
     )
@@ -165,13 +207,15 @@ def item_requirements(
                     "operator": Operator.TEXT,
                     "attribute": None,
                     "alternatives": [],
+                    "any_alternative": False,
                 }
             )
         )
         for m, part in enumerate(parts, start=1):
+            label, value = _part_fields(group.label, part, ontology, options)
             out.append(
                 _requirement(
-                    item, f"{req_id}.{m}", len(out), group.label, part, ontology, options, req_id
+                    item, f"{req_id}.{m}", len(out), label, value, ontology, options, req_id, part
                 )
             )
     return out

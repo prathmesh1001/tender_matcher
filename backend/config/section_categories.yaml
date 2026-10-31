@@ -71,7 +71,7 @@ categories:
            payment term, evaluation method, itc on gst, itc available, advisory bank,
            earnest money deposit, performance security, bank guarantee, price variation,
            unit price, total value wise evaluation, item wise evaluation, ra qualification rule,
-           bid to ra]
+           bid to ra, reverse auction, price term, gst reimbursement, input tax credit, invoice]
 
   - name: delivery_and_timeline
     kind: commercial
@@ -80,7 +80,8 @@ categories:
     headings: [delivery, consignee, packing, marking, shipment, dispatch, transportation,
                preparation for shipment]
     text: [delivery days, delivery period, consignee, reporting officer, packing and marking,
-           preparation for shipment, dispatch instruction, total quantity]
+           preparation for shipment, dispatch instruction, total quantity, delivery term,
+           delivery of goods, shipping address, parcel]
 
   - name: warranty_and_support
     kind: commercial
@@ -98,7 +99,8 @@ categories:
                force majeure, jurisdiction, definition, general terms and conditions,
                legal, dispute]
     text: [arbitration clause, mediation clause, breach of contract, liquidated damage,
-           force majeure, termination for default, risk purchase]
+           force majeure, termination for default, risk purchase, sub contract, assign the contract,
+           terminate the contract, jointly and severally, labour code]
 
   - name: submission_requirements
     kind: administrative
@@ -162,10 +164,11 @@ categories:
     kind: technical
     evidence: catalogue
     description: Item description and technical specification not covered above.
-    headings: [technical specification, specification, technical parameter, scope of supply,
+    # Not bare "specification": it stems like "specific", so "Bid Specific ATC" would match.
+    headings: [technical specification, technical parameter, scope of supply,
                technical information, technical detail, product portfolio, features, design,
                item detail, boq]
     text: [technical specification, specification document, item category, primary product
-           category, boq title, scope of supply, specification]
+           category, boq title, scope of supply]
     vendor_categories: [technical_specifications, size_and_dimensions, material_and_construction,
                         performance_requirements]

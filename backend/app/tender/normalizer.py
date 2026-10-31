@@ -39,6 +39,11 @@ _AT_LEAST_LABEL: Final = frozenset({"max", "maximum"})
 _AT_MOST_LABEL: Final = frozenset({"min", "minimum"})
 _AT_LEAST_VALUE: Final = re.compile(r"\b(?:or higher|or above|or more|minimum|min\.?|at least)\b")
 _AT_MOST_VALUE: Final = re.compile(r"\b(?:or lower|or less|up to|upto|maximum|max\.?)\b")
+# "NITRILE OR SS" names options; "WCB OR EQUIVALENT" and "PN 16 OR HIGHER" name one thing.
+_OPTION_OR: Final = re.compile(
+    r"\s+or\s+(?!(?:equivalent|equal|similar|better|higher|above|more|lower|less)\b)",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +57,7 @@ class ParsedValue:
     unit: str | None = None  # folded spelling, or "class" / "pn" for designations
     canonical_unit: str | None = None  # pint unit via the ontology
     alternatives: tuple[str, ...] = ()
+    any_alternative: bool = False  # the tender wrote "or": any one option is enough
 
     @property
     def is_designation(self) -> bool:
@@ -83,6 +89,24 @@ def alternatives(value: str) -> tuple[str, ...]:
     """Options written with "/" ("ASTM A217 Gr. CA15/CF8M" -> "ASTM A217 Gr. CA15", "CF8M")."""
     parts = tuple(p.strip() for p in value.split("/"))
     return parts if len(parts) > 1 and all(parts) else ()
+
+
+def or_options(value: str) -> tuple[str, ...]:
+    """Options when the tender writes "or" ("NITRILE OR SS"); "/" inside them also separates.
+
+    "/" alone does not say whether one option is enough, so only a written "or" does.
+    Qualifiers ("OR EQUIVALENT", "OR HIGHER") are not options.
+
+    Args:
+        value: The printed value.
+
+    Returns:
+        The options, or an empty tuple if the value has no "or" between options.
+    """
+    pieces = [p.strip() for p in _OPTION_OR.split(value)]
+    if len(pieces) < 2 or not all(pieces):
+        return ()
+    return tuple(option for piece in pieces for option in (alternatives(piece) or (piece,)))
 
 
 def operator_for(label: str | None, value: str) -> Operator:
@@ -141,8 +165,12 @@ def parse_value(
     if match:
         return _numeric(match, label, stripped, ontology)
     if has_code(stripped) or len(stripped.split()) <= enum_max_words:
+        options = or_options(stripped)
         return ParsedValue(
-            kind=ValueKind.CODE, operator=Operator.IN, alternatives=alternatives(stripped)
+            kind=ValueKind.CODE,
+            operator=Operator.IN,
+            alternatives=options or alternatives(stripped),
+            any_alternative=bool(options),
         )
     return ParsedValue(kind=ValueKind.TEXT, operator=Operator.TEXT)
 

@@ -50,8 +50,38 @@ def test_ranking_by_compatibility_then_coverage_none_last() -> None:
         },
         {"Alpha": 1, "Beta": 1, "Delta": 1},
         SCORES,
+        0.0,
     )
     assert [(r.rank, r.manufacturer) for r in ranking] == [
         (1, "Beta"), (2, "Alpha"), (3, "Delta"), (4, "Gamma"),
     ]  # fmt: skip
     assert ranking[-1].items_with_catalogue == 0
+    assert not any(r.low_coverage for r in ranking)
+
+
+def test_low_coverage_ranks_after_the_others_and_is_marked() -> None:
+    ranking = rank(
+        {
+            "Thin": [_c(FULL), _c(UNSUPPORTED), _c(UNSUPPORTED)],  # 100 %, coverage 33
+            "Solid": [_c(MISSING), _c(FULL)],  # 50 %, coverage 100
+            "Border": [_c(MISSING), _c(UNSUPPORTED)],  # 0 %, coverage exactly 50
+            "Empty": [_c(UNSUPPORTED)],  # nothing decided
+        },
+        {},
+        SCORES,
+        50.0,
+    )
+    assert [(r.manufacturer, r.low_coverage) for r in ranking] == [
+        ("Solid", False), ("Border", False), ("Thin", True), ("Empty", True),
+    ]  # fmt: skip
+    assert ranking[2].score.coverage_pct == pytest.approx(100 / 3)  # coverage is always reported
+
+
+def test_everyone_below_the_minimum_still_ranks_by_compatibility() -> None:
+    ranking = rank(
+        {"Low": [_c(MISSING), _c(UNSUPPORTED)], "High": [_c(FULL), _c(UNSUPPORTED)]},
+        {},
+        SCORES,
+        75.0,
+    )
+    assert [(r.manufacturer, r.low_coverage) for r in ranking] == [("High", True), ("Low", True)]

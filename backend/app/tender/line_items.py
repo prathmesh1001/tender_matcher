@@ -105,8 +105,24 @@ def _description_lines(chunk: ChunkDraft, columns: ItemColumns) -> list[str]:
         column = cell_lines[i] if i < len(cell_lines) and cell_lines[i] else [_cell(cells, i)]
         if lines and any(column):
             lines.append("")
-        lines.extend(column)
+        lines.extend(line.replace('""', '"').strip('"') for line in column)
     return lines
+
+
+def _title_from(lines: Sequence[str], fallback: str) -> str:
+    """A title when the table has no title column: the first line up to its first comma."""
+    first = next((ln for ln in lines if ln.strip()), "")
+    return first.split(",", 1)[0].strip() or fallback
+
+
+def is_schedule_row(chunk: ChunkDraft, options: ItemColumnOptions) -> bool:
+    """True if the chunk is a schedule row whose item-number cell holds an item number."""
+    if chunk.chunk_type is not ChunkType.TABLE_ROW or "header" not in chunk.meta:
+        return False
+    columns = find_columns(chunk.meta["header"], options)
+    return columns is not None and bool(
+        _ITEM_NO.match(_cell(chunk.meta.get("cells", []), columns.item_no))
+    )
 
 
 def line_items(
@@ -124,22 +140,22 @@ def line_items(
     """
     items: list[LineItem] = []
     for chunk in chunks:
-        if chunk.chunk_type is not ChunkType.TABLE_ROW or "header" not in chunk.meta:
+        if not is_schedule_row(chunk, options):
             continue
-        columns = find_columns(chunk.meta["header"], options)
+        header: list[str] = chunk.meta["header"]
+        columns = find_columns(header, options)
         if columns is None:
             continue
         cells: list[str] = chunk.meta.get("cells", [])
         item_no = _cell(cells, columns.item_no)
-        if not _ITEM_NO.match(item_no):
-            continue
         lines = _description_lines(chunk, columns)
-        title = _cell(cells, columns.title) or next((ln for ln in lines if ln.strip()), item_no)
+        title = _cell(cells, columns.title) or _title_from(lines, item_no)
         items.append(
             LineItem(
                 item_no=item_no.rstrip(".)"),
                 title=title,
                 description_lines=lines,
+                description_header=" ".join(header[i] for i in columns.description),
                 quantity=_cell(cells, columns.quantity) or None,
                 unit=_cell(cells, columns.unit) or None,
                 document=document,

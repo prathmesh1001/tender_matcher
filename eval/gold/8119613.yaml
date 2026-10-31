@@ -1,0 +1,118 @@
+# Hand labels for tender GEM/2026/B/8119613, copied from docs/manual_match_check.md section 1.
+# That section labels item 10 only. Requirements and items it does not label are left out here
+# and reported as "not labelled" by the diff; they are never filled in by extrapolation.
+#
+# Status: full_match | partial_match | missing_capability | unsupported (manual "NONE").
+# `manual_row` is the row of the manual check; one row can cover several atomic requirements.
+tender: GEM_2026_B_8119613
+source: docs/manual_match_check.md (section 1)
+
+evaluations:
+  - item_no: "10"
+    manufacturer: LnT_Valves
+    document: lt_triple_offset_butterfly.pdf
+    manual_fit: 0.96
+    manual_coverage: "11/14 = 79 %"
+    requirements:
+      - id: "10.1"
+        manual_row: Triple-offset metal seated, torque seated
+        status: full_match
+        pages: [1, 9]
+        evidence: 'p1 "API 609 Triple-offset Butterfly Valves"; p9 "torque-seated valves"'
+      - id: "10.2"
+        manual_row: Size 250 mm
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "3" to 100" (80 mm to 2500 mm)"'
+        note: >-
+          Known and deliberately not fixed: the printed range has no "size" label, so the
+          comparator cannot read it as the size attribute.
+      - id: "10.3"
+        manual_row: "Class #150"
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "ASME Class 150 to 1500"'
+      - id: "10.4"
+        manual_row: Valve design API 609
+        status: full_match
+        pages: [4]
+        evidence: 'p4 "Design · API 609 (Category B), ASME B16.34"'
+      - id: "10.5"
+        manual_row: Fluid water
+        status: unsupported
+        evidence: water named only as an industry (p3)
+      - id: "10.6"
+        manual_row: Max flow 650 m3/h
+        status: unsupported
+        evidence: no flow / Cv data
+      - id: "10.7"
+        manual_row: End connection wafer
+        status: full_match
+        pages: [4]
+        evidence: 'p4 "Ends · Wafer/ Lugged"'
+      - id: "10.8"
+        manual_row: Body ASTM A216 Gr. WCB
+        status: full_match
+        pages: [4]
+        evidence: 'p4 "Body · A 216 Gr. WCB/ WCC"'
+      - id: "10.9"
+        manual_row: Disc ASTM A217 CA15 / CF8M
+        status: partial_match
+        pages: [4, 5]
+        evidence: WCB variant disc is WCB (p4); CF8M only in the stainless variant (p5); CA15 not listed
+      - id: "10.10.1"
+        manual_row: Shaft A479 SS410 / 17-4PH
+        status: full_match
+        pages: [4]
+        evidence: 'p4 "A 479 Type SS 410/ A 564 Type 630" (Type 630 = 17-4PH)'
+      - id: "10.11"
+        manual_row: Body seat Stellite 21
+        status: full_match
+        pages: [4]
+        evidence: 'p4 "Body seat hard-faced with Stellite 21 or 6"'
+      - id: "10.12"
+        manual_row: Hand gear operated
+        status: full_match
+        pages: [4]
+        evidence: 'p4 "Gear Unit · Worm type (self-locking)"'
+      - id: "10.13"
+        manual_row: Torque at shaft 820 Nm
+        status: unsupported
+        evidence: torque described, no values (p8)
+      - id: "10.14.1"
+        manual_row: Triple-offset metal seated, torque seated
+        status: full_match
+        pages: [9]
+        evidence: 'p9 "torque-seated valves"'
+      - id: "10.14.2"
+        manual_row: Triple-offset metal seated, torque seated
+        status: full_match
+        pages: [1, 9]
+        evidence: 'p1 "API 609 Triple-offset Butterfly Valves"; p9 "torque-seated valves"'
+      - id: "10.14.3"
+        manual_row: Zero leakage
+        status: full_match
+        pages: [9]
+        evidence: 'p9 "Bi-directional bubble-tight sealing" (synonym)'
+
+# Product labels per catalogue (Layer 2 of the manual check).
+products:
+  - item_no: "10"
+    manufacturer: LnT_Valves
+    document: lt_triple_offset_butterfly.pdf
+    label: full
+  - item_no: "10"
+    manufacturer: LnT_Valves
+    document: lt_aquaseal_butterfly_check.pdf
+    label: least
+    note: centric
+  - item_no: "10"
+    manufacturer: Delval
+    document: delval_series_44_49_hpbfv_spec.pdf
+    label: least
+    note: double offset, p1 "Double Offset High Performance"
+  - item_no: "10"
+    manufacturer: Delval
+    document: delval_series_50_52_centric_bfv_spec.pdf
+    label: least
+    note: centric

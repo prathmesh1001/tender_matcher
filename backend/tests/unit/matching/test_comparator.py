@@ -281,6 +281,26 @@ def test_both_options_found_is_full(valves: Ontology, with_ontology: bool) -> No
     assert result.status is FULL
 
 
+@BOTH
+def test_one_option_is_full_when_the_tender_says_or(valves: Ontology, with_ontology: bool) -> None:
+    disc = _row(PARTS, ["2", "Disc", "ASTM A351 Gr. CF8M"])
+    result = _compare(
+        "DISC MOC : ASTM A217 Gr. CA15 or CF8M", [disc], _ontology(valves, with_ontology)
+    )
+    assert (result.status, result.needs_review) == (FULL, False)
+
+
+@BOTH
+def test_no_option_found_is_not_full_when_the_tender_says_or(
+    valves: Ontology, with_ontology: bool
+) -> None:
+    disc = _row(PARTS, ["2", "Disc", "ASTM A105"])
+    result = _compare(
+        "DISC MOC : ASTM A217 Gr. CA15 or CF8M", [disc], _ontology(valves, with_ontology)
+    )
+    assert result.status is not FULL
+
+
 def test_free_text_and_statements_need_the_judge(valves: Ontology) -> None:
     for line in ("OPERATION : HAND GEAR OPERATED", "THE VALVE SHALL BE FIRE SAFE"):
         result = _compare(line, [SIZE_RANGE], valves)

@@ -23,15 +23,15 @@ from dataclasses import dataclass
 from typing import Final
 
 from app.core.config import Settings
-from app.core.exceptions import UnitConversionError
 from app.matching.fields import FieldOptions, LocatedField
 from app.matching.values import Quantity, code_tokens, quantities
 from app.ontology.schema import Attribute, Ontology
-from app.ontology.units import class_to_pn, convert, nps_to_dn
+from app.ontology.units import canonical_number, class_to_pn
 from app.retrieval.text_normalizer import SearchVocabulary, fold_text, is_code, stem_token
-from app.schemas.enums import DecisionSource, MatchStatus, Operator
+from app.schemas.enums import DecisionSource, MatchStatus, Operator, RequirementType
 from app.schemas.matching import Comparison, Evidence, LabelBasis
 from app.schemas.requirements import Requirement, ValueKind
+from app.schemas.sections import EvidenceSource
 from app.tender.normalizer import ParsedValue, resolve_attribute, stems
 
 _RANK: Final = {
@@ -166,21 +166,6 @@ def field_value(
 # ---------------------------------------------------------------- numbers
 
 
-def _physical(number: float, unit: str | None, attr: Attribute, ontology: Ontology) -> float | None:
-    """A number in the attribute's canonical unit, or None if it cannot be converted."""
-    if unit is None or attr.canonical_unit is None:
-        return None
-    expr = ontology.units.get(unit) or ontology.prefix_units.get(unit)
-    if expr is None:
-        return None
-    try:
-        if attr.nominal_pipe_size and expr == "inch":
-            return float(nps_to_dn(ontology, f"{number:g}"))
-        return convert(number, expr, attr.canonical_unit)
-    except UnitConversionError:
-        return None
-
-
 def _designation(number: float, unit: str, target: str, ontology: Ontology | None) -> float | None:
     """A Class or PN number in the `target` system (EN 1759 table only, never via bar)."""
     if unit == target:
@@ -206,7 +191,7 @@ def _to_common(
         return _designation(number, unit, requirement.unit, ctx.ontology)
     attr = ctx.attribute(requirement)
     if attr is not None and ctx.ontology is not None and attr.canonical_unit is not None:
-        return _physical(number, unit, attr, ctx.ontology)
+        return canonical_number(number, unit, attr, ctx.ontology)
     return number if unit is not None and unit == requirement.unit else None
 
 
@@ -310,7 +295,8 @@ def judge_code(
     """What one field's value decides for a code requirement.
 
     Every token of an option must appear ("ASTM A216 Gr. WCB" needs a216 and wcb). With
-    options ("CA15/CF8M") all found is full, some found is partial. A value that states
+    options ("CA15/CF8M") all found is full, some found is partial, unless the tender wrote
+    "or" ("NITRILE OR SS"): then one found is full. A value that states
     something else (a code, or a short value such as "Flanged") is missing. An empty value,
     bare numbers ("5" in a "No." column, B4) or a sentence without codes decide nothing.
     """
@@ -325,7 +311,7 @@ def judge_code(
     if not wanted:
         return _Outcome(None, "requirement has no code")
     found = [w for w in wanted if w <= have]
-    if len(found) == len(wanted):
+    if len(found) == len(wanted) or (found and requirement.any_alternative):
         return _Outcome(MatchStatus.FULL_MATCH, "")
     if found:
         return _Outcome(MatchStatus.PARTIAL_MATCH, f"{len(found)} of {len(wanted)} options found")
@@ -368,6 +354,42 @@ def _unsupported(requirement: Requirement, reason: str, basis: LabelBasis) -> Co
     )
 
 
+def routed(requirement: Requirement) -> Comparison | None:
+    """The result of a requirement catalogues cannot decide, or None if they may.
+
+    Nothing is searched for these (CLAUDE.md section 7): vendor documents are not ingested, so
+    they have no evidence and are not failures; a named make is recorded and never fails
+    another make (D4); a buyer detail has nothing to compare.
+
+    Args:
+        requirement: An atomic requirement.
+
+    Returns:
+        The result, or None if the requirement goes on to the catalogues.
+    """
+    reason = None
+    if requirement.named_make:
+        reason = f"tender names a make ({requirement.named_make}): recorded, not judged"
+    elif requirement.req_type is RequirementType.VAGUE:
+        reason = "nothing to verify in this wording"
+    elif requirement.evidence is EvidenceSource.VENDOR_DOCUMENTS:
+        reason = "needs the vendor's own documents: none ingested, so no evidence"
+    elif requirement.evidence is None:
+        reason = "could not tell what kind of requirement this is"
+    if reason is not None:
+        return _unsupported(requirement, reason, LabelBasis.NONE)
+    if requirement.evidence is EvidenceSource.NONE:
+        return Comparison(
+            requirement_id=requirement.id,
+            status=MatchStatus.NOT_APPLICABLE,
+            needs_review=False,
+            decided_by=DecisionSource.NONE,
+            basis=LabelBasis.NONE,
+            reason="nothing to compare",
+        )
+    return None
+
+
 def _not_checkable(requirement: Requirement) -> str | None:
     """Why rules cannot check this requirement at all, or None."""
     if requirement.label is None:
@@ -394,6 +416,9 @@ def compare(
     Returns:
         The best status any field supports, with the fields behind it as evidence.
     """
+    route = routed(requirement)
+    if route is not None:
+        return route
     basis = LabelBasis.ATTRIBUTE if ctx.attribute(requirement) else LabelBasis.LABEL_WORDS
     reason = _not_checkable(requirement)
     if reason:
@@ -410,7 +435,8 @@ def compare(
         else:
             outcome = judge_code(requirement, value, ctx, options)
         judged.append(_evidence(located, value, outcome))
-    return _decide(requirement, judged, basis, options)
+    result = _decide(requirement, judged, basis, options)
+    return result.model_copy(update={"needs_review": True}) if requirement.flags else result
 
 
 def _decide(

@@ -38,6 +38,7 @@ class SelectionOptions:
     comparator: ComparatorOptions
     status_scores: dict[MatchStatus, float]
     quote_threshold: float
+    min_coverage_pct: float
 
     @classmethod
     def from_settings(cls, settings: Settings) -> SelectionOptions:
@@ -46,6 +47,7 @@ class SelectionOptions:
             comparator=ComparatorOptions.from_settings(settings),
             status_scores={MatchStatus(k): v for k, v in settings.STATUS_SCORES.items()},
             quote_threshold=settings.QUOTE_MATCH_THRESHOLD,
+            min_coverage_pct=settings.RANKING_MIN_COVERAGE_PCT,
         )
 
 

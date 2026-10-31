@@ -179,6 +179,28 @@ def test_parse_value(
     )  # fmt: skip
 
 
+@pytest.mark.parametrize(
+    ("value", "options", "any_option"),
+    [
+        ("ASTM A217 Gr. CA15/CF8M", ("ASTM A217 Gr. CA15", "CF8M"), False),  # "/" alone
+        ("NITRILE OR SS", ("NITRILE", "SS"), True),
+        ("CA15/CF8M or A105", ("CA15", "CF8M", "A105"), True),
+        ("ASTM A216 WCB or equivalent", (), False),  # D4: a qualifier, not an option
+        ("ASTM A216 WCB OR BETTER", (), False),
+    ],
+)
+def test_written_or_means_any_option(
+    value: str, options: tuple[str, ...], any_option: bool
+) -> None:
+    parsed = parse_value("MOC", value, None, enum_max_words=3)
+    assert (parsed.alternatives, parsed.any_alternative) == (options, any_option)
+
+
+def test_or_higher_stays_a_direction() -> None:
+    parsed = parse_value("RATING", "PN 16 OR HIGHER", None, enum_max_words=3)
+    assert (parsed.operator, parsed.any_alternative) == (Operator.GTE, False)
+
+
 def test_units_resolve_only_through_the_ontology(ontology: Ontology) -> None:
     assert parse_value("MAX FLOW", "650 M3/HR", None, 2).canonical_unit is None
     assert parse_value("MAX FLOW", "650 M3/HR", ontology, 2).canonical_unit == "m**3/h"

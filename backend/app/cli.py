@@ -7,22 +7,31 @@ Usage (from backend/):
     python -m app.cli ingest-tenders [--tender ...]
     python -m app.cli tag-products                                  # no re-parsing
     python -m app.cli embed [--source manufacturer|tender|all] [--manufacturer NAME]
+    python -m app.cli index [--category valves_pumps] [--reprocess]  # catalogues + their vectors
+    python -m app.cli index-status                                  # chunks, vectors, facts
     python -m app.cli ingest-all [--fetch] [--reprocess]            # catalogues + tenders
     python -m app.cli match-tender --tender GEM_2026_B_8119613 [--no-ontology] [--out FILE]
+    python -m app.cli parse-tender --tender GEM_2026_B_8119613      # requirements, no matching
+    python -m app.cli gold-diff --gold ../eval/gold/8119613.yaml [--out FILE]
+    python -m app.cli extract-specs [--manufacturer NAME] [--reprocess]   # calls the LLM
 
 Exit code 1 if any file failed.
 """
 
 import argparse
 import sys
+from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
 
 from app.core.config import Settings, get_settings
+from app.core.exceptions import InvalidInputError
 from app.core.logging import configure_logging
 from app.ingestion.pipeline import IngestOutcome
+from app.reporting.gold_diff import gold_diff, load_gold, render_gold_diff
 from app.reporting.json_report import write_json_report
 from app.schemas.enums import DocumentSource
+from app.schemas.requirements import Requirement
 from app.services.indexing_service import build_indexing_service
 from app.services.ingestion_service import (
     BatchResult,
@@ -30,8 +39,10 @@ from app.services.ingestion_service import (
     build_ingestion_service,
 )
 from app.services.match_service import build_match_service
+from app.services.spec_service import build_spec_service
 from app.tender.documents import TenderIngestOutcome
 from app.tender.link_fetcher import CrawlReport
+from app.tender.splitter import leaves
 
 
 def _out(line: str = "") -> None:
@@ -164,8 +175,80 @@ def run_match(settings: Settings, tender: str, *, use_ontology: bool, out: str |
         _out(
             f"  {r.rank}. {r.manufacturer:20} {_pct(r.score.compatibility_pct)} cov "
             f"{r.score.coverage_pct:5.1f}%  review={r.score.needs_review}"
+            f"{'  LOW COVERAGE' if r.low_coverage else ''}"
         )
     _out(f"Report: {path}")
+    return 0
+
+
+def run_parse_tender(settings: Settings, tender: str) -> int:
+    """Print one tender's items, its requirements per category and the makes it names."""
+    parsed = build_match_service(settings).parse_tender(tender)
+    _out(
+        f"Tender {parsed.bid_number}: {len(parsed.files)} files, {len(parsed.items)} items "
+        f"from {parsed.item_source.value}"
+    )
+    atomic: list[Requirement] = []
+    for entry in parsed.items:
+        found = leaves(entry.requirements)
+        atomic.extend(found)
+        _out(f"  item {entry.item.item_no} {entry.item.title}: {len(found)} requirements")
+    everything = [*atomic, *parsed.general]
+    _out(f"Requirements: {len(atomic)} on items, {len(parsed.general)} general")
+    for name, count in Counter(r.category or "other" for r in everything).most_common():
+        _out(f"  {count:5} {name}")
+    _out(f"Named makes: {', '.join(parsed.named_makes) or 'none'}")
+    return 0
+
+
+def run_index_status(settings: Settings) -> int:
+    """Print chunks, vectors and spec facts per stored catalogue."""
+    rows = build_indexing_service(settings).status()
+    for r in rows:
+        _out(f"  {r.file_path}  chunks={r.chunks} vectors={r.with_vector} facts={r.spec_facts}")
+    chunks, vectors = sum(r.chunks for r in rows), sum(r.with_vector for r in rows)
+    facts = sum(r.spec_facts for r in rows)
+    _out(f"Index: {len(rows)} catalogues, {chunks} chunks, {vectors} with vector, {facts} facts")
+    return 0
+
+
+def run_index(
+    settings: Settings, service: IngestionService, category: str | None, *, reprocess: bool
+) -> int:
+    """Ingest catalogues, embed their new chunks and print the resulting index; returns failures."""
+    failures = run_manufacturers(service, category, reprocess=reprocess)
+    failures += run_embed(settings, DocumentSource.MANUFACTURER.value, None)
+    run_index_status(settings)
+    return failures
+
+
+def run_extract_specs(settings: Settings, manufacturer: str | None, *, reprocess: bool) -> int:
+    """Extract verified spec facts with the LLM and print one line per document."""
+    try:
+        service = build_spec_service(settings)
+    except InvalidInputError as exc:
+        _out(f"Cannot extract: {exc.message}")
+        return 1
+    result = service.extract(manufacturer=manufacturer, reprocess=reprocess)
+    _out(f"Spec facts: {len(result.succeeded)} documents ok, {len(result.failed)} failed")
+    for o in result.succeeded:
+        dropped = ", ".join(f"{r.value}={n}" for r, n in sorted(o.dropped.items()))
+        _out(f"  {o.file_path}  proposed={o.proposed} stored={o.stored}  dropped: {dropped or '-'}")
+    return _report_failures(result)
+
+
+def run_gold_diff(settings: Settings, gold_file: str, out: str | None) -> int:
+    """Match the gold's tender with and without the ontology and write the diff as markdown."""
+    gold = load_gold(Path(gold_file))
+    service = build_match_service(settings)
+    runs = {
+        "ontology": service.match_tender(gold.tender),
+        "no ontology": service.match_tender(gold.tender, use_ontology=False),
+    }
+    path = Path(out) if out else settings.REPORT_DIR / f"{gold.tender}_gold_diff.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_gold_diff(gold_diff(gold, runs)), encoding="utf-8")
+    _out(f"Gold diff: {path}")
     return 0
 
 
@@ -193,10 +276,22 @@ def build_parser() -> argparse.ArgumentParser:
     embed = sub.add_parser("embed", help="embed chunks that have no vector yet")
     embed.add_argument("--source", choices=["manufacturer", "tender", "all"], default="all")
     embed.add_argument("--manufacturer", default=None)
+    index = sub.add_parser("index", help="ingest catalogues and embed their chunks")
+    index.add_argument("--category", default=None)
+    index.add_argument("--reprocess", action="store_true", help="re-parse stored catalogues")
+    sub.add_parser("index-status", help="chunks, vectors and spec facts per catalogue")
     match = sub.add_parser("match-tender", help="rules-only match of one tender -> JSON report")
     match.add_argument("--tender", required=True, help="tender folder, e.g. GEM_2026_B_8119613")
     match.add_argument("--no-ontology", action="store_true", help="run without any ontology")
     match.add_argument("--out", default=None, help="report path (default: REPORT_DIR)")
+    parse = sub.add_parser("parse-tender", help="print a tender's requirements, no matching")
+    parse.add_argument("--tender", required=True, help="tender folder, e.g. GEM_2026_B_8119613")
+    diff = sub.add_parser("gold-diff", help="compare match results with a gold file -> markdown")
+    diff.add_argument("--gold", required=True, help="gold file, e.g. ../eval/gold/8119613.yaml")
+    diff.add_argument("--out", default=None, help="diff path (default: REPORT_DIR)")
+    specs = sub.add_parser("extract-specs", help="LLM spec facts from stored catalogues")
+    specs.add_argument("--manufacturer", default=None)
+    specs.add_argument("--reprocess", action="store_true", help="replace facts already stored")
     for name in ("ingest-manufacturers", "ingest-tenders", "ingest-all"):
         sub.choices[name].add_argument(
             "--reprocess", action="store_true", help="re-parse files that are already stored"
@@ -220,9 +315,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1 if run_embed(settings, args.source, args.manufacturer) else 0
     if args.command == "match-tender":
         return run_match(settings, args.tender, use_ontology=not args.no_ontology, out=args.out)
+    if args.command == "parse-tender":
+        return run_parse_tender(settings, args.tender)
+    if args.command == "gold-diff":
+        return run_gold_diff(settings, args.gold, args.out)
+    if args.command == "extract-specs":
+        return run_extract_specs(settings, args.manufacturer, reprocess=args.reprocess)
+    if args.command == "index-status":
+        return run_index_status(settings)
     service = build_ingestion_service(settings)
     failures = 0
     match args.command:
+        case "index":
+            failures = run_index(settings, service, args.category, reprocess=args.reprocess)
         case "ingest-manufacturers":
             failures = run_manufacturers(service, args.category, reprocess=args.reprocess)
         case "tag-products":

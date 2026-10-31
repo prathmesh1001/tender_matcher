@@ -44,7 +44,7 @@ def _tender(root: Path) -> None:
     book.save(folder / "boq.xlsx")
     manifest = {
         "bid_number": "GEM/2099/B/0000001",
-        "files": [{"file": "boq.xlsx", "role": "boq", "url": None}],
+        "files": [{"file": "boq.xlsx", "role": "boq_items", "url": None}],
     }
     (folder / "tender.yaml").write_text(yaml.safe_dump(manifest), encoding="utf-8")
 

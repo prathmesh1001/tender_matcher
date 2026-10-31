@@ -1,0 +1,40 @@
+# How a tender line is classified, beyond its section category (section_categories.yaml).
+# Phrases match whole words on normalize_for_search() text; `make_patterns` are regular
+# expressions on the printed text. Add new wording here, never in Python.
+
+# Section category kind -> requirement type (CLAUDE.md section 6).
+kind_types:
+  technical: technical
+  commercial: commercial
+  eligibility: compliance_doc
+  legal: legal
+  administrative: compliance_doc
+
+# A line whose category cannot be told. It is reported as unsupported + needs_review, like a
+# vague line: never as a pass or a failure.
+unclassified_type: vague
+
+# Lines of an item's schedule row that name no category are technical (they describe the item).
+item_default_category: technical_specifications
+
+# D3: wording with nothing to verify. A line that also holds a code or names a make is not vague.
+vague: [good quality, best quality, high quality, superior quality, reputed make, standard make,
+        as per standard, as per standards, as per relevant standard, as per applicable standard,
+        as per requirement, as required, suitable type, first class]
+
+# Whether the tender requires the line. Mandatory wins if both match; neither means unknown.
+mandatory: [shall, must, mandatory, compulsory, is required, are required, liable to be rejected,
+            pre requisite, prerequisite]
+optional: [may, optional, if required, preferably, preferred, advised, advisable]
+
+# D4: another make or grade is acceptable. Recorded on the requirement; it never fails a make.
+or_equivalent: [or equivalent, or equal, or similar, or eqv]
+
+# T9 and D4: a make named by the tender. The group `make` is what gets recorded.
+make_patterns:
+  - '\bmake\s*:\s*(?:m/s\.?\s*)?(?P<make>[^.,;)\n]+)'
+  - '\bmake\s+like\s+(?P<make>[^.,;)\n]+?)(?:\s+make)?\s*(?:[.,;)\n]|$)'
+  - '\bsingle\s+tender\s+enquiry\s+on\s+(?:m/s\.?\s*)?(?P<make>[^.,;\n]+)'
+
+# Words ending in "." that do not end a sentence when prose is split into requirements.
+sentence_abbreviations: [m/s, "no", nos, gr, ltd, pvt, dt, sl, sr, rs, inr, govt, dept, viz, etc, e.g, i.e, f.o.r]

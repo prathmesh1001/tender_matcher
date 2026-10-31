@@ -1,0 +1,69 @@
+# Gold diff: GEM_2026_B_8119613
+
+Gold source: docs/manual_match_check.md (section 1)
+
+| Run | agree | not decided | weaker | stronger | other catalogue | other page |
+|---|---|---|---|---|---|---|
+| ontology | 7 | 6 | 3 | 0 | 0 | 0 |
+| no ontology | 5 | 7 | 4 | 0 | 0 | 0 |
+
+## Item 10, LnT_Valves, `lt_triple_offset_butterfly.pdf`
+
+| Req | Tender | Gold | ontology | no ontology |
+|---|---|---|---|---|
+| 10.1 | TYPE : TRIPLE OFFSET METAL SEATED BUTTERFLY VALVE | full_match (p1, p9) | unsupported (-): **not decided**; free text: needs the LLM judge (not enabled) | unsupported (-): **not decided**; free text: needs the LLM judge (not enabled) |
+| 10.2 | SIZE : 250 MM | full_match (p1) | partial_match (p11): **weaker** | partial_match (p11): **weaker** |
+| 10.3 | PRESSURE RATING : CLASS #150 | full_match (p1) | full_match (p1): **agree** | unsupported (p4): **not decided**; label found but no value in a comparable unit |
+| 10.4 | VALVE DESIGN : API 609 5TH EDITION | full_match (p4) | partial_match (p4): **weaker**; near miss: only part of the code found | partial_match (p4): **weaker**; near miss: only part of the code found |
+| 10.5 | FLUID : WATER | unsupported (-) | unsupported (-): **agree**; no catalogue field names this attribute | unsupported (-): **agree**; no catalogue field names this attribute |
+| 10.6 | MAX FLOW : 650 M3/HR | unsupported (-) | unsupported (-): **agree**; no catalogue field names this attribute | unsupported (-): **agree**; no catalogue field names this attribute |
+| 10.7 | END CONNECTION : WAFER | full_match (p4) | full_match (p4): **agree** | unsupported (-): **not decided**; no catalogue field names this attribute |
+| 10.8 | VALVE BODY MOC : ASTM A216 Gr. WCB | full_match (p4) | full_match (p4): **agree** | full_match (p4): **agree** |
+| 10.9 | DISC MOC : ASTM A217 Gr. CA15/CF8M | partial_match (p4, p5) | partial_match (p4, p5): **agree**; near miss: only part of the code found | partial_match (p4, p5): **agree**; near miss: only part of the code found |
+| 10.10.1 | SHAFT MOC : A479 Type SS 410/17-4PH SS | full_match (p4) | partial_match (p4): **weaker**; 1 of 2 options found | partial_match (p4): **weaker**; 1 of 2 options found |
+| 10.11 | BODY SEAT : STELLITE 21 INTEGRALLY WELDED TO BODY | full_match (p4) | unsupported (-): **not decided**; no catalogue field names this attribute | partial_match (p4): **weaker**; near miss: only part of the code found |
+| 10.12 | OPERATION : HAND GEAR OPERATED | full_match (p4) | unsupported (-): **not decided**; free text: needs the LLM judge (not enabled) | unsupported (-): **not decided**; free text: needs the LLM judge (not enabled) |
+| 10.13 | TORQUE AT SHAFT : 820 Nm | unsupported (-) | unsupported (-): **agree**; no catalogue field names this attribute | unsupported (-): **agree**; no catalogue field names this attribute |
+| 10.14.1 | TORQUE SEATED | full_match (p9) | unsupported (-): **not decided**; statement without a label: needs the LLM judge (not enabled) | unsupported (-): **not decided**; statement without a label: needs the LLM judge (not enabled) |
+| 10.14.2 | METAL SEATED | full_match (p1, p9) | unsupported (-): **not decided**; statement without a label: needs the LLM judge (not enabled) | unsupported (-): **not decided**; statement without a label: needs the LLM judge (not enabled) |
+| 10.14.3 | ZERO LEAKAGE | full_match (p9) | unsupported (-): **not decided**; statement without a label: needs the LLM judge (not enabled) | unsupported (-): **not decided**; statement without a label: needs the LLM judge (not enabled) |
+
+Manual check: fit 0.96, coverage 11/14 = 79 % (weighted).
+System, ontology: compatibility 71.42857142857143, coverage 38.9 % (7/18, unweighted).
+System, no ontology: compatibility 58.333333333333336, coverage 33.3 % (6/18, unweighted).
+
+Notes from gold:
+
+- 10.2: Known and deliberately not fixed: the printed range has no "size" label, so the comparator cannot read it as the size attribute.
+
+Not labelled in gold, so not compared:
+
+- 10.10.2 `SHAFT MOC : SINGLE PIECE` (ontology: unsupported, no ontology: unsupported)
+- 10.14.4 `NON RUBBING` (ontology: unsupported, no ontology: unsupported)
+
+Items without gold: 20.
+
+## Catalogues: product label vs sub-type fit
+
+| Item | Manufacturer | Catalogue | Gold | ontology | no ontology |
+|---|---|---|---|---|---|
+| 10 | LnT_Valves | `lt_triple_offset_butterfly.pdf` | full | match, chosen: agree | match, chosen: agree |
+| 10 | LnT_Valves | `lt_aquaseal_butterfly_check.pdf` | least | general: **differs** | mismatch: agree |
+| 10 | Delval | `delval_series_44_49_hpbfv_spec.pdf` | least | mismatch: agree | unknown, chosen: **differs** |
+| 10 | Delval | `delval_series_50_52_centric_bfv_spec.pdf` | least | mismatch, chosen: agree | unknown: **differs** |
+
+## Ranking (not in gold, shown only)
+
+ontology:
+
+1. LnT_Valves: compatibility 71.4 %, coverage 38.9 %, low coverage
+2. Delval: compatibility 41.7 %, coverage 33.3 %, low coverage
+3. KSB: compatibility -, coverage 0.0 %, low coverage
+4. Kirloskar Brothers: compatibility -, coverage 0.0 %, low coverage
+
+no ontology:
+
+1. Delval: compatibility 66.7 %, coverage 16.7 %, low coverage
+2. LnT_Valves: compatibility 58.3 %, coverage 33.3 %, low coverage
+3. KSB: compatibility -, coverage 0.0 %, low coverage
+4. Kirloskar Brothers: compatibility -, coverage 0.0 %, low coverage

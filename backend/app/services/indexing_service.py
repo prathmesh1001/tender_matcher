@@ -19,6 +19,7 @@ from app.db.session import create_db_engine, create_session_factory, session_sco
 from app.retrieval.embedder import Embedder, build_embedder
 from app.retrieval.vector_index import EmbedStats, embed_document_chunks
 from app.schemas.enums import DocumentSource
+from app.schemas.retrieval import DocumentIndexStatus
 from app.services.ingestion_service import BatchResult
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,11 @@ class IndexingService:
                 logger.error("embedding failed", extra={"file": file_path, "error": str(exc)})
                 result.failed.append((file_path, str(exc)))
         return result
+
+    def status(self) -> list[DocumentIndexStatus]:
+        """Chunks, vectors of the configured model and spec facts of every stored catalogue."""
+        with session_scope(self.session_factory) as session:
+            return ChunkRepository(session).index_status(self.embedder.model_name)
 
     def _embed_one(self, document_id: uuid.UUID, file_path: str) -> EmbedOutcome:
         """Embed one document in its own transaction."""

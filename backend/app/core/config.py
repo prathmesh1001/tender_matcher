@@ -8,7 +8,7 @@ from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, PostgresDsn, field_validator, model_validator
+from pydantic import Field, PostgresDsn, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -33,6 +33,12 @@ class FileStoreBackend(StrEnum):
     """Where source files are stored (Postgres is added in plan step 16)."""
 
     LOCAL = "local"
+
+
+class LLMProvider(StrEnum):
+    """LLM providers behind `LLMClient`."""
+
+    GEMINI = "gemini"
 
 
 class EmbeddingDevice(StrEnum):
@@ -101,6 +107,10 @@ class Settings(BaseSettings):
         default=Path("config/section_categories.yaml"),
         description="Section categories (costing, eligibility, dimensions, ...) and their phrases.",
     )
+    REQUIREMENT_RULES_FILE: Path = Field(
+        default=Path("config/requirement_rules.yaml"),
+        description="Phrases that classify a tender line: vague, mandatory, named make, ...",
+    )
     REPORT_DIR: Path = Field(
         default=Path(".cache/reports"),
         description="Where match-tender writes JSON reports (local output, not committed).",
@@ -158,12 +168,36 @@ class Settings(BaseSettings):
         description="Header labels of the item-title column (JSON list).",
     )
     TENDER_ITEM_DESCRIPTION_HEADERS: list[str] = Field(
-        default_factory=lambda: ["description", "specification", "critical dimension"],
+        default_factory=lambda: [
+            "description",
+            "descriptions",
+            "specification",
+            "specifications",
+            "critical dimension",
+        ],
         description="Header labels of the columns holding an item's specification (JSON list).",
     )
     TENDER_ITEM_QUANTITY_HEADERS: list[str] = Field(
         default_factory=lambda: ["quant", "qty"],
         description="Prefixes of quantity-column header words ('Quantity', 'Qty.').",
+    )
+    TENDER_ITEM_LIST_ROLES: list[str] = Field(
+        default_factory=lambda: ["boq_items"],
+        description="File roles that are a tender's item list; read first (JSON list).",
+    )
+    TENDER_SPEC_ROLES: list[str] = Field(
+        default_factory=lambda: [
+            "boq_spec",
+            "buyer_spec",
+            "gem_category_spec",
+            "buyer_doc",
+            "attachment",
+        ],
+        description="File roles whose schedules can give line items; ATC never does (JSON list).",
+    )
+    TENDER_ITEM_CATEGORY_LABELS: list[str] = Field(
+        default_factory=lambda: ["item category"],
+        description="Label of the bid row naming the items, the last source of items (JSON list).",
     )
     TENDER_ITEM_UNIT_HEADERS: list[str] = Field(
         default_factory=lambda: ["unit", "uom"],
@@ -267,6 +301,31 @@ class Settings(BaseSettings):
         },
         description="Score per decided status (CLAUDE.md section 7); other statuses are "
         "excluded from scores (JSON object).",
+    )
+    RANKING_MIN_COVERAGE_PCT: float = Field(
+        default=50.0,
+        ge=0,
+        le=100,
+        description="Manufacturers with less evidence coverage are marked low coverage and "
+        "ranked after the others.",
+    )
+    LLM_PROVIDER: LLMProvider = Field(default=LLMProvider.GEMINI)
+    LLM_MODEL: str = Field(default="gemini-3.8-flash", description="Model id at the provider.")
+    GEMINI_API_KEY: SecretStr | None = Field(
+        default=None, description="Needed by every command that calls the LLM."
+    )
+    GEMINI_API_BASE: str = Field(default="https://generativelanguage.googleapis.com/v1beta")
+    LLM_TEMPERATURE: float = Field(default=0.0, ge=0, le=2)
+    LLM_MAX_OUTPUT_TOKENS: int = Field(default=16384, ge=1)
+    LLM_TIMEOUT_SECONDS: float = Field(default=120.0, gt=0)
+    LLM_MAX_RETRIES: int = Field(
+        default=4, ge=0, description="Retries after a rate limit, server error or network failure."
+    )
+    LLM_RETRY_BACKOFF_SECONDS: float = Field(
+        default=2.0, ge=0, description="First retry delay; doubles on each further retry."
+    )
+    SPEC_EXTRACT_BATCH_CHUNKS: int = Field(
+        default=25, ge=1, description="Chunks sent to the LLM in one spec-extraction call."
     )
     TABLE_CONTINUATION_EDGE_FRACTION: float = Field(
         default=0.25,

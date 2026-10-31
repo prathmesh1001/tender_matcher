@@ -6,12 +6,14 @@ from collections.abc import Sequence
 
 from sqlalchemy.orm import Session
 
+from app.db.models import Document
 from app.db.models.embedding import EMBEDDING_DIMENSIONS
 from app.db.repositories import ChunkRepository
 from app.retrieval.embedder import embedding_text, text_hash
 from app.retrieval.vector_index import embed_document_chunks
 from app.schemas.enums import DocumentSource
-from tests.integration.factories import make_chunk, make_document
+from app.schemas.retrieval import DocumentIndexStatus
+from tests.integration.factories import make_chunk, make_document, make_spec_fact
 
 
 class FakeEmbedder:
@@ -80,3 +82,40 @@ def test_documents_needing_embedding(db_session: Session) -> None:
     # A different model has no vectors yet, so both documents still need it.
     other_model = {d for d, _ in ChunkRepository(db_session).documents_needing_embedding("x")}
     assert {done.id, todo.id} <= other_model
+
+
+def _status(db_session: Session, doc: Document, model: str) -> DocumentIndexStatus:
+    rows = ChunkRepository(db_session).index_status(model)
+    return next(r for r in rows if r.file_path == doc.file_path)
+
+
+def test_index_status_counts_chunks_vectors_and_facts(db_session: Session) -> None:
+    doc = _doc_with_chunks(db_session, ["Body: SS316", "Body: SS316", "Seat: PTFE"], "Counted")
+    embedder = FakeEmbedder()
+    assert _status(db_session, doc, embedder.model_name).with_vector == 0
+    embed_document_chunks(db_session, embedder, doc.id)
+    db_session.add(make_spec_fact(doc, attribute="body_material", value_text="SS316"))
+    db_session.flush()
+    row = _status(db_session, doc, embedder.model_name)
+    # Facts are counted once, not once per chunk the join returns.
+    assert (row.chunks, row.with_vector, row.spec_facts) == (3, 3, 1)
+    assert _status(db_session, doc, "another-model").with_vector == 0
+
+
+def test_index_status_lists_a_catalogue_without_chunks(db_session: Session) -> None:
+    doc = make_document(manufacturer="Empty", pages=1)
+    db_session.add(doc)
+    db_session.flush()
+    row = _status(db_session, doc, FakeEmbedder.model_name)
+    assert (row.chunks, row.with_vector, row.spec_facts) == (0, 0, 0)
+
+
+def test_index_status_leaves_out_tender_documents(db_session: Session) -> None:
+    doc = make_document(manufacturer="Tendered", pages=1)
+    doc.source_kind = DocumentSource.TENDER
+    doc.manufacturer = None
+    doc.category = None
+    db_session.add(doc)
+    db_session.flush()
+    rows = ChunkRepository(db_session).index_status(FakeEmbedder.model_name)
+    assert doc.file_path not in {r.file_path for r in rows}

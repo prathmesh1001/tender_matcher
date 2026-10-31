@@ -7,9 +7,11 @@ from sqlalchemy import delete, func, select
 from app.db.models.chunk import Chunk
 from app.db.models.document import Document
 from app.db.models.embedding import TextEmbedding
+from app.db.models.spec_fact import SpecFact
 from app.db.models.tender import TenderDocument
 from app.db.repositories.base import SqlRepository
 from app.schemas.enums import DocumentSource
+from app.schemas.retrieval import DocumentIndexStatus
 
 
 class ChunkRepository(SqlRepository[Chunk]):
@@ -70,6 +72,34 @@ class ChunkRepository(SqlRepository[Chunk]):
             .order_by(Chunk.document_id, Chunk.page_number, Chunk.position)
         )
         return list(self._session.scalars(stmt))
+
+    def index_status(self, model_name: str) -> list[DocumentIndexStatus]:
+        """Chunks, vectors and spec facts of every stored catalogue.
+
+        Args:
+            model_name: Embedding model identifier; vectors of other models do not count.
+
+        Returns:
+            One row per manufacturer document, ordered by file path.
+        """
+        joined = (TextEmbedding.text_hash == Chunk.embed_hash) & (TextEmbedding.model == model_name)
+        facts = (
+            select(func.count(SpecFact.id))
+            .where(SpecFact.document_id == Document.id)
+            .scalar_subquery()
+        )
+        stmt = (
+            select(Document.file_path, func.count(Chunk.id), func.count(TextEmbedding.id), facts)
+            .outerjoin(Chunk, Chunk.document_id == Document.id)
+            .outerjoin(TextEmbedding, joined)
+            .where(Document.source_kind == DocumentSource.MANUFACTURER)
+            .group_by(Document.id, Document.file_path)
+            .order_by(Document.file_path)
+        )
+        return [
+            DocumentIndexStatus(file_path=path, chunks=chunks, with_vector=vectors, spec_facts=n)
+            for path, chunks, vectors, n in self._session.execute(stmt)
+        ]
 
     def documents_needing_embedding(
         self,
