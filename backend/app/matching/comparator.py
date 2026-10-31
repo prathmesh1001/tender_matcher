@@ -118,11 +118,23 @@ def _shape(requirement: Requirement) -> ParsedValue:
 
 
 def label_names(
-    requirement: Requirement, label: str, ctx: MatchContext, options: ComparatorOptions
+    requirement: Requirement,
+    label: str,
+    ctx: MatchContext,
+    options: ComparatorOptions,
+    key: str = "",
 ) -> bool:
-    """True if a catalogue label names the requirement's attribute (rule 1)."""
+    """True if a catalogue label names the requirement's attribute (rule 1).
+
+    A table cell's label is its row key plus a column header, and the header can be a model or
+    a heading ("Head" + "Etanorm", "End Connection" + "Standard"). So if the whole label names
+    nothing, the row key alone decides; "Disc Nut" + "Material" still names no disc.
+    """
     if ctx.ontology is not None and requirement.attribute is not None:
-        found = resolve_attribute(label, _shape(requirement), ctx.ontology)
+        shape = _shape(requirement)
+        found = resolve_attribute(label, shape, ctx.ontology)
+        if found is None and key:
+            found = resolve_attribute(key, shape, ctx.ontology)
         return found == requirement.attribute
     keys = key_words(requirement.label or "", options)
     return bool(keys) and keys <= frozenset(stems(label))
@@ -159,7 +171,8 @@ def field_value(
     """The field's value if the field states the requirement's attribute, else None."""
     field = located.field
     if field.label:
-        return field.value if label_names(requirement, field.label, ctx, options) else None
+        named = label_names(requirement, field.label, ctx, options, field.key)
+        return field.value if named else None
     return _inline_value(requirement, field.value, ctx, options)
 
 

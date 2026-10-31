@@ -101,6 +101,10 @@ class Ontology(BaseModel):
     version: int = Field(ge=1)
     product_types: list[ProductType] = Field(min_length=1)
     attributes: list[Attribute] = Field(min_length=1)
+    label_generic_words: list[str] = Field(
+        default_factory=list,
+        description="Words that may follow a synonym in a label without changing what it names.",
+    )
     codes: list[CodeRule] = Field(default_factory=list)
     abbreviations: dict[str, str] = Field(default_factory=dict)
     equivalents: list[EquivalentGroup] = Field(default_factory=list)

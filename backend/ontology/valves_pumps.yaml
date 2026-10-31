@@ -84,6 +84,12 @@ product_types:
     synonyms: [submersible pump, borewell pump]
     sub_types: []
 
+# Words a label may have after a synonym and still name that attribute ("Body Materials", "Size
+# Range", "Ends Parameter"). Any other word means the label names something else ("Stem Length").
+label_generic_words: [valve, moc, material, parameter, component, part, sl, "no", number, type,
+                      spec, specification, description, detail, range, dim, dimension, scope,
+                      iso, asme, of, to, and, for, at, the, max, maximum, min, minimum]
+
 attributes:
   - name: nominal_size
     dimension: length
@@ -105,7 +111,8 @@ attributes:
   - name: max_temperature
     dimension: temperature
     canonical_unit: degC
-    synonyms: [max temperature, maximum temperature, design temperature, operating temperature]
+    synonyms: [max temperature, maximum temperature, design temperature, design temp,
+               operating temperature]
     limit: max
   - name: min_temperature
     dimension: temperature
@@ -125,23 +132,27 @@ attributes:
   - name: power
     dimension: power
     canonical_unit: kW
-    synonyms: [power, motor power, motor rating, rated power, kw rating]
+    synonyms: [power, motor power, motor rating, rated power, kw rating, power rating]
   - name: speed
     dimension: speed
     canonical_unit: rpm
     synonyms: [speed, rpm, rotational speed]
   - name: body_material
     dimension: none
-    synonyms: [body, body material, body moc, moc of body, shell material]
+    synonyms: [body, body material, body moc, moc of body, shell material, body bonnet,
+               body and bonnet]
+  - name: bonnet_type
+    dimension: none
+    synonyms: [bonnet type, bonnet construction, body bonnet construction]
   - name: disc_material
     dimension: none
     synonyms: [disc, disc material, disk, wedge, ball material, closure member]
   - name: seat_material
     dimension: none
-    synonyms: [seat, seat material, seat ring, seal ring]
+    synonyms: [seat, seat material, seat ring, seal ring, liner, body liner, seat liner]
   - name: stem_material
     dimension: none
-    synonyms: [stem, stem material, shaft, shaft material, spindle]
+    synonyms: [stem, stem material, shaft, shaft material, spindle, hinge pin]
   - name: trim_material
     dimension: none
     synonyms: [trim, trim material]
@@ -191,6 +202,8 @@ codes:
     canonical: a217_wc9
   - pattern: '\b(?:astm\s*)?(?:a\s*-?\s*352\s*(?:gr(?:ade)?\.?\s*)?)?lcb\b'
     canonical: a352_lcb
+  - pattern: '\b(?:astm\s*)?(?:a\s*-?\s*352\s*(?:gr(?:ade)?\.?\s*)?)?lcc\b'
+    canonical: a352_lcc
   - pattern: '\b(?:astm\s*)?(?:a\s*-?\s*351\s*(?:gr(?:ade)?\.?\s*)?)?cf\s*-?\s*8\s*m\b'
     canonical: a351_cf8m
   - pattern: '\b(?:astm\s*)?(?:a\s*-?\s*351\s*(?:gr(?:ade)?\.?\s*)?)?cf\s*-?\s*8\b'

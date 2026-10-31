@@ -201,6 +201,58 @@ def test_or_higher_stays_a_direction() -> None:
     assert (parsed.operator, parsed.any_alternative) == (Operator.GTE, False)
 
 
+@pytest.mark.parametrize(
+    ("label", "value", "attribute"),
+    [
+        # The whole label decides: a synonym followed by another word names something else.
+        ("Design Temp.", "-40 Deg. C to +40 Deg. C", None),  # never design_standard
+        ("Body / Bonnet Construction", "Bolted Bonnet", "bonnet_type"),  # never body_material
+        ("STEM LENGTH", "ROUND", None),
+        ("SEAT LEAKAGE", "CLASS VI", None),
+        # Generic words and codes may follow a synonym.
+        ("Design Standard", "BS-1873", "design_standard"),
+        ("Valve Design", "API 609", "design_standard"),
+        ("Body Materials WCB/ WCC", "A 216 Gr. WCB/ WCC", "body_material"),
+        ("Disc Materials C5", "A 217 Gr. C5", "disc_material"),
+        ("Shaft No.", "WCB", "stem_material"),
+        ("Ends Parameter", "Wafer/ Lugged", "end_connection"),
+        ("Body & Bonnet MOC", "LCB", "body_material"),
+        ("Stem/Hinge pin", "SS316", "stem_material"),
+        ("Body Materials LCB/ LCC", "A 352 Gr. LCB", "body_material"),
+        ("Body & Bonnet", "LCB", "body_material"),
+        ("BODY SPEC", "WCB", "body_material"),
+        ("Stem Sl. No.", "WCB", "stem_material"),
+        # A part of the component is not the component.
+        ("Disc Nut Material", "SS 410", None),
+        ("Seat/ Liner Materials", "EPDM", "seat_material"),
+        ("Body Liner", "EPDM", "seat_material"),
+        ("Seat Retainer", "SS 410", None),
+        ("Body Gasket", "Graphite", None),
+        ("Stem packing Specification", "Graphite", "packing_material"),
+    ],
+)
+def test_whole_label_decides_the_attribute(
+    label: str, value: str, attribute: str | None, ontology: Ontology
+) -> None:
+    parsed = parse_value(label, value, ontology, 2)
+    assert resolve_attribute(label, parsed, ontology) == attribute
+
+
+def test_design_temp_is_a_temperature_once_the_value_is_numeric(ontology: Ontology) -> None:
+    parsed = parse_value("Design Temp.", "120 degC", ontology, 2)
+    assert resolve_attribute("Design Temp.", parsed, ontology) == "max_temperature"
+
+
+def test_a_unit_may_follow_the_attribute(ontology: Ontology) -> None:
+    parsed = parse_value("Design Pressure (Bar)", "40 bar", ontology, 2)
+    assert resolve_attribute("Design Pressure (Bar)", parsed, ontology) == "pressure_rating"
+
+
+def test_a_temperature_value_never_fits_a_material_label(ontology: Ontology) -> None:
+    parsed = parse_value("Body Temperature", "120 degC", ontology, 2)
+    assert resolve_attribute("Body Temperature", parsed, ontology) is None
+
+
 def test_units_resolve_only_through_the_ontology(ontology: Ontology) -> None:
     assert parse_value("MAX FLOW", "650 M3/HR", None, 2).canonical_unit is None
     assert parse_value("MAX FLOW", "650 M3/HR", ontology, 2).canonical_unit == "m**3/h"

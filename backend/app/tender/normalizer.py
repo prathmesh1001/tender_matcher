@@ -186,6 +186,25 @@ def _synonym_spans(label_words: tuple[str, ...], attribute: Attribute) -> list[t
     return spans
 
 
+def _rest_is_ignorable(label: str, end: int, ontology: Ontology) -> bool:
+    """True if every label word after position `end` is generic, a unit or a code.
+
+    The label's last words name the thing, so anything else after a synonym means the label
+    is about something else: "Design Temp." is not a design standard, "Stem Length" is not a
+    stem material. "Body Materials WCB/ WCC" keeps body: the rest is generic or a code.
+    """
+    printed = _COMPOUND.findall(fold_text(label))
+    generic = {s for word in ontology.label_generic_words for s in stems(word)}
+    for word in printed[end:]:
+        if stem_token(word.replace("-", "")) in generic or any(ch.isdigit() for ch in word):
+            continue
+        if word in ontology.units:
+            continue
+        if not any(re.fullmatch(rule.pattern, word) for rule in ontology.codes):
+            return False
+    return True
+
+
 def _fits(attribute: Attribute, value: ParsedValue) -> bool:
     """True if the value could be a value of this attribute (unit dimension, designation)."""
     if value.kind is not ValueKind.NUMERIC or value.is_designation:
@@ -201,9 +220,10 @@ def resolve_attribute(
     """Canonical attribute for a printed label, or None (no ontology, no match, no fit).
 
     The label's last words name the thing ("VALVE BODY MOC" -> body moc; "BODY SEAT" ->
-    seat), so a synonym ending at the label's end wins, then the longer synonym. The value
-    must fit the attribute: "TORQUE AT SHAFT : 820 Nm" is not the shaft material. Words are
-    stemmed on both sides, so catalogue labels ("Body Materials") resolve the same way.
+    seat), so a synonym ending at the label's end wins, then the longer synonym, and only
+    generic words or codes may follow a synonym ("Design Temp." is not `design_standard`).
+    The value must fit the attribute: "TORQUE AT SHAFT : 820 Nm" is not the shaft material.
+    Words are stemmed on both sides, so catalogue labels ("Body Materials") resolve the same.
 
     Args:
         label: The printed label, or None.
@@ -221,6 +241,8 @@ def resolve_attribute(
         if not _fits(attribute, value):
             continue
         for end, length in _synonym_spans(label_words, attribute):
+            if not _rest_is_ignorable(label, end, ontology):
+                continue
             rank = (int(end == len(label_words)), length, attribute.name)
             if best is None or rank[:2] > best[:2]:
                 best = rank

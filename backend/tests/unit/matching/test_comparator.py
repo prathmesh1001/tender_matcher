@@ -301,6 +301,22 @@ def test_no_option_found_is_not_full_when_the_tender_says_or(
     assert result.status is not FULL
 
 
+def test_bolted_bonnet_never_fails_a_body_row(valves: Ontology) -> None:
+    body = _row(PARTS, ["1", "Body & Bonnet", "Carbon Steel"])
+    result = _compare("Body / Bonnet Construction : Bolted Bonnet", [body], valves)
+    assert result.status is UNSUPPORTED  # not missing: the row states no bonnet type
+
+
+def test_row_key_decides_when_the_column_is_a_model_or_heading(valves: Ontology) -> None:
+    row = _row(["Component", "Etanorm"], ["Body", "A 216 Gr. WCB"])
+    assert _compare("BODY MOC : ASTM A216 Gr. WCB", [row], valves).status is FULL
+
+
+def test_a_part_of_the_component_is_not_the_component(valves: Ontology) -> None:
+    nut = _row(PARTS, ["7", "Disc Nut", "ASTM A351 Gr. CF8M"])
+    assert _compare("DISC MOC : CF8M", [nut], valves).status is UNSUPPORTED
+
+
 def test_free_text_and_statements_need_the_judge(valves: Ontology) -> None:
     for line in ("OPERATION : HAND GEAR OPERATED", "THE VALVE SHALL BE FIRE SAFE"):
         result = _compare(line, [SIZE_RANGE], valves)

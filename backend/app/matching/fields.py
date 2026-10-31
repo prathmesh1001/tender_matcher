@@ -33,6 +33,7 @@ class CatalogueField:
     quote: str  # a substring of the chunk's raw_text
     parts: tuple[str, ...]  # pieces printed on the page (cells or lines)
     in_dimension_table: bool = False
+    key: str = ""  # a table row's key cell; the label adds the column header to it
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,7 +122,8 @@ def table_fields(chunk: ChunkDraft, options: FieldOptions) -> list[CatalogueFiel
             continue
         quote = _span(chunk.raw_text, _pair(header[key], cells[key]), own)
         label = f"{cells[key]} {header[i]}"
-        out.append(CatalogueField(label, cells[i], quote, (cells[key], cells[i]), dimension))
+        parts = (cells[key], cells[i])
+        out.append(CatalogueField(label, cells[i], quote, parts, dimension, cells[key]))
     return out
 
 
