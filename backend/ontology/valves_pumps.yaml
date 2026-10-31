@@ -8,6 +8,7 @@
 #                  meets a 10 bar requirement); `nominal_pipe_size` = inch sizes go via nps_to_dn
 #   material_names words that start a material value, so "Pump Shaft Carbon Steel" reads as
 #                  label + value
+#   physical_min   lowest value that can exist, in the canonical unit: below it a value was misread
 #   codes          canonical forms for material/rating/size codes (A4); applied in this order on
 #                  lower-cased, unicode-folded text, so longer codes come before their prefixes
 #   abbreviations  expanded on the query side (A5)
@@ -120,11 +121,13 @@ attributes:
     synonyms: [temperature, max temperature, maximum temperature, design temperature,
                design temp, temp design, operating temperature]
     limit: max
+    physical_min: -273.15
   - name: min_temperature
     dimension: temperature
     canonical_unit: degC
     synonyms: [min temperature, minimum temperature]
     limit: min
+    physical_min: -273.15
   - name: flow_rate
     dimension: flow
     canonical_unit: m**3/h

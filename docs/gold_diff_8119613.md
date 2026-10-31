@@ -4,7 +4,7 @@ Gold source: docs/manual_match_check.md (section 1)
 
 | Run | agree | not decided | weaker | stronger | other catalogue | other page |
 |---|---|---|---|---|---|---|
-| ontology | 7 | 6 | 3 | 0 | 0 | 0 |
+| ontology | 6 | 6 | 4 | 0 | 0 | 0 |
 | no ontology | 5 | 7 | 4 | 0 | 0 | 0 |
 
 ## Item 10, LnT_Valves, `lt_triple_offset_butterfly.pdf`
@@ -13,7 +13,7 @@ Gold source: docs/manual_match_check.md (section 1)
 |---|---|---|---|---|
 | 10.1 | TYPE : TRIPLE OFFSET METAL SEATED BUTTERFLY VALVE | full_match (p1, p9) | unsupported (-): **not decided**; free text: needs the LLM judge (not enabled) | unsupported (-): **not decided**; free text: needs the LLM judge (not enabled) |
 | 10.2 | SIZE : 250 MM | full_match (p1) | partial_match (p11): **weaker** | partial_match (p11): **weaker** |
-| 10.3 | PRESSURE RATING : CLASS #150 | full_match (p1) | full_match (p1): **agree** | unsupported (p4): **not decided**; label found but no value in a comparable unit |
+| 10.3 | PRESSURE RATING : CLASS #150 | full_match (p1) | partial_match (p1): **weaker**; product heading unclear: capped at partial | unsupported (p4): **not decided**; label found but no value in a comparable unit |
 | 10.4 | VALVE DESIGN : API 609 5TH EDITION | full_match (p4) | partial_match (p4): **weaker**; near miss: only part of the code found | partial_match (p4): **weaker**; near miss: only part of the code found |
 | 10.5 | FLUID : WATER | unsupported (-) | unsupported (-): **agree**; no catalogue field names this attribute | unsupported (-): **agree**; no catalogue field names this attribute |
 | 10.6 | MAX FLOW : 650 M3/HR | unsupported (-) | unsupported (-): **agree**; no catalogue field names this attribute | unsupported (-): **agree**; no catalogue field names this attribute |
@@ -29,7 +29,7 @@ Gold source: docs/manual_match_check.md (section 1)
 | 10.14.3 | ZERO LEAKAGE | full_match (p9) | unsupported (-): **not decided**; statement without a label: needs the LLM judge (not enabled) | unsupported (-): **not decided**; statement without a label: needs the LLM judge (not enabled) |
 
 Manual check: fit 0.96, coverage 11/14 = 79 % (weighted).
-System, ontology: compatibility 71.42857142857143, coverage 38.9 % (7/18, unweighted).
+System, ontology: compatibility 64.28571428571429, coverage 38.9 % (7/18, unweighted).
 System, no ontology: compatibility 58.333333333333336, coverage 33.3 % (6/18, unweighted).
 
 Notes from gold:
@@ -56,7 +56,7 @@ Items without gold: 20.
 
 ontology:
 
-1. LnT_Valves: compatibility 71.4 %, coverage 38.9 %, low coverage
+1. LnT_Valves: compatibility 64.3 %, coverage 38.9 %, low coverage
 2. Delval: compatibility 50.0 %, coverage 27.8 %, low coverage
 3. KSB: compatibility -, coverage 0.0 %, low coverage
 4. Kirloskar Brothers: compatibility -, coverage 0.0 %, low coverage

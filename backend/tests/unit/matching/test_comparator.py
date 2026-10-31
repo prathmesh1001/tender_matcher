@@ -475,3 +475,64 @@ def test_tender_naming_only_the_material_is_met_by_its_grade_code(valves: Ontolo
 def test_tender_naming_only_the_material_still_fails_on_another(valves: Ontology) -> None:
     row = _row(["Part", "Material"], ["Body", "Carbon Steel"])
     assert _compare("BODY MOC : CI", [row], valves).status is MatchStatus.MISSING_CAPABILITY
+
+
+# ---------------------------------------------------------------- without material equivalents
+
+
+@pytest.mark.parametrize(
+    ("line", "value"),
+    [
+        ("BODY MOC : CI", "ASTM A216 Gr. WCB"),
+        ("DISC MOC : SGI", "ASTM A536"),
+        ("BODY MOC : CI", "Wafer"),
+        ("BODY MOC : ASTM A126", "Cast Iron"),
+    ],
+)
+def test_without_equivalents_a_word_never_fails(line: str, value: str) -> None:
+    component = line.split()[0].title()
+    result = _compare(line, [_row(["Part", "Material"], [component, value])], None)
+    assert result.status is MatchStatus.UNSUPPORTED
+    assert result.needs_review is True
+
+
+def test_without_equivalents_a_code_still_fails_against_a_code() -> None:
+    row = _row(["Part", "Material"], ["Body", "ASTM A351 Gr. CF8M"])
+    assert _compare("BODY MOC : ASTM A216", [row], None).status is MatchStatus.MISSING_CAPABILITY
+
+
+# ---------------------------------------------------------------- impossible values
+
+TEMPERATURE = "DESIGN TEMP. : -40 Deg. C to +40 Deg. C"
+
+
+def test_a_temperature_below_absolute_zero_never_fails(valves: Ontology) -> None:
+    result = _compare(TEMPERATURE, [_prose("Temperature: -460C")], valves)
+    assert result.status is MatchStatus.UNSUPPORTED
+    assert result.needs_review is True
+    assert "misread" in result.reason
+
+
+def test_a_possible_temperature_still_fails(valves: Ontology) -> None:
+    result = _compare(TEMPERATURE, [_prose("Temperature: 100C to 200C")], valves)
+    assert result.status is MatchStatus.MISSING_CAPABILITY
+
+
+def test_absolute_zero_itself_is_readable(valves: Ontology) -> None:
+    result = _compare(TEMPERATURE, [_prose("Temperature: -273C to 100C")], valves)
+    assert result.status is MatchStatus.FULL_MATCH
+    assert result.needs_review is False
+
+
+def test_a_readable_value_still_decides_and_the_misread_flags_it(valves: Ontology) -> None:
+    chunks = [_prose("Temperature: -460C"), _prose("Temperature: -46C to 343C")]
+    result = _compare(TEMPERATURE, chunks, valves)
+    assert result.status is MatchStatus.FULL_MATCH
+    assert result.needs_review is True
+    assert "misread" in result.reason
+    assert [e.value for e in result.evidence] == ["-46C to 343C"]  # ignored as evidence
+
+
+def test_the_rule_is_only_for_attributes_with_a_limit(valves: Ontology) -> None:
+    result = _compare("SIZE : 100 MM", [_prose("Size: -460 mm")], valves)
+    assert "misread" not in result.reason

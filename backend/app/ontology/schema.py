@@ -49,6 +49,10 @@ class Attribute(BaseModel):
     nominal_pipe_size: bool = Field(
         default=False, description="Sizes in inch map to DN through `nps_to_dn`, not by pint."
     )
+    physical_min: float | None = Field(
+        default=None,
+        description="Lowest possible value in the canonical unit; below it a value was misread.",
+    )
     critical: bool = Field(
         default=False, description="Identifies the product: decides which catalogue is chosen."
     )

@@ -4,7 +4,7 @@ Gold source: docs/manual_match_check.md (section 3)
 
 | Run | agree | not decided | weaker | stronger | other catalogue | other page |
 |---|---|---|---|---|---|---|
-| ontology | 10 | 12 | 4 | 0 | 0 | 3 |
+| ontology | 10 | 13 | 3 | 0 | 0 | 3 |
 | no ontology | 1 | 3 | 1 | 0 | 21 | 0 |
 
 ## Item 1, LnT_Valves, `lt_gate_globe_check_api600.pdf`
@@ -20,7 +20,7 @@ Gold source: docs/manual_match_check.md (section 3)
 | 1.s1.p6.4 | Service Fluid/Working Fluid : Liquid Ammonia | unsupported (-) | unsupported (-): **agree**; no catalogue field names this attribute | - (-): **other catalogue** |
 | 1.s1.p6.5 | Design Standard : BS-1873 | full_match (p5) | unsupported (-): **not decided**; no catalogue field names this attribute | - (-): **other catalogue** |
 | 1.s1.p6.6 | Testing Standard : API 598 | full_match (p5) | unsupported (-): **not decided**; no catalogue field names this attribute | - (-): **other catalogue** |
-| 1.s1.p6.7 | Body & Bonnet MOC : LCB | full_match (p9) | missing_capability (p12, p13): **weaker** | - (-): **other catalogue** |
+| 1.s1.p6.7 | Body & Bonnet MOC : LCB | full_match (p9) | partial_match (p9, p12, p13): **weaker**; fails in a table, but the document's options list offers it | - (-): **other catalogue** |
 | 1.s1.p6.8 | Trim : 12 -> 16 | full_match (p9) | unsupported (-): **not decided**; free text: needs the LLM judge (not enabled) | - (-): **other catalogue** |
 | 1.s1.p6.9 | Disc : LCB + HF | partial_match (p12) | unsupported (-): **not decided**; free text: needs the LLM judge (not enabled) | - (-): **other catalogue** |
 | 1.s1.p6.10 | Gasket : Graphite or equivalent | partial_match (p6) | unsupported (-): **not decided**; free text: needs the LLM judge (not enabled) | - (-): **other catalogue** |
@@ -28,14 +28,14 @@ Gold source: docs/manual_match_check.md (section 3)
 | 1.s1.p6.12 | Operator : Gear/HW | full_match (p9, p12) | unsupported (-): **not decided**; no catalogue field names this attribute | - (-): **other catalogue** |
 | 1.s1.p6.13 | Valve Ends : Flanged. | partial_match (p9) | unsupported (p17): **not decided**; quote not found on the cited page (was full_match) | - (-): **other catalogue** |
 | 1.s1.p6.14 | Bolting : B7/2H | full_match (p12) | partial_match (p12, p13): **weaker**; 1 of 2 options found | - (-): **other catalogue** |
-| 1.s1.p6.15 | Stem/Hinge pin : SS316 | full_match (p9) | missing_capability (p12, p13, p19): **weaker** | - (-): **other catalogue** |
-| 1.s1.p6.16 | Design Temp. : -40 Deg. C to +40 Deg. C | full_match (p5) | missing_capability (p20): **weaker** | - (-): **other catalogue** |
+| 1.s1.p6.15 | Stem/Hinge pin : SS316 | full_match (p9) | partial_match (p9, p12, p13, p19): **weaker**; fails in a table, but the document's options list offers it | - (-): **other catalogue** |
+| 1.s1.p6.16 | Design Temp. : -40 Deg. C to +40 Deg. C | full_match (p5) | unsupported (p5, p6, p16): **not decided**; printed value is impossible, so it was misread: ignored | - (-): **other catalogue** |
 | 1.s1.p6.17 | Low temperature/Cyro : Low Temperature Test | unsupported (-) | unsupported (-): **agree**; free text: needs the LLM judge (not enabled) | - (-): **other catalogue** |
 | 1.s1.p6.18 | Design Pressure (Bar) : 40 | unsupported (-) | unsupported (-): **agree**; no catalogue field names this attribute | - (-): **other catalogue** |
 
 Manual check: fit 0.92, coverage 15/18 (weighted).
-System, ontology: compatibility 50.0, coverage 33.3 % (7/21, unweighted).
-System, no ontology: compatibility 50.0, coverage 19.0 % (4/21, unweighted).
+System, ontology: compatibility 75.0, coverage 28.6 % (6/21, unweighted).
+System, no ontology: compatibility 100.0, coverage 9.5 % (2/21, unweighted).
 
 Notes from gold:
 
@@ -53,14 +53,14 @@ Notes from gold:
 
 Manual check: fit None, coverage None (weighted).
 System, ontology: compatibility 77.77777777777777, coverage 40.9 % (9/22, unweighted).
-System, no ontology: compatibility 50.0, coverage 18.2 % (4/22, unweighted).
+System, no ontology: compatibility 66.66666666666667, coverage 13.6 % (3/22, unweighted).
 
 Not labelled in gold, so not compared:
 
 - 7.1.1 `Size : 3/4 inch` (ontology: full_match, no ontology: unsupported)
 - 7.1.3 `Socket Weld Ended` (ontology: unsupported, no ontology: unsupported)
 - 7.s2.p6.1 `Valve Type. : Gate Valve` (ontology: unsupported, no ontology: unsupported)
-- 7.s2.p6.3 `Body / Bonnet Construction : Bolted Bonnet` (ontology: unsupported, no ontology: missing_capability)
+- 7.s2.p6.3 `Body / Bonnet Construction : Bolted Bonnet` (ontology: unsupported, no ontology: unsupported)
 - 7.s2.p6.4 `Service Fluid/Working Fluid : Liquid Ammonia` (ontology: unsupported, no ontology: unsupported)
 - 7.s2.p6.6 `Testing Standard : API 598` (ontology: full_match, no ontology: unsupported)
 - 7.s2.p6.9 `Trim : 12 -> 16` (ontology: unsupported, no ontology: unsupported)
@@ -89,14 +89,14 @@ Items without gold: 2, 3, 4, 5, 6.
 
 ontology:
 
-1. LnT_Valves: compatibility 51.9 %, coverage 35.8 %, low coverage
+1. LnT_Valves: compatibility 70.8 %, coverage 31.8 %, low coverage
 2. Delval: compatibility -, coverage 0.0 %, low coverage
 3. KSB: compatibility -, coverage 0.0 %, low coverage
 4. Kirloskar Brothers: compatibility -, coverage 0.0 %, low coverage
 
 no ontology:
 
-1. LnT_Valves: compatibility 50.0 %, coverage 18.5 %, low coverage
+1. LnT_Valves: compatibility 69.4 %, coverage 11.9 %, low coverage
 2. Delval: compatibility -, coverage 0.0 %, low coverage
 3. KSB: compatibility -, coverage 0.0 %, low coverage
 4. Kirloskar Brothers: compatibility -, coverage 0.0 %, low coverage

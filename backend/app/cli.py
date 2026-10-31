@@ -168,6 +168,8 @@ def run_match(settings: Settings, tender: str, *, use_ontology: bool, out: str |
         _out(f"  item {item.item.item_no} {item.item.title} -> {item.product_type}")
         for m in item.manufacturers:
             doc = m.chosen.document if m.chosen else "no catalogue"
+            if m.tied_documents:
+                doc = f"TIED, needs review: {', '.join(m.tied_documents)}"
             _out(
                 f"    {m.manufacturer:20} {_pct(m.score.compatibility_pct)} cov "
                 f"{m.score.coverage_pct:5.1f}%  {doc}"

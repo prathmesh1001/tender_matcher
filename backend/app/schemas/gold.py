@@ -121,6 +121,9 @@ class EvaluationDiff(BaseModel):
     rows: list[RowDiff]
     unlabelled: list[Unlabelled]
     scores: dict[str, Score | None] = Field(description="Item score per run.")
+    tied: dict[str, list[str]] = Field(
+        default_factory=dict, description="Per run, the catalogues that tie, if any."
+    )
 
 
 class ProductDiff(BaseModel):

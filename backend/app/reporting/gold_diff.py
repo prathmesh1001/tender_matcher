@@ -141,7 +141,10 @@ def _evaluation_diff(
         if req_id not in labelled
     ]
     scores = {name: m.score if m else None for name, m in reports.items()}
-    return EvaluationDiff(evaluation=evaluation, rows=rows, unlabelled=unlabelled, scores=scores)
+    tied = {name: m.tied_documents if m else [] for name, m in reports.items()}
+    return EvaluationDiff(
+        evaluation=evaluation, rows=rows, unlabelled=unlabelled, scores=scores, tied=tied
+    )
 
 
 def _atomic(runs: Mapping[str, TenderReport], item_no: str) -> dict[str, Requirement]:
@@ -244,6 +247,10 @@ def _evaluation_lines(diff: GoldDiff, evaluation: EvaluationDiff) -> list[str]:
             lines.append(
                 f"System, {run}: compatibility {score.compatibility_pct}, coverage "
                 f"{score.coverage_pct:.1f} % ({score.decided}/{score.total}, unweighted)."
+            )
+        if evaluation.tied.get(run):
+            lines.append(
+                f"System, {run}: catalogues tie, none chosen: {', '.join(evaluation.tied[run])}."
             )
     notes = [row for row in evaluation.rows if row.gold.note]
     if notes:

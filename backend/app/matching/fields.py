@@ -45,6 +45,7 @@ class FieldOptions:
     label_max_words: int
     dimension_words: tuple[str, ...]
     dimension_min_letter_columns: int
+    option_sections: tuple[str, ...] = ()
 
     @classmethod
     def from_settings(cls, settings: Settings) -> FieldOptions:
@@ -53,6 +54,7 @@ class FieldOptions:
             label_max_words=settings.TENDER_LABEL_MAX_WORDS,
             dimension_words=tuple(settings.COMPARATOR_DIMENSION_WORDS),
             dimension_min_letter_columns=settings.COMPARATOR_DIMENSION_MIN_LETTER_COLUMNS,
+            option_sections=tuple(settings.CATALOGUE_OPTION_SECTIONS),
         )
 
 
@@ -226,6 +228,32 @@ def chunk_fields(chunk: ChunkDraft, options: FieldOptions) -> list[CatalogueFiel
     if chunk.chunk_type is ChunkType.TABLE_ROW:
         return table_fields(chunk, options)
     return prose_fields(chunk, options)
+
+
+def _lists_options(chunk: ChunkDraft, options: FieldOptions) -> bool:
+    """True for an ordering-code legend, or a chunk under a section about ordering."""
+    if chunk.meta.get("option_legend"):
+        return True
+    section = f" {' '.join(words(chunk.section or ''))} "
+    return any(f" {' '.join(words(s))} " in section for s in options.option_sections)
+
+
+def option_fields(chunks: Sequence[CatalogueChunk], options: FieldOptions) -> list[LocatedField]:
+    """Fields of the document's pages that list what can be ordered, dimension tables left out.
+
+    The whole page counts: its lines ("LCB for ASTM A352 Gr. LCB") and tables ("Trim Materials")
+    print under whatever text the layout took for a section.
+
+    Args:
+        chunks: One document's chunks.
+        options: Field options.
+
+    Returns:
+        The fields, in the order given.
+    """
+    pages = {c.chunk.page_number for c in chunks if _lists_options(c.chunk, options)}
+    on_pages = [c for c in chunks if c.chunk.page_number in pages]
+    return [f for f in located_fields(on_pages, options) if not f.field.in_dimension_table]
 
 
 def located_fields(chunks: Sequence[CatalogueChunk], options: FieldOptions) -> list[LocatedField]:

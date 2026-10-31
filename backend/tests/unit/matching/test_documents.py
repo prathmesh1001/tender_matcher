@@ -15,11 +15,12 @@ from app.matching.documents import (
     item_sub_type,
     sub_type_fit,
 )
+from app.matching.engine import manufacturer_report
 from app.ontology.loader import load_ontologies
 from app.ontology.schema import Ontology
 from app.schemas.chunking import ChunkDraft
 from app.schemas.enums import ChunkType, DocType, MatchStatus
-from app.schemas.matching import SubTypeFit
+from app.schemas.matching import ManufacturerItemResult, SubTypeFit
 from app.schemas.requirements import LineItem, Requirement
 from app.tender.splitter import SplitOptions, item_requirements, leaves
 
@@ -119,7 +120,9 @@ def test_documents_are_never_pooled(valves: Ontology, with_ontology: bool) -> No
         _Pages(CHUNKS),
     )
     by_file = {d.document: [c.status for c in d.comparisons] for d in result.documents}
-    assert by_file["concentric.pdf"] == [MatchStatus.FULL_MATCH, MatchStatus.MISSING_CAPABILITY]
+    # Without equivalents a material word can't fail: EPDM could be anything.
+    seat = MatchStatus.MISSING_CAPABILITY if with_ontology else MatchStatus.UNSUPPORTED
+    assert by_file["concentric.pdf"] == [MatchStatus.FULL_MATCH, seat]
     assert by_file["triple.pdf"] == [MatchStatus.UNSUPPORTED, MatchStatus.FULL_MATCH]
     # Same fit score (1.0 each): the declared sub-type decides.
     assert result.item_sub_type == "triple_offset"
@@ -264,3 +267,117 @@ def test_critical_counts_are_reported(valves: Ontology) -> None:
 def test_a_catalogue_deciding_nothing_never_wins(valves: Ontology) -> None:
     documents = {"alpha": "A brochure about cryogenic service", "zeta": "Size: 8 mm to 50 mm"}
     assert _choice(["SIZE : 150 MM"], documents, valves) == ["zeta.pdf", "alpha.pdf"]
+
+
+# ---------------------------------------------------------------- options list in the document
+
+
+def _ordering(
+    doc: CatalogueDocument, text: str, section: str = "Ordering Information"
+) -> CatalogueChunk:
+    chunk = ChunkDraft(
+        page_number=9,
+        position=0,
+        chunk_type=ChunkType.PROSE,
+        raw_text=text,
+        section=section,
+        token_count=1,
+    )
+    return CatalogueChunk(doc, chunk)
+
+
+def _table_and_list(
+    valves: Ontology, line: str, option: CatalogueChunk
+) -> tuple[MatchStatus, bool]:
+    doc = option.document
+    chunks = [_seat(doc, "ASTM A216 Gr. WCB"), option]
+    item = LineItem(
+        item_no="1", title=TITLE, description_lines=[line], document="t.pdf", page_number=1
+    )
+    result = evaluate_item(
+        ItemQuery("Acme", "1", TITLE, "butterfly_valve"),
+        leaves(item_requirements(item, valves, SplitOptions(6, 2))),
+        chunks,
+        MatchContext.for_ontology(valves),
+        OPTIONS,
+        _Pages(chunks),
+    )
+    found = result.documents[0].comparisons[0]
+    return found.status, found.needs_review
+
+
+def test_options_list_turns_a_failure_into_partial(valves: Ontology) -> None:
+    option = _ordering(_doc("range", ()), "LCB for ASTM A352 Gr. LCB")
+    assert _table_and_list(valves, "SEAT MOC : LCB", option) == (MatchStatus.PARTIAL_MATCH, True)
+
+
+def test_options_list_needs_the_whole_value(valves: Ontology) -> None:
+    option = _ordering(_doc("range", ()), "LCB for ASTM A352 Gr. LCB")
+    status, _ = _table_and_list(valves, "SEAT MOC : ASTM A352 Gr. LCC", option)
+    assert status is MatchStatus.MISSING_CAPABILITY
+
+
+def test_other_sections_are_not_an_options_list(valves: Ontology) -> None:
+    option = _ordering(_doc("range", ()), "LCB for ASTM A352 Gr. LCB", section="Applications")
+    status, _ = _table_and_list(valves, "SEAT MOC : LCB", option)
+    assert status is MatchStatus.MISSING_CAPABILITY
+
+
+def test_an_option_never_gives_more_than_partial_and_a_match_stays(valves: Ontology) -> None:
+    option = _ordering(_doc("range", ()), "WCB for ASTM A216 Gr. WCB")
+    status, _ = _table_and_list(valves, "SEAT MOC : ASTM A216 Gr. WCB", option)
+    assert status is MatchStatus.FULL_MATCH  # the table itself states it
+
+
+# ---------------------------------------------------------------- ties
+
+
+def _tied_result(valves: Ontology, names: tuple[str, str]) -> ManufacturerItemResult:
+    first, second = _doc(names[0], ()), _doc(names[1], ())
+    chunks = [_seat(first, "Stellite 21"), _seat(second, "Stellite 21")]
+    return evaluate_item(
+        ItemQuery("Acme", "1", "BUTTERFLY VALVE", "butterfly_valve"),
+        _requirements(valves),
+        chunks,
+        MatchContext.for_ontology(valves),
+        OPTIONS,
+        _Pages(chunks),
+    )
+
+
+def test_a_tie_chooses_no_catalogue_and_lists_them(valves: Ontology) -> None:
+    result = _tied_result(valves, ("alpha", "beta"))
+    assert result.chosen is None
+    assert sorted(result.tied_documents) == ["alpha.pdf", "beta.pdf"]
+
+
+def test_a_file_name_never_decides(valves: Ontology) -> None:
+    result = _tied_result(valves, ("zulu", "alpha"))
+    assert result.chosen is None
+    assert sorted(result.tied_documents) == ["alpha.pdf", "zulu.pdf"]
+
+
+def test_every_requirement_of_a_tie_is_unsupported_and_flagged(valves: Ontology) -> None:
+    requirements = _requirements(valves)
+    report = manufacturer_report(_tied_result(valves, ("alpha", "beta")), requirements, OPTIONS)
+    assert report.chosen is None
+    assert len(report.tied_documents) == 2
+    assert {r.status for r in report.results} == {MatchStatus.UNSUPPORTED}
+    assert all(r.needs_review for r in report.results)
+    assert "alpha.pdf" in report.results[0].reason
+    assert report.score.compatibility_pct is None
+
+
+def test_a_clear_winner_is_no_tie(valves: Ontology) -> None:
+    good, poor = _doc("alpha", ()), _doc("beta", ())
+    chunks = [_seat(good, "Stellite 21"), _seat(poor, "EPDM")]
+    result = evaluate_item(
+        ItemQuery("Acme", "1", "BUTTERFLY VALVE", "butterfly_valve"),
+        _requirements(valves),
+        chunks,
+        MatchContext.for_ontology(valves),
+        OPTIONS,
+        _Pages(chunks),
+    )
+    assert result.chosen == good.sha256
+    assert result.tied_documents == []

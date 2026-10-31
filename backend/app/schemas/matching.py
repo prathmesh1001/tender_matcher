@@ -87,6 +87,10 @@ class DocumentResult(BaseModel):
     )
     fit_score: float = Field(description="Sum of status scores over decided requirements.")
     decided: int = Field(ge=0, description="Requirements with a rule decision.")
+    product_heading: str | None = Field(
+        default=None,
+        description="The product heading chosen inside the document, if it holds several.",
+    )
     comparisons: list[Comparison]
 
 
@@ -104,4 +108,7 @@ class ManufacturerItemResult(BaseModel):
     )
     documents: list[DocumentResult] = Field(
         default_factory=list, description="Candidates, best first."
+    )
+    tied_documents: list[str] = Field(
+        default_factory=list, description="Catalogues nothing tells apart; none is then chosen."
     )

@@ -270,6 +270,10 @@ class Settings(BaseSettings):
         default_factory=lambda: ["dimension", "dimensions", "weight", "wt", "face to face"],
         description="A table whose header or section names one of these is a dimension table.",
     )
+    CATALOGUE_OPTION_SECTIONS: list[str] = Field(
+        default_factory=lambda: ["ordering information", "how to order", "ordering code"],
+        description="A catalogue page with a section naming one of these lists its options.",
+    )
     COMPARATOR_DIMENSION_MIN_LETTER_COLUMNS: int = Field(
         default=2,
         ge=1,
@@ -307,6 +311,11 @@ class Settings(BaseSettings):
         },
         description="Score per decided status (CLAUDE.md section 7); other statuses are "
         "excluded from scores (JSON object).",
+    )
+    CATALOGUE_OVERVIEW_MIN_HEADINGS: int = Field(
+        default=3,
+        ge=2,
+        description="A catalogue page naming this many products is an overview of them.",
     )
     RANKING_MIN_COVERAGE_PCT: float = Field(
         default=50.0,

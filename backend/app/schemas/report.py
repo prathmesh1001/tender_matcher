@@ -37,6 +37,7 @@ class CandidateSummary(BaseModel):
     sub_type_fit: SubTypeFit
     critical_met: float = 0.0
     critical_failed: int = 0
+    product_heading: str | None = None
     fit_score: float
     decided: int
 
@@ -51,6 +52,10 @@ class ManufacturerItemReport(BaseModel):
         description="The catalogue every result comes from; None if none declares the type."
     )
     candidates: list[CandidateSummary]
+    tied_documents: list[str] = Field(
+        default_factory=list,
+        description="Catalogues nothing tells apart: none is chosen, a reader must decide.",
+    )
     results: list[Comparison] = Field(description="One per atomic requirement, in order.")
     score: Score
 

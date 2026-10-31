@@ -91,6 +91,9 @@ class MatchContext:
         return self.ontology.attribute(requirement.attribute)
 
 
+_UNREADABLE: Final = "printed value is impossible, so it was misread: ignored"
+
+
 @dataclass(frozen=True, slots=True)
 class _Outcome:
     """What one field decides: a status, or None with the reason it decides nothing."""
@@ -252,6 +255,14 @@ def _judge_range(
     return MatchStatus.MISSING_CAPABILITY
 
 
+def _impossible(printed: Sequence[tuple[float, float]], attribute: Attribute) -> bool:
+    """True if a printed number is below what can exist ("-460C": the degree sign read as 0)."""
+    floor = attribute.physical_min
+    if floor is None:
+        return False
+    return any(math.isfinite(end) and end < floor for pair in printed for end in pair)
+
+
 def judge_numeric(
     requirement: Requirement,
     value: str,
@@ -269,10 +280,10 @@ def judge_numeric(
     op = _effective_operator(requirement, attr)
     exact = attr is not None or requirement.unit in _DESIGNATIONS
     tol = options.rel_tolerance * max(abs(want[0]), abs(want[1]), 1.0)
-    statuses = [
-        _judge_range(op, want, have, exact, tol)
-        for have in _comparable(quantities(value, options.designation_prefixes), requirement, ctx)
-    ]
+    printed = _comparable(quantities(value, options.designation_prefixes), requirement, ctx)
+    if attr is not None and _impossible(printed, attr):
+        return _Outcome(None, _UNREADABLE)
+    statuses = [_judge_range(op, want, have, exact, tol) for have in printed]
     decided = [s for s in statuses if s is not None]
     if decided:
         return _Outcome(max(decided, key=_RANK.__getitem__), "")
@@ -325,8 +336,9 @@ def judge_code(
     something else (a code, or a short value such as "Flanged") is missing. The same material
     named another way is full if the tender names no grade ("CI" against "Cast Iron EN 1561"), and
     partial if the catalogue leaves its grade out ("SS ASTM A276" against "Stainless Steel"): that
-    is no contradiction. An empty value, bare numbers ("5" in a "No." column, B4) or a sentence
-    without codes decide nothing.
+    is no contradiction. Without an ontology's equivalents only a code can fail against a code:
+    "CI" against "A216 WCB" may or may not be the same material. An empty value, bare numbers ("5"
+    in a "No." column, B4) or a sentence without codes decide nothing.
     """
     have = code_tokens(value, options.code_noise_words, ctx.vocabulary)
     if not any(not t.isdigit() for t in have):
@@ -352,6 +364,9 @@ def judge_code(
         return _Outcome(MatchStatus.PARTIAL_MATCH, "near miss: only part of the code found")
     if same_material:
         return _Outcome(MatchStatus.PARTIAL_MATCH, "same material, grade not printed")
+    knows_materials = ctx.ontology is not None and bool(ctx.ontology.equivalents)
+    if not knows_materials and not (_coded(have) and any(_coded(w) for w in wanted)):
+        return _Outcome(None, "no material equivalents: cannot tell if these are the same")
     if any(is_code(t) for t in have) or len(value.split()) <= options.value_max_words:
         return _Outcome(MatchStatus.MISSING_CAPABILITY, "")
     return _Outcome(None, "value is a sentence without codes: needs the LLM judge")
@@ -474,6 +489,53 @@ def compare(
     return result.model_copy(update={"needs_review": True}) if requirement.flags else result
 
 
+def offered_as_option(
+    requirement: Requirement,
+    comparison: Comparison,
+    fields: Sequence[LocatedField],
+    ctx: MatchContext,
+    options: ComparatorOptions,
+) -> Comparison:
+    """Soften a failure if the document's options list offers the tender's whole value.
+
+    A table showing the standard build fails "LCB", yet the same document may offer LCB on order.
+    Positive beats negative only so far: the list does not say which part or model the value is
+    for, so the result is partial + review, never full.
+
+    Args:
+        requirement: An atomic requirement.
+        comparison: Its result against the document.
+        fields: The document's options fields (`option_fields`).
+        ctx: The item's ontology context (may be empty).
+        options: Comparator settings.
+
+    Returns:
+        The comparison, changed only if it was a failure of a code value and a field offers it.
+    """
+    if comparison.status is not MatchStatus.MISSING_CAPABILITY:
+        return comparison
+    if requirement.kind is ValueKind.NUMERIC:
+        return comparison
+    reason = "fails in a table, but the document's options list offers it"
+    outcome = _Outcome(MatchStatus.PARTIAL_MATCH, reason)
+    offered = [
+        _evidence(located, located.field.value, outcome)
+        for located in fields
+        if judge_code(requirement, located.field.value, ctx, options).status
+        is MatchStatus.FULL_MATCH
+    ]
+    if not offered:
+        return comparison
+    return comparison.model_copy(
+        update={
+            "status": MatchStatus.PARTIAL_MATCH,
+            "needs_review": True,
+            "reason": reason,
+            "evidence": [*offered[: options.max_evidence], *comparison.evidence],
+        }
+    )
+
+
 def _decide(
     requirement: Requirement,
     judged: Sequence[Evidence],
@@ -484,8 +546,10 @@ def _decide(
     if not judged:
         return _unsupported(requirement, "no catalogue field names this attribute", LabelBasis.NONE)
     decided = [e for e in judged if e.status is not None]
+    misread = any(e.reason == _UNREADABLE for e in judged)
     if not decided:
-        result = _unsupported(requirement, judged[0].reason, basis)
+        reason = _UNREADABLE if misread else judged[0].reason
+        result = _unsupported(requirement, reason, basis)
         return result.model_copy(update={"evidence": list(judged[: options.max_evidence])})
     best = max(decided, key=lambda e: _RANK[e.status] if e.status else 0)
     status = best.status or MatchStatus.UNSUPPORTED
@@ -493,9 +557,9 @@ def _decide(
     return Comparison(
         requirement_id=requirement.id,
         status=status,
-        needs_review=status is MatchStatus.PARTIAL_MATCH,
+        needs_review=misread or status is MatchStatus.PARTIAL_MATCH,
         decided_by=DecisionSource.RULE,
         basis=basis,
-        reason=best.reason,
+        reason=f"{best.reason}; {_UNREADABLE}".strip("; ") if misread else best.reason,
         evidence=support[: options.max_evidence],
     )

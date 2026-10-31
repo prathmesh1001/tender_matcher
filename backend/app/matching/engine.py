@@ -53,18 +53,21 @@ def _summary(result: DocumentResult) -> CandidateSummary:
         sub_type_fit=result.sub_type_fit,
         critical_met=result.critical_met,
         critical_failed=result.critical_failed,
+        product_heading=result.product_heading,
         fit_score=result.fit_score,
         decided=result.decided,
     )
 
 
 def _no_catalogue(
-    requirements: Sequence[Requirement], product_type: str | None
+    requirements: Sequence[Requirement], product_type: str | None, tied: Sequence[str] = ()
 ) -> list[Comparison]:
-    """Unsupported for every requirement: the manufacturer has no catalogue for the type."""
+    """Unsupported for every requirement: no catalogue for the type, or none can be chosen."""
     reason = (
         f"no catalogue declares {product_type}" if product_type else "item product type unknown"
     )
+    if tied:
+        reason = f"catalogues tie, none chosen: {', '.join(tied)}"
     return [
         Comparison(
             requirement_id=r.id,
@@ -103,11 +106,16 @@ def manufacturer_report(
 ) -> ManufacturerItemReport:
     """Report one manufacturer from its chosen catalogue only."""
     chosen = next((d for d in result.documents if d.sha256 == result.chosen), None)
-    comparisons = chosen.comparisons if chosen else _no_catalogue(requirements, result.product_type)
+    comparisons = (
+        chosen.comparisons
+        if chosen
+        else _no_catalogue(requirements, result.product_type, result.tied_documents)
+    )
     return ManufacturerItemReport(
         manufacturer=result.manufacturer,
         chosen=_summary(chosen) if chosen else None,
         candidates=[_summary(d) for d in result.documents],
+        tied_documents=result.tied_documents,
         results=list(comparisons),
         score=score(comparisons, options.status_scores),
     )
