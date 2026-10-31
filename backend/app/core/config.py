@@ -101,6 +101,10 @@ class Settings(BaseSettings):
         default=Path("config/section_categories.yaml"),
         description="Section categories (costing, eligibility, dimensions, ...) and their phrases.",
     )
+    REPORT_DIR: Path = Field(
+        default=Path(".cache/reports"),
+        description="Where match-tender writes JSON reports (local output, not committed).",
+    )
     CHUNK_CACHE_DIR: Path = Field(
         default=Path(".cache/chunks"),
         description="Processed catalogue files for in-memory matching, one JSON per sha256.",

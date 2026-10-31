@@ -67,6 +67,22 @@ def test_xlsx_sheets_are_pages(tmp_path: Path, options: ChunkerOptions) -> None:
     assert sheet_chunks(sheets[1], options) == []  # header only
 
 
+def test_xlsx_cell_lines_are_kept(tmp_path: Path, options: ChunkerOptions) -> None:
+    workbook = Workbook()
+    sheet = workbook.active
+    assert sheet is not None
+    sheet.append(["Item No", "Description"])
+    sheet.append(["10", "SIZE : 250 MM\n\nBODY MOC :  WCB"])
+    sheet.append(["20", "SIZE : 300 MM"])
+    path = tmp_path / "boq.xlsx"
+    workbook.save(path)
+    [read] = read_xlsx(path)
+    multi, single = sheet_chunks(read, options)
+    assert multi.meta["cells"] == ["10", "SIZE : 250 MM BODY MOC : WCB"]  # cells as before
+    assert multi.meta["cell_lines"] == [["10"], ["SIZE : 250 MM", "BODY MOC : WCB"]]
+    assert "cell_lines" not in single.meta  # one line per cell: nothing to keep
+
+
 def test_bad_xlsx_raises(tmp_path: Path) -> None:
     path = tmp_path / "bad.xlsx"
     path.write_bytes(b"not a zip")

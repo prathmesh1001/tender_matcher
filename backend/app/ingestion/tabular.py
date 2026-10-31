@@ -9,7 +9,7 @@ import csv
 import io
 import zipfile
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
@@ -33,6 +33,8 @@ class Sheet:
     page_number: int
     name: str
     rows: list[list[str]]
+    # Per row, per cell: the cell's own lines (a BOQ description has one "KEY : value" each).
+    lines: list[list[list[str]]] = field(default_factory=list)
 
     @property
     def text(self) -> str:
@@ -40,10 +42,26 @@ class Sheet:
         return "\n".join(CELL_SEPARATOR.join(c for c in row if c) for row in self.rows)
 
 
-def _clean_rows(rows: Sequence[Sequence[object]]) -> list[list[str]]:
-    """Stringify and whitespace-normalize cells; drop rows that are entirely empty."""
-    cleaned = [[normalize_cell("" if c is None else str(c)) or "" for c in row] for row in rows]
-    return [row for row in cleaned if any(row)]
+def _cell_lines(value: object) -> list[str]:
+    """A cell's non-empty lines, each whitespace-normalized."""
+    text = "" if value is None else str(value)
+    return [line for line in (normalize_cell(x) or "" for x in text.splitlines()) if line]
+
+
+def _clean_rows(rows: Sequence[Sequence[object]]) -> tuple[list[list[str]], list[list[list[str]]]]:
+    """Stringify and whitespace-normalize cells; drop rows that are entirely empty.
+
+    Returns:
+        The cleaned rows and, per kept row, each cell's lines.
+    """
+    kept: list[list[str]] = []
+    lines: list[list[list[str]]] = []
+    for row in rows:
+        cells = [normalize_cell("" if c is None else str(c)) or "" for c in row]
+        if any(cells):
+            kept.append(cells)
+            lines.append([_cell_lines(c) for c in row])
+    return kept, lines
 
 
 def read_csv(path: Path) -> list[Sheet]:
@@ -58,8 +76,8 @@ def read_csv(path: Path) -> list[Sheet]:
             text = raw.decode(encoding)
         except UnicodeDecodeError:
             continue
-        rows = list(csv.reader(io.StringIO(text)))
-        return [Sheet(page_number=1, name=path.name, rows=_clean_rows(rows))]
+        rows, lines = _clean_rows(list(csv.reader(io.StringIO(text))))
+        return [Sheet(page_number=1, name=path.name, rows=rows, lines=lines)]
     raise DocumentParseError(f"Cannot decode CSV {path}", details={"path": str(path)})
 
 
@@ -74,10 +92,11 @@ def read_xlsx(path: Path) -> list[Sheet]:
     except (OSError, ValueError, KeyError, zipfile.BadZipFile) as exc:
         raise DocumentParseError(f"Cannot open {path}: {exc}", details={"path": str(path)}) from exc
     try:
-        return [
-            Sheet(page_number=i, name=ws.title, rows=_clean_rows(list(ws.values)))
-            for i, ws in enumerate(workbook.worksheets, start=1)
-        ]
+        sheets: list[Sheet] = []
+        for i, ws in enumerate(workbook.worksheets, start=1):
+            rows, lines = _clean_rows(list(ws.values))
+            sheets.append(Sheet(page_number=i, name=ws.title, rows=rows, lines=lines))
+        return sheets
     finally:
         workbook.close()
 
@@ -85,6 +104,14 @@ def read_xlsx(path: Path) -> list[Sheet]:
 def _pad(row: list[str], width: int) -> list[str]:
     """Pad or trim a row to `width` cells."""
     return (row + [""] * width)[:width]
+
+
+def _row_lines(sheet: Sheet, row: int) -> list[list[str]]:
+    """The row's cell lines, kept only when a cell has several (same rule as PDF rows)."""
+    if row >= len(sheet.lines) or all(len(c) <= 1 for c in sheet.lines[row]):
+        return []
+    width = len(sheet.rows[0])
+    return (sheet.lines[row] + [[]] * width)[:width]
 
 
 def sheet_chunks(sheet: Sheet, options: ChunkerOptions) -> list[ChunkDraft]:
@@ -105,7 +132,10 @@ def sheet_chunks(sheet: Sheet, options: ChunkerOptions) -> list[ChunkDraft]:
         index=0,
         bbox=_NO_BOX,
         header=header,
-        rows=[TableRow(cells=_pad(r, len(header)), bbox=_NO_BOX) for r in sheet.rows[1:]],
+        rows=[
+            TableRow(cells=_pad(r, len(header)), bbox=_NO_BOX, cell_lines=_row_lines(sheet, i))
+            for i, r in enumerate(sheet.rows[1:], start=1)
+        ],
     )
     chunks = table_chunks(table, sheet.name, options)
     return [c.model_copy(update={"position": i}) for i, c in enumerate(chunks)]

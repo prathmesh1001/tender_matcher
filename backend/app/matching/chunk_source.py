@@ -89,6 +89,10 @@ class ChunkSource(Protocol):
         """Manufacturers with at least one document in the category, sorted."""
         ...
 
+    def product_types(self) -> dict[str, frozenset[str]]:
+        """Every declared product type and the categories of the documents declaring it."""
+        ...
+
     def documents(
         self, manufacturer: str, category: str, product_type: str
     ) -> list[CatalogueDocument]:
@@ -291,6 +295,14 @@ class InMemoryChunkSource:
     def manufacturers(self, category: str) -> list[str]:
         """Manufacturers with at least one document in the category, sorted."""
         return sorted({s.manufacturer for s in self.sources if s.category == category})
+
+    def product_types(self) -> dict[str, frozenset[str]]:
+        """Every declared product type and the categories of the documents declaring it."""
+        found: dict[str, set[str]] = {}
+        for source in self.sources:
+            for product_type in source.product_types:
+                found.setdefault(product_type, set()).add(source.category)
+        return {t: frozenset(c) for t, c in found.items()}
 
     def _matching(self, manufacturer: str, category: str) -> list[RegisteredSource]:
         return [

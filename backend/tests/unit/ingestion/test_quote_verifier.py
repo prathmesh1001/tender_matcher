@@ -1,6 +1,8 @@
 """Quote verification against page text. Page texts are synthetic."""
 
-from app.ingestion.quote_verifier import normalize_quote, partial_ratio, verify_quote
+from difflib import SequenceMatcher
+
+from app.ingestion.quote_verifier import exact_tokens, normalize_quote, partial_ratio, verify_quote
 
 PAGE = (
     "Standards & Materials\n"
@@ -44,3 +46,61 @@ def test_unknown_page_or_no_pieces_never_verify() -> None:
     assert not verify_quote(["Body"], None, 0.9).verified
     assert not verify_quote(["", "  "], PAGE, 0.9).verified
     assert partial_ratio("", "x") == 0.0
+
+
+# ---------------------------------------------------------------- numbers and codes are exact
+
+LONG_PAGE = (
+    "Pressure ratings\n"
+    "Dead-End Service (No downstream flanges and disc in closed position)\n"
+    "2 to 12 inch (DN 50 - DN 300) 125 psi (12.0 barg)\n"
+)
+LONG_QUOTE = (
+    "Dead-End Service (No downstream flanges and disc in closed position) "
+    "2 to 12 inch (DN 50 - DN 300) 175 psi (12.0 barg)"
+)
+
+
+def test_exact_tokens_are_numbers_and_capital_codes() -> None:
+    assert exact_tokens("A 216 Gr. WCB/ WCC, Class 150 (80 mm") == (
+        "216", "wcb", "wcc", "150", "80",
+    )  # fmt: skip
+    assert exact_tokens("Body Materials") == ()
+
+
+def test_class_150_quote_fails_on_a_class_300_page() -> None:
+    check = verify_quote(
+        ["Pressure rating: ASME Class 150"], "Pressure rating: ASME Class 300", 0.9
+    )
+    assert not check.verified
+
+
+def test_one_wrong_number_in_a_long_quote_fails_despite_a_high_ratio() -> None:
+    window = normalize_quote(LONG_PAGE)[normalize_quote(LONG_PAGE).find("dead") :]
+    assert SequenceMatcher(None, normalize_quote(LONG_QUOTE), window).ratio() >= 0.9
+    # Fuzzy alone would accept it; the exact-token rule is what rejects it.
+    assert partial_ratio(normalize_quote(LONG_QUOTE), normalize_quote(LONG_PAGE)) >= 0.9
+    check = verify_quote([LONG_QUOTE], LONG_PAGE, 0.9)
+    assert not check.verified  # 175 psi is not 125 psi
+
+
+def test_letter_code_must_be_exact() -> None:
+    assert not verify_quote(["A 216 Gr. WCC"], "Body A 216 Gr. WCB", 0.9).verified
+
+
+def test_word_noise_is_still_forgiven() -> None:
+    check = verify_quote(["Butterfiy valves, Class 150"], "Butterfly valves, Class 150", 0.9)
+    assert check.verified  # OCR "fi" for "fl" in a word; the number is exact
+    assert check.score < 1.0
+
+
+def test_label_printed_inside_a_wrapped_cell_still_verifies() -> None:
+    # Aquaseal p8 reading order: the row label "Disc" lands between the cell's lines.
+    page = (
+        "SG Iron to EN 1563-400/\nDisc\n18 with Nylon-coating,\n"
+        "CF8, CF8M to A 351,\nAB2 to IS EN 1982, CF3M\nStem"
+    )
+    cell = (
+        "SG Iron to EN 1563-400/ 18 with Nylon-coating, CF8, CF8M to A 351, AB2 to IS EN 1982, CF3M"
+    )
+    assert verify_quote(["Disc", cell], page, 0.9).verified
