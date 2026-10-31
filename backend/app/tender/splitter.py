@@ -10,6 +10,9 @@ with one child per comma part; "/" stays inside a part as alternatives of one re
 
 A key can run straight into its value ("Pump Shaft Carbon Steel"): attribute words followed by a
 material name are a key and a value, whatever ":" comes later ("impeller BRONZE IS:318").
+
+A dash can separate a key from its value ("Body- CI"). A part with such a key ends the line's
+label: in "Body : A216, DISC- A351, Spring" neither of the last two is the body.
 """
 
 import re
@@ -37,6 +40,11 @@ RATING_LABEL: Final = "CLASS"
 _LABEL_LINE: Final = re.compile(r"^(?P<label>[^:]+?)\s*:\s*(?P<value>.*)$")
 # Parts of a list: split on commas that are not inside a number ("1,000").
 _PART_SPLIT: Final = re.compile(r",\s*(?!\d{3}\b)")
+# "Body- CI" (dash against the key) or "Body - CI" (spaced); "Butt-weld" has no space after it.
+_MIN_KEY_LETTERS: Final = 2
+_DASH_KEY: Final = re.compile(
+    r"^(?P<key>[^\W\d][^:,]*?)(?:(?P<attached>-)\s+|\s+-\s+)(?P<value>\S.*)$"
+)
 # "THE VALVE SHALL BE TORQUE SEATED" -> "TORQUE SEATED" (the value; the quote keeps it all).
 _STATEMENT_LEAD: Final = re.compile(
     r"^(?:the\s+\w+\s+)?(?:shall|should|must|will)\s+(?:be\s+)?", re.IGNORECASE
@@ -188,6 +196,55 @@ def merged_line_key(line: str, ontology: Ontology | None, max_words: int) -> tup
     return None
 
 
+def dash_key(
+    text: str, ontology: Ontology | None, options: SplitOptions, whole_part: bool
+) -> tuple[str, str] | None:
+    """`(key, value)` of text whose key ends in a dash: "Body- CI", "DISC- A351 CF8M".
+
+    A key naming an attribute always counts, spaced or not. A dash against any other key counts
+    in one comma part of a list, or if a code or material follows it: elsewhere it may be a wrapped
+    word ("HARD- FACED"). A size or rating ("DN- 50") stays whole, and a key needs two letters and
+    no digit ("V- 415410%" is a voltage).
+
+    Args:
+        text: One comma part of a list, or one whole requirement.
+        ontology: Category ontology, or None.
+        options: Splitting thresholds.
+        whole_part: The text is one comma part of a list.
+
+    Returns:
+        The key and the value, or None.
+    """
+    found = _DASH_KEY.match(text.strip())
+    if found is None:
+        return None
+    key, value = found.group("key").strip(), found.group("value").strip()
+    letters = sum(ch.isalpha() for ch in key)
+    if letters < _MIN_KEY_LETTERS or len(key.split()) > options.label_max_words:
+        return None
+    if any(ch.isdigit() for ch in key) or "-" in key.split()[-1]:
+        return None  # "wrong face-to- face length": a word wrapped inside a sentence
+    whole = parse_value(None, text, ontology, options.enum_max_words)
+    if size_form(text) is not None or whole.is_designation:
+        return None
+    parsed = parse_value(key, value, ontology, options.enum_max_words)
+    if resolve_attribute(key, parsed, ontology) is not None:
+        return key, value
+    if found.group("attached") and (whole_part or _is_material(value, ontology)):
+        return key, value
+    return None
+
+
+def _colon_key(
+    part: str, ontology: Ontology | None, options: SplitOptions
+) -> tuple[str, str] | None:
+    """The "KEY : value" a comma part prints, if it has one."""
+    own = label_of(part, options.label_max_words)
+    if own is not None and ontology and _starts_with_material(own[0], ontology):
+        return None  # "BRONZE IS:318" is a value with a colon in it, not a key
+    return own
+
+
 def implicit_label(
     part: str, ontology: Ontology | None, options: SplitOptions
 ) -> tuple[str, str] | None:
@@ -238,9 +295,9 @@ def _part_fields(
     or the attribute words the part starts with. Bare millimetres right after the item's name
     are its size ("GLOBE VALVE, 15MM"); anywhere else they may measure anything.
     """
-    own = label_of(part, options.label_max_words)
-    if own is not None and not (ontology and _starts_with_material(own[0], ontology)):
-        return own  # "BRONZE IS:318" is a value with a colon in it, not a key
+    own = _colon_key(part, ontology, options) or dash_key(part, ontology, options, whole_part=True)
+    if own is not None:
+        return own
     parsed = parse_value(label, part, ontology, options.enum_max_words)
     if size_form(part) is not None:
         return label or SIZE_LABEL, part
@@ -331,6 +388,11 @@ def item_requirements(
             item, req_id, len(out), group.label, group.value, ontology, options, printed=printed
         )
         if len(parts) <= 1:
+            alone = dash_key(group.value, ontology, options, False) if not group.label else None
+            if alone is not None:
+                parent = _requirement(
+                    item, req_id, len(out), *alone, ontology, options, printed=group.value
+                )
             out.append(parent)
             continue
         out.append(
@@ -347,18 +409,23 @@ def item_requirements(
         first = parse_value(group.label, parts[0], ontology, options.enum_max_words)
         numeric_line = group.label is not None and first.kind is ValueKind.NUMERIC
         names_item = fold_text(parts[0]).strip() == fold_text(item.title).strip()
+        carried = group.label
         for m, part in enumerate(parts, start=1):
             after_title = names_item and m == 2
             # A merged key was recognised by its material: it does not name "Type -enclosed".
             names_part = not group.merged or _is_material(part, ontology)
             label, value = _part_fields(
-                group.label if names_part else None,
+                carried if names_part else None,
                 part,
                 numeric_line,
                 after_title,
                 ontology,
                 options,
             )
+            if _colon_key(part, ontology, options) is None and dash_key(
+                part, ontology, options, whole_part=True
+            ):
+                carried = None
             out.append(
                 _requirement(
                     item, f"{req_id}.{m}", len(out), label, value, ontology, options, req_id, part

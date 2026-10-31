@@ -186,7 +186,7 @@ attributes:
   - name: design_standard
     critical: true
     dimension: none
-    synonyms: [design standard, design code, manufacturing standard, design]
+    synonyms: [design standard, design code, manufacturing standard, design, design mfg std]
   - name: test_standard
     dimension: none
     synonyms: [testing standard, test standard, inspection and testing]

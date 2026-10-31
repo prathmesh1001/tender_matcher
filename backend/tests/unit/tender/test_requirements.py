@@ -21,6 +21,7 @@ from app.tender.normalizer import (
 from app.tender.pipeline import ontology_for
 from app.tender.splitter import (
     SplitOptions,
+    dash_key,
     group_lines,
     item_requirements,
     leaves,
@@ -613,3 +614,85 @@ def test_a_two_digit_number_before_a_fraction_is_not_part_of_it() -> None:
     # A DN + NPS table row: DN15 next to 1/2 inch, never 15.5 inch.
     assert title_size('DN 15 1/2" VALVE') != '15 1/2"'
     assert size_form('15 1/2"') is None
+
+
+# ---------------------------------------------------------------- dash separators
+
+
+@pytest.mark.parametrize(
+    ("part", "label", "attribute", "value"),
+    [
+        ("Body- CI", "Body", "body_material", "CI"),
+        ("Disc- SGI", "Disc", "disc_material", "SGI"),
+        ("Seat- EPDM", "Seat", "seat_material", "EPDM"),
+        ("DESIGN/MFG STD- EN593", "DESIGN/MFG STD", "design_standard", "EN593"),
+        ("Disc - A351 CF8M", "Disc", "disc_material", "A351 CF8M"),
+        ("Bearing/Bush- SS316", "Bearing/Bush", None, "SS316"),
+    ],
+)
+def test_a_dash_separates_key_and_value_in_a_list(
+    part: str, label: str, attribute: str | None, value: str, ontology: Ontology
+) -> None:
+    parts = leaves(item_requirements(_sized(f"IVGK, {part}"), ontology, SPLIT))
+    found = parts[-1]
+    assert (found.label, found.attribute, found.value_text) == (label, attribute, value)
+    assert found.raw_text == part  # the quote stays as printed
+
+
+def test_a_label_does_not_carry_past_a_dash_key(ontology: Ontology) -> None:
+    line = "Body : ASTM A216, DISC- A351 CF8M, Spring, Stem- SS316"
+    parts = leaves(item_requirements(_sized(line), ontology, SPLIT))
+    by_value = {p.value_text: p for p in parts}
+    assert by_value["ASTM A216"].attribute == "body_material"
+    assert by_value["A351 CF8M"].attribute == "disc_material"
+    assert by_value["Spring"].attribute is None
+    assert by_value["SS316"].attribute == "stem_material"
+
+
+def test_a_part_before_a_dash_key_keeps_the_label(ontology: Ontology) -> None:
+    parts = leaves(item_requirements(_sized("Body : A216, WCB, DISC- A351"), ontology, SPLIT))
+    assert {p.value_text: p.label for p in parts}["WCB"] == "Body"
+
+
+def test_a_key_wrapped_over_two_lines_is_one_part(ontology: Ontology) -> None:
+    item = LineItem(
+        item_no="1",
+        title="CHECK VALVE",
+        description_lines=["Body : ASTM A216, Type of", "Seat- nitrile, Spring"],
+        document="b.pdf",
+        page_number=1,
+    )
+    by_value = {p.value_text: p for p in leaves(item_requirements(item, ontology, SPLIT))}
+    assert by_value["nitrile"].attribute == "seat_material"
+    assert by_value["nitrile"].label == "Type of Seat"
+    assert by_value["Spring"].attribute is None
+
+
+def test_one_requirement_on_its_own_with_a_dash_key(ontology: Ontology) -> None:
+    [part] = item_requirements(_sized("Disc- A351 CF8M"), ontology, SPLIT)
+    assert (part.attribute, part.value_text, part.raw_text) == (
+        "disc_material",
+        "A351 CF8M",
+        "Disc- A351 CF8M",
+    )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Butt-weld",
+        "V- 415410%",
+        "A216- WCB",
+        "DN- 50",
+        "Shaft Nut - 1 No.",
+        "Non - return valve",
+        "Type -enclosed",
+        "wrong face-to- face length",
+    ],
+)
+def test_dashes_that_are_no_key(text: str, ontology: Ontology) -> None:
+    assert dash_key(text, ontology, SPLIT, whole_part=True) is None
+
+
+def test_a_wrapped_word_alone_is_no_key(ontology: Ontology) -> None:
+    assert dash_key("HARD- FACED", ontology, SPLIT, whole_part=False) is None

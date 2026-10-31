@@ -323,9 +323,10 @@ def judge_code(
     options ("CA15/CF8M") all found is full, some found is partial, unless the tender wrote
     "or" ("NITRILE OR SS"): then one found is full. A value that states
     something else (a code, or a short value such as "Flanged") is missing. The same material
-    named another way ("SS ASTM A276" against "Stainless Steel") is partial: the grade is not
-    printed, which is no contradiction. An empty value, bare numbers ("5" in a "No." column, B4)
-    or a sentence without codes decide nothing.
+    named another way is full if the tender names no grade ("CI" against "Cast Iron EN 1561"), and
+    partial if the catalogue leaves its grade out ("SS ASTM A276" against "Stainless Steel"): that
+    is no contradiction. An empty value, bare numbers ("5" in a "No." column, B4) or a sentence
+    without codes decide nothing.
     """
     have = code_tokens(value, options.code_noise_words, ctx.vocabulary)
     if not any(not t.isdigit() for t in have):
@@ -342,11 +343,14 @@ def judge_code(
         return _Outcome(MatchStatus.FULL_MATCH, "")
     if found:
         return _Outcome(MatchStatus.PARTIAL_MATCH, f"{len(found)} of {len(wanted)} options found")
+    same_material = _families(requirement.value_text, ctx.ontology) & _families(value, ctx.ontology)
+    if same_material and len(wanted) == 1 and not _coded(wanted[0]):
+        return _Outcome(MatchStatus.FULL_MATCH, "same material, named another way")
     if not any(_coded(w) for w in wanted) and _coded(have):
         return _Outcome(None, "tender names words, catalogue names codes: not like-for-like")
     if any(w & have for w in wanted):
         return _Outcome(MatchStatus.PARTIAL_MATCH, "near miss: only part of the code found")
-    if _families(requirement.value_text, ctx.ontology) & _families(value, ctx.ontology):
+    if same_material:
         return _Outcome(MatchStatus.PARTIAL_MATCH, "same material, grade not printed")
     if any(is_code(t) for t in have) or len(value.split()) <= options.value_max_words:
         return _Outcome(MatchStatus.MISSING_CAPABILITY, "")

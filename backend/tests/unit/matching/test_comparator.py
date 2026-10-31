@@ -465,3 +465,13 @@ def test_another_material_is_still_missing(valves: Ontology) -> None:
     row = _row(["Part", "Material"], ["Stem", "Cast Iron"])
     result = _compare("STEM MOC : SS ASTM A276", [row], valves)
     assert result.status is MatchStatus.MISSING_CAPABILITY
+
+
+def test_tender_naming_only_the_material_is_met_by_its_grade_code(valves: Ontology) -> None:
+    row = _row(["Part", "Material"], ["Body", "Cast Iron EN 1561 Gr. 200"])
+    assert _compare("BODY MOC : CI", [row], valves).status is MatchStatus.FULL_MATCH
+
+
+def test_tender_naming_only_the_material_still_fails_on_another(valves: Ontology) -> None:
+    row = _row(["Part", "Material"], ["Body", "Carbon Steel"])
+    assert _compare("BODY MOC : CI", [row], valves).status is MatchStatus.MISSING_CAPABILITY
