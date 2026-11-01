@@ -317,6 +317,44 @@ class Settings(BaseSettings):
         ge=2,
         description="A catalogue page naming this many products is an overview of them.",
     )
+    EXTRACTION_TITLE_FRAGMENT_MAX_WORDS: int = Field(
+        default=3,
+        ge=1,
+        description="An item title this short, with no digit and no product, is a fragment.",
+    )
+    EXTRACTION_TITLE_SENTENCE_MIN_WORDS: int = Field(
+        default=25,
+        ge=1,
+        description="An item title this long, with no product, is running text.",
+    )
+    EXTRACTION_TITLE_SENTENCE_WORDS: list[str] = Field(
+        default_factory=lambda: ["shall", "must", "should", "will", "are", "be"],
+        description="Words that make an item title a sentence, never one that is also a code "
+        "('IS 6438') (JSON list).",
+    )
+    EXTRACTION_BAD_TITLE_SHARE: float = Field(
+        default=0.5,
+        ge=0,
+        le=1,
+        description="Tender is unreliable if this share of items have such titles.",
+    )
+    EXTRACTION_MAX_ITEM_REQUIREMENTS: int = Field(
+        default=50,
+        ge=1,
+        description="Tender is unreliable if one item has more atomic requirements than this.",
+    )
+    EXTRACTION_OCR_MIN_CONFIDENCE: float = Field(
+        default=0.7,
+        ge=0,
+        le=1,
+        description="OCR pages with a lower mean confidence are low-confidence.",
+    )
+    EXTRACTION_LOW_OCR_SHARE: float = Field(
+        default=0.2,
+        ge=0,
+        le=1,
+        description="Tender is unreliable if this share of item requirements cite such pages.",
+    )
     RANKING_MIN_COVERAGE_PCT: float = Field(
         default=50.0,
         ge=0,

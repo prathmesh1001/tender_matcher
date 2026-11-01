@@ -1,11 +1,14 @@
 """Processing stage: file -> pages + chunks with search_text. Synthetic PDFs only."""
 
+from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 import pymupdf
 import pytest
 
 from app.core.exceptions import DocumentParseError
+from app.ingestion.ocr import OcrLine
 from app.ingestion.processing import (
     ProcessingOptions,
     drop_duplicate_rule_rows,
@@ -19,7 +22,7 @@ from app.retrieval.text_normalizer import SearchVocabulary
 from app.schemas.chunking import ChunkDraft
 from app.schemas.enums import ChunkType
 from tests.conftest import make_test_settings
-from tests.unit.ingestion.conftest import write_catalogue_pdf
+from tests.unit.ingestion.conftest import FakeOcrEngine, write_catalogue_pdf
 
 ONTOLOGY_DIR = Path(__file__).resolve().parents[3] / "ontology"
 
@@ -74,6 +77,17 @@ def test_table_continuing_on_next_page_keeps_its_header(
         "Parameter: Power; Value: 2.0 (horsepower)",
     ]
     assert all(c.meta["continued_from_page"] == 1 for c in page2)
+
+
+def test_processed_page_keeps_its_ocr_confidence(
+    scanned_pdf: Path,
+    options: ProcessingOptions,
+    fake_ocr: Callable[[list[OcrLine]], FakeOcrEngine],
+) -> None:
+    line = OcrLine(text="Body: SS316", left=300, top=600, right=900, bottom=660, confidence=0.42)
+    processed = process_file(scanned_pdf, replace(options, ocr_engine=fake_ocr([line])))
+    assert processed.pages[0].ocr is True
+    assert processed.pages[0].ocr_confidence == pytest.approx(0.42)
 
 
 def test_unsupported_type(tmp_path: Path, options: ProcessingOptions) -> None:

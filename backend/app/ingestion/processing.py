@@ -121,6 +121,7 @@ class ProcessedPage:
     page_number: int
     text: str
     ocr: bool
+    ocr_confidence: float | None = None
 
     @property
     def char_count(self) -> int:
@@ -237,7 +238,12 @@ def process_pdf(path: Path, options: ProcessingOptions) -> ProcessedDocument:
         options.layout if options.rule_grid_tables else None,
     )
     chunks = chunk_document(cleaned, tables, options.chunker)
-    pages = [ProcessedPage(page_number=p.page_number, text=p.text, ocr=p.ocr) for p in parsed.pages]
+    pages = [
+        ProcessedPage(
+            page_number=p.page_number, text=p.text, ocr=p.ocr, ocr_confidence=p.ocr_confidence
+        )
+        for p in parsed.pages
+    ]
     searchable = add_search_text(chunks, options.vocabulary)
     return ProcessedDocument(pages=pages, chunks=drop_duplicate_rule_rows(searchable))
 

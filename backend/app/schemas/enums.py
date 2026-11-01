@@ -73,6 +73,22 @@ class DecisionSource(StrEnum):
     NONE = "none"
 
 
+class ExtractionStatus(StrEnum):
+    """Whether a tender's extracted items can be trusted."""
+
+    OK = "ok"
+    UNRELIABLE = "unreliable"
+
+
+class ExtractionIssueCode(StrEnum):
+    """Why a tender's extraction is unreliable."""
+
+    TITLES_NOT_PRODUCTS = "titles_not_products"
+    OVERSIZED_ITEM = "oversized_item"
+    ITEM_CATEGORY_FALLBACK = "item_category_fallback"
+    LOW_CONFIDENCE_OCR = "low_confidence_ocr"
+
+
 class RunStatus(StrEnum):
     """Lifecycle of a matching run."""
 

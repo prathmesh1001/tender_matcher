@@ -13,6 +13,7 @@ import pytest
 import yaml
 from openpyxl import Workbook
 
+from app.core.config import Settings
 from app.ingestion.chunker import table_row_text
 from app.ingestion.processing import ProcessedDocument, ProcessedPage, ProcessingOptions
 from app.ingestion.product_tagger import ProductMatcher
@@ -22,7 +23,13 @@ from app.ontology.loader import load_ontologies
 from app.reporting.json_report import write_json_report
 from app.retrieval.text_normalizer import SearchVocabulary
 from app.schemas.chunking import ChunkDraft
-from app.schemas.enums import ChunkType, DocType, MatchStatus
+from app.schemas.enums import (
+    ChunkType,
+    DocType,
+    ExtractionIssueCode,
+    ExtractionStatus,
+    MatchStatus,
+)
 from app.schemas.sources import RegisteredSource
 from app.services.match_service import MatchService
 from app.tender.pipeline import RequirementOptions
@@ -99,9 +106,7 @@ def _source() -> RegisteredSource:
     )
 
 
-@pytest.fixture
-def service(tmp_path: Path) -> MatchService:
-    settings = make_test_settings()
+def _service(tmp_path: Path, settings: Settings) -> MatchService:
     ontologies = load_ontologies(BACKEND / "ontology")
     vocabulary = SearchVocabulary.from_ontologies(ontologies)
     options = ProcessingOptions.from_settings(
@@ -123,8 +128,14 @@ def service(tmp_path: Path) -> MatchService:
     )
 
 
+@pytest.fixture
+def service(tmp_path: Path) -> MatchService:
+    return _service(tmp_path, make_test_settings())
+
+
 def test_full_report_with_ontology(service: MatchService, tmp_path: Path) -> None:
     report = service.match_tender(TENDER)
+    assert report.extraction_quality.status is ExtractionStatus.OK
     [item] = report.items
     assert (item.item.item_no, item.product_type, item.sub_type) == (
         "10", "butterfly_valve", "triple_offset",
@@ -160,3 +171,33 @@ def test_report_without_ontology(service: MatchService) -> None:
     assert report.ontology_used is False
     assert report.items[0].category is None
     assert acme.results[0].status is MatchStatus.FULL_MATCH  # same unit "mm" printed
+
+
+def test_unreliable_extraction_sends_everything_to_review_and_changes_no_status(
+    service: MatchService, tmp_path: Path
+) -> None:
+    clean = service.match_tender(TENDER)
+    settings = make_test_settings().model_copy(update={"EXTRACTION_MAX_ITEM_REQUIREMENTS": 1})
+    flagged = _service(tmp_path / "strict", settings).match_tender(TENDER)
+
+    assert flagged.extraction_quality.status is ExtractionStatus.UNRELIABLE
+    [issue] = flagged.extraction_quality.reasons
+    assert issue.code is ExtractionIssueCode.OVERSIZED_ITEM
+
+    [before] = clean.items[0].manufacturers
+    [after] = flagged.items[0].manufacturers
+    assert [r.status for r in after.results] == [r.status for r in before.results]
+    assert [r.evidence for r in after.results] == [r.evidence for r in before.results]
+    assert not all(r.needs_review for r in before.results)  # the check is what changed them
+    assert all(r.needs_review for r in after.results)
+    assert all("extraction unreliable: oversized_item" in (r.reason or "") for r in after.results)
+    assert all(r.needs_review for r in flagged.general_results)
+
+    total = len(after.results)
+    assert after.score.needs_review == total
+    assert flagged.ranking[0].score.needs_review == total
+    assert after.score.compatibility_pct == before.score.compatibility_pct
+    assert flagged.ranking[0].rank == clean.ranking[0].rank
+
+    keys = list(json.loads(write_json_report(flagged, tmp_path / "r.json").read_text("utf-8")))
+    assert keys.index("extraction_quality") < keys.index("items")

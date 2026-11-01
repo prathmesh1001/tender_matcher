@@ -8,16 +8,24 @@ import pytest
 from app import cli
 from app.core.config import Settings
 from app.matching.scorer import score
-from app.schemas.enums import DecisionSource, MatchStatus
+from app.schemas.enums import (
+    DecisionSource,
+    ExtractionIssueCode,
+    ExtractionStatus,
+    MatchStatus,
+)
 from app.schemas.matching import Comparison, LabelBasis, SubTypeFit
 from app.schemas.report import (
     CandidateSummary,
+    ExtractionIssue,
+    ExtractionQuality,
     ItemReport,
     ManufacturerItemReport,
     TenderReport,
     TiedDocumentRows,
 )
 from app.schemas.requirements import LineItem
+from tests.conftest import make_test_settings
 
 SCORES = {MatchStatus.FULL_MATCH: 1.0, MatchStatus.PARTIAL_MATCH: 0.5}
 ROW = Comparison(
@@ -89,3 +97,22 @@ def test_match_tender_shows_a_tie_with_its_shared_score(
     assert code == 0
     assert "TIED, needs review: alpha.pdf, beta.pdf" in line
     assert "100" in line  # the score the tied catalogues share, not a blank
+
+
+def test_match_tender_prints_the_extraction_warning_first(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    quality = ExtractionQuality(
+        status=ExtractionStatus.UNRELIABLE,
+        reasons=[ExtractionIssue(code=ExtractionIssueCode.OVERSIZED_ITEM, reason="item 1 is big")],
+    )
+
+    class _Flagged:
+        def match_tender(self, tender: str, *, use_ontology: bool = True) -> TenderReport:
+            return _report().model_copy(update={"extraction_quality": quality})
+
+    monkeypatch.setattr(cli, "build_match_service", lambda settings: _Flagged())
+    cli.run_match(make_test_settings(), "T", use_ontology=True, out=str(tmp_path / "r.json"))
+    first, second, *_ = capsys.readouterr().out.splitlines()
+    assert first.startswith("WARNING: extraction unreliable")
+    assert second == "  oversized_item: item 1 is big"

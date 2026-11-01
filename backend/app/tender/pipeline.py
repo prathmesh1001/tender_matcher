@@ -24,6 +24,7 @@ from app.tender.general import general_requirements
 from app.tender.line_items import ItemColumnOptions, is_schedule_row, line_items
 from app.tender.link_fetcher import BID_ROLE
 from app.tender.normalizer import stems, title_size, words
+from app.tender.quality import QualityRules
 from app.tender.splitter import SIZE_LABEL, SplitOptions, item_requirements
 
 SIZE_DIFFERS_FROM_TITLE: Final = "size_differs_from_title"
@@ -42,6 +43,7 @@ class RequirementOptions:
     spec_roles: tuple[str, ...]
     bid_role: str
     item_category_labels: tuple[str, ...]
+    quality: QualityRules
 
     @classmethod
     def from_settings(cls, settings: Settings) -> RequirementOptions:
@@ -59,6 +61,7 @@ class RequirementOptions:
             spec_roles=tuple(settings.TENDER_SPEC_ROLES),
             bid_role=BID_ROLE,
             item_category_labels=tuple(settings.TENDER_ITEM_CATEGORY_LABELS),
+            quality=QualityRules.from_settings(settings),
         )
 
 

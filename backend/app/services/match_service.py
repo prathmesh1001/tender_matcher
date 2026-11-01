@@ -28,19 +28,34 @@ from app.matching.chunk_source import (
 )
 from app.matching.comparator import MatchContext
 from app.matching.documents import SelectionOptions
-from app.matching.engine import ItemInput, general_result, match_item
+from app.matching.engine import (
+    ItemInput,
+    for_review,
+    general_result,
+    item_for_review,
+    match_item,
+)
 from app.matching.scorer import rank
 from app.ontology.loader import load_ontologies
 from app.ontology.schema import Ontology
 from app.reporting.warnings import single_firm_warning
 from app.retrieval.text_normalizer import SearchVocabulary
+from app.schemas.enums import ExtractionStatus
 from app.schemas.matching import Comparison
-from app.schemas.report import ItemReport, RankingEntry, SingleFirmWarning, TenderReport
+from app.schemas.report import (
+    ExtractionQuality,
+    ItemReport,
+    RankingEntry,
+    SingleFirmWarning,
+    TenderReport,
+)
 from app.schemas.requirements import Requirement
 from app.storage.file_store import FileStore, build_file_store
-from app.tender.items import ItemSource, TenderFile, parse_tender_files
+from app.tender.items import ItemSource, TenderFile, TenderRequirements, parse_tender_files
 from app.tender.link_fetcher import MANIFEST_FILENAME, read_manifest
-from app.tender.pipeline import RequirementOptions, ontology_for
+from app.tender.pipeline import ItemRequirements, RequirementOptions, ontology_for
+from app.tender.quality import ItemFacts, extraction_quality, low_confidence_pages
+from app.tender.splitter import leaves
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +69,7 @@ class ParsedTender:
     items: list[ItemInput] = field(default_factory=list)
     general: list[Requirement] = field(default_factory=list)
     item_source: ItemSource = ItemSource.NONE
+    extraction_quality: ExtractionQuality = field(default_factory=ExtractionQuality)
 
     @property
     def named_makes(self) -> list[str]:
@@ -114,11 +130,14 @@ class MatchService:
         manifest = read_manifest(tender_dir / MANIFEST_FILENAME)
         ontologies = self._ontologies if use_ontology else []
         files: list[TenderFile] = []
+        low_ocr: set[tuple[str, int]] = set()
+        min_confidence = self._requirement_options.quality.ocr_min_confidence
         for entry in manifest.stored_files():
             path = tender_dir / (entry.file or "")
             if is_supported(path) and path.is_file():
-                chunks = process_file(path, self._tender_options).chunks
-                files.append(TenderFile(path.name, entry.role, chunks))
+                processed = process_file(path, self._tender_options)
+                files.append(TenderFile(path.name, entry.role, processed.chunks))
+                low_ocr |= low_confidence_pages(path.name, processed.pages, min_confidence)
         found = parse_tender_files(files, self._requirement_options, ontologies)
         return ParsedTender(
             bid_number=manifest.bid_number,
@@ -133,6 +152,28 @@ class MatchService:
             ],
             general=found.general,
             item_source=found.source,
+            extraction_quality=self._quality(found, low_ocr),
+        )
+
+    def _item_facts(self, entry: ItemRequirements, low_ocr: set[tuple[str, int]]) -> ItemFacts:
+        """What the extraction check reads about one item."""
+        atomic = leaves(entry.requirements)
+        return ItemFacts(
+            item_no=entry.item.item_no,
+            title=entry.item.title,
+            names_product=ontology_for(entry.item.title, self._ontologies) is not None,
+            requirements=len(atomic),
+            low_ocr_requirements=sum((r.document, r.page_number) in low_ocr for r in atomic),
+        )
+
+    def _quality(
+        self, found: TenderRequirements, low_ocr: set[tuple[str, int]]
+    ) -> ExtractionQuality:
+        """Judge the extraction; titles are read with every ontology, however the run is set."""
+        return extraction_quality(
+            [self._item_facts(entry, low_ocr) for entry in found.items],
+            found.source is ItemSource.ITEM_CATEGORY,
+            self._requirement_options.quality,
         )
 
     def match_tender(self, tender: str, *, use_ontology: bool = True) -> TenderReport:
@@ -153,9 +194,16 @@ class MatchService:
             parsed = self.parse_tender(tender, use_ontology=use_ontology)
             reports = [match_item(entry, self._source, self._selection) for entry in parsed.items]
             logger.info("tender matched", extra={"items": len(reports), "files": len(parsed.files)})
+        general = [general_result(r) for r in parsed.general]
+        quality = parsed.extraction_quality
+        if quality.status is ExtractionStatus.UNRELIABLE:
+            note = "extraction unreliable: " + ", ".join(r.code.value for r in quality.reasons)
+            reports = [item_for_review(r, note, self._selection) for r in reports]
+            general = for_review(general, note)
         return TenderReport(
             tender=tender,
             bid_number=parsed.bid_number,
+            extraction_quality=quality,
             single_firm=parsed.single_firm,
             tender_files=parsed.files,
             generated_at=datetime.now(UTC),
@@ -163,7 +211,7 @@ class MatchService:
             items=reports,
             ranking=self._ranking(reports),
             general_requirements=parsed.general,
-            general_results=[general_result(r) for r in parsed.general],
+            general_results=general,
             named_makes=parsed.named_makes,
             item_source=parsed.item_source.value,
         )

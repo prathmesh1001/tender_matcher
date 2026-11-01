@@ -198,7 +198,12 @@ class ProcessedCache:
         data = {
             "fingerprint": self._fingerprint,
             "pages": [
-                {"page_number": p.page_number, "text": p.text, "ocr": p.ocr}
+                {
+                    "page_number": p.page_number,
+                    "text": p.text,
+                    "ocr": p.ocr,
+                    "ocr_confidence": p.ocr_confidence,
+                }
                 for p in processed.pages
             ],
             "chunks": [c.model_dump(mode="json") for c in processed.chunks],

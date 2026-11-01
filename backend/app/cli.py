@@ -30,8 +30,8 @@ from app.core.logging import configure_logging
 from app.ingestion.pipeline import IngestOutcome
 from app.reporting.gold_diff import gold_diff, load_gold, render_gold_diff
 from app.reporting.json_report import write_json_report
-from app.schemas.enums import DocumentSource
-from app.schemas.report import SingleFirmWarning
+from app.schemas.enums import DocumentSource, ExtractionStatus
+from app.schemas.report import ExtractionQuality, SingleFirmWarning
 from app.schemas.requirements import Requirement
 from app.services.indexing_service import build_indexing_service
 from app.services.ingestion_service import (
@@ -162,6 +162,7 @@ def run_match(settings: Settings, tender: str, *, use_ontology: bool, out: str |
     path = write_json_report(
         report, Path(out) if out else settings.REPORT_DIR / f"{tender}{suffix}.json"
     )
+    _report_extraction(report.extraction_quality)
     _report_single_firm(report.single_firm)
     _out(f"Tender {report.bid_number}: {len(report.items)} items, ontology={use_ontology}")
     for item in report.items:
@@ -183,6 +184,15 @@ def run_match(settings: Settings, tender: str, *, use_ontology: bool, out: str |
         )
     _out(f"Report: {path}")
     return 0
+
+
+def _report_extraction(quality: ExtractionQuality) -> None:
+    """Print the extraction warning, if any, before everything else."""
+    if quality.status is ExtractionStatus.OK:
+        return
+    _out("WARNING: extraction unreliable, every result below needs review:")
+    for issue in quality.reasons:
+        _out(f"  {issue.code.value}: {issue.reason}")
 
 
 def _report_single_firm(warning: SingleFirmWarning | None) -> None:

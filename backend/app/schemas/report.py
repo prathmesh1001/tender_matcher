@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.enums import MatchStatus
+from app.schemas.enums import ExtractionIssueCode, ExtractionStatus, MatchStatus
 from app.schemas.matching import Comparison, SubTypeFit
 from app.schemas.requirements import LineItem, Requirement
 
@@ -123,6 +123,24 @@ class SingleFirmWarning(BaseModel):
     citations: list[Citation]
 
 
+class ExtractionIssue(BaseModel):
+    """One reason a tender's extraction cannot be trusted."""
+
+    model_config = ConfigDict(frozen=True)
+
+    code: ExtractionIssueCode
+    reason: str
+
+
+class ExtractionQuality(BaseModel):
+    """Whether the items of this tender were read correctly. The reader must see this first."""
+
+    model_config = ConfigDict(frozen=True)
+
+    status: ExtractionStatus = ExtractionStatus.OK
+    reasons: list[ExtractionIssue] = Field(default_factory=list)
+
+
 class TenderReport(BaseModel):
     """Everything one match run produced for one tender."""
 
@@ -130,6 +148,10 @@ class TenderReport(BaseModel):
 
     tender: str = Field(description="Tender folder name (bid number with underscores).")
     bid_number: str
+    extraction_quality: ExtractionQuality = Field(
+        default_factory=ExtractionQuality,
+        description="If unreliable, every result of this tender is marked needs_review.",
+    )
     single_firm: SingleFirmWarning | None = Field(
         default=None,
         description="Set if only one firm is acceptable; separate from `named_makes`.",

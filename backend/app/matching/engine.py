@@ -64,15 +64,27 @@ def _summary(result: DocumentResult) -> CandidateSummary:
     )
 
 
-def _flagged(comparisons: Sequence[Comparison], tied: Sequence[str]) -> list[Comparison]:
-    """A tied catalogue's rows, each for review and saying that no catalogue was picked."""
-    note = f"catalogues tie, none picked: {', '.join(tied)}"
+def for_review(comparisons: Sequence[Comparison], note: str) -> list[Comparison]:
+    """The results, each sent to review with a note saying why; statuses are unchanged.
+
+    Args:
+        comparisons: The results.
+        note: Why a person must look.
+
+    Returns:
+        Copies with `needs_review` set and the note added to the reason.
+    """
     return [
         c.model_copy(
             update={"needs_review": True, "reason": f"{c.reason}; {note}" if c.reason else note}
         )
         for c in comparisons
     ]
+
+
+def _flagged(comparisons: Sequence[Comparison], tied: Sequence[str]) -> list[Comparison]:
+    """A tied catalogue's rows, each for review and saying that no catalogue was picked."""
+    return for_review(comparisons, f"catalogues tie, none picked: {', '.join(tied)}")
 
 
 def _no_catalogue(
@@ -145,6 +157,35 @@ def manufacturer_report(
         results=list(comparisons),
         score=score(comparisons, options.status_scores),
     )
+
+
+def item_for_review(report: ItemReport, note: str, options: SelectionOptions) -> ItemReport:
+    """One item with every manufacturer's results sent to review (scores count them).
+
+    Args:
+        report: The item's report.
+        note: Why a person must look.
+        options: Holds the status scores.
+
+    Returns:
+        A copy with results, tied rows and scores updated.
+    """
+    manufacturers: list[ManufacturerItemReport] = []
+    for m in report.manufacturers:
+        results = for_review(m.results, note)
+        tied_rows = [
+            row.model_copy(update={"results": for_review(row.results, note)}) for row in m.tied_rows
+        ]
+        manufacturers.append(
+            m.model_copy(
+                update={
+                    "results": results,
+                    "tied_rows": tied_rows,
+                    "score": score(results, options.status_scores),
+                }
+            )
+        )
+    return report.model_copy(update={"manufacturers": manufacturers})
 
 
 def match_item(entry: ItemInput, source: ChunkSource, options: SelectionOptions) -> ItemReport:

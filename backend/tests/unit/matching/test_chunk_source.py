@@ -115,6 +115,14 @@ def test_cache_round_trip_and_fingerprint_miss(tmp_path: Path) -> None:
     assert ProcessedCache(tmp_path, "v1").get(SHA_B) is None
 
 
+def test_cache_keeps_ocr_confidence(tmp_path: Path) -> None:
+    scanned = ProcessedDocument(
+        pages=[ProcessedPage(1, "scan", ocr=True, ocr_confidence=0.42)], chunks=[]
+    )
+    ProcessedCache(tmp_path, "v1").put(SHA_A, scanned)
+    assert ProcessedCache(tmp_path, "v1").get(SHA_A) == scanned
+
+
 def test_cache_corrupt_file_is_a_miss(tmp_path: Path) -> None:
     (tmp_path / f"{SHA_A}.json").write_text("{not json", encoding="utf-8")
     assert ProcessedCache(tmp_path, "v1").get(SHA_A) is None
