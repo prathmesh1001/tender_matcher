@@ -3,23 +3,36 @@
 Run with: `uvicorn app.main:create_app --factory`.
 """
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.db.session import create_db_engine, create_session_factory
+from app.services.run_service import build_run_service
+from app.workers.tasks import ThreadJobQueue
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Release pooled DB connections when the app shuts down."""
+    """Fail runs a restart lost; on shutdown stop the queue and release DB connections."""
+    try:
+        lost = app.state.run_service.fail_interrupted()
+        if lost:
+            logger.warning("marked interrupted runs failed", extra={"runs": lost})
+    except SQLAlchemyError as exc:  # the API still starts without a DB; requests then report it
+        logger.warning("could not check for interrupted runs", extra={"error": str(exc)})
     yield
+    app.state.job_queue.shutdown()
     app.state.engine.dispose()
 
 
@@ -49,6 +62,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # The engine connects lazily, so building the app never requires a reachable DB.
     app.state.engine = create_db_engine(settings)
     app.state.session_factory = create_session_factory(app.state.engine)
+    app.state.job_queue = ThreadJobQueue()
+    app.state.run_service = build_run_service(
+        settings, app.state.session_factory, app.state.job_queue
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,

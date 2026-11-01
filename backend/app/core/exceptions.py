@@ -42,6 +42,13 @@ class InvalidInputError(AppError):
     code = "invalid_input"
 
 
+class RunNotReadyError(AppError):
+    """A run has no report: it is unfinished, or it failed."""
+
+    status_code = status.HTTP_409_CONFLICT
+    code = "run_not_ready"
+
+
 class TenderParseError(AppError):
     """A tender document could not be parsed into requirements."""
 

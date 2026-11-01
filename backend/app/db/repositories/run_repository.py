@@ -45,6 +45,11 @@ class RunRepository(SqlRepository[Run]):
             stmt = stmt.where(Run.status == status)
         return list(self._session.scalars(stmt.limit(limit).offset(offset)))
 
+    def list_unfinished(self) -> list[Run]:
+        """Return every run still queued or running."""
+        stmt = select(Run).where(Run.status.in_((RunStatus.QUEUED, RunStatus.RUNNING)))
+        return list(self._session.scalars(stmt))
+
     def add_rows(self, line_items: Sequence[LineItem], requirements: Sequence[Requirement]) -> None:
         """Stage what a run read and flush. Parent requirements must come before their parts.
 

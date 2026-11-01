@@ -108,12 +108,15 @@ class MatchService:
         self._ontologies = list(ontologies)
         self._tender_root = tender_root
 
-    def parse_tender(self, tender: str, *, use_ontology: bool = True) -> ParsedTender:
+    def parse_tender(
+        self, tender: str, *, use_ontology: bool = True, unfetched: Sequence[str] = ()
+    ) -> ParsedTender:
         """Read one tender's files into line items and general requirements.
 
         Args:
             tender: Tender folder name under the tender data root ("GEM_2026_B_8119613").
             use_ontology: False runs without any ontology (labels and units as printed).
+            unfetched: Linked files that could not be fetched or read.
 
         Returns:
             The parsed tender, in manifest order.
@@ -152,7 +155,7 @@ class MatchService:
             ],
             general=found.general,
             item_source=found.source,
-            extraction_quality=self._quality(found, low_ocr),
+            extraction_quality=self._quality(found, low_ocr, unfetched),
         )
 
     def _item_facts(self, entry: ItemRequirements, low_ocr: set[tuple[str, int]]) -> ItemFacts:
@@ -167,21 +170,34 @@ class MatchService:
         )
 
     def _quality(
-        self, found: TenderRequirements, low_ocr: set[tuple[str, int]]
+        self,
+        found: TenderRequirements,
+        low_ocr: set[tuple[str, int]],
+        unfetched: Sequence[str],
     ) -> ExtractionQuality:
         """Judge the extraction; titles are read with every ontology, however the run is set."""
         return extraction_quality(
             [self._item_facts(entry, low_ocr) for entry in found.items],
             found.source is ItemSource.ITEM_CATEGORY,
             self._requirement_options.quality,
+            unfetched,
         )
 
-    def match_tender(self, tender: str, *, use_ontology: bool = True) -> TenderReport:
+    def match_tender(
+        self,
+        tender: str,
+        *,
+        use_ontology: bool = True,
+        manufacturers: Sequence[str] | None = None,
+        unfetched: Sequence[str] = (),
+    ) -> TenderReport:
         """Match every line item of one tender; report its other requirements alongside.
 
         Args:
             tender: Tender folder name under the tender data root ("GEM_2026_B_8119613").
             use_ontology: False runs without any ontology (labels and units as printed).
+            manufacturers: Only these; None for every registered one.
+            unfetched: Linked files that could not be fetched or read.
 
         Returns:
             The report.
@@ -191,8 +207,11 @@ class MatchService:
             DocumentParseError: If a tender file cannot be parsed.
         """
         with log_context(tender_id=tender):
-            parsed = self.parse_tender(tender, use_ontology=use_ontology)
-            reports = [match_item(entry, self._source, self._selection) for entry in parsed.items]
+            parsed = self.parse_tender(tender, use_ontology=use_ontology, unfetched=unfetched)
+            reports = [
+                match_item(entry, self._source, self._selection, manufacturers)
+                for entry in parsed.items
+            ]
             logger.info("tender matched", extra={"items": len(reports), "files": len(parsed.files)})
         general = [general_result(r) for r in parsed.general]
         quality = parsed.extraction_quality

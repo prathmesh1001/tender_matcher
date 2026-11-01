@@ -294,6 +294,11 @@ def bid_number_from_pdf(path: Path) -> str:
     return match.group(0)
 
 
+def tender_folder(bid_number: str) -> str:
+    """The folder of a tender ("GEM/2026/B/1234567" -> "GEM_2026_B_1234567")."""
+    return bid_number.replace("/", "_")
+
+
 def init_manifest(tender_dir: Path) -> TenderManifest:
     """Create a manifest for a tender folder that only has a user-provided bid.pdf.
 

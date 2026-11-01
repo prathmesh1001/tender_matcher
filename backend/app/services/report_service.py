@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.core.exceptions import InvalidInputError, NotFoundError
+from app.core.exceptions import InvalidInputError, NotFoundError, RunNotReadyError
 from app.db.repositories import DocumentRepository, ResultRepository, RunRepository
 from app.reporting.report_rows import RowContext, cited_hashes, report_rows
 from app.schemas.enums import MatchStatus
@@ -40,6 +40,27 @@ class ReportService:
         self._results = results
         self._documents = documents
         self._status_scores = status_scores
+
+    def get(self, run_id: uuid.UUID) -> TenderReport:
+        """Return a run's finished report, exactly as it was produced.
+
+        Args:
+            run_id: The run.
+
+        Returns:
+            The report.
+
+        Raises:
+            NotFoundError: If the run does not exist.
+            RunNotReadyError: If it has no report, with its status and any failure reason.
+        """
+        run = self._runs.get_or_raise(run_id)
+        if run.report is None:
+            raise RunNotReadyError(
+                f"Run {run_id} has no report (status: {run.status.value})",
+                details={"status": run.status.value, "error": run.error},
+            )
+        return TenderReport.model_validate(run.report)
 
     def save(self, run_id: uuid.UUID, report: TenderReport) -> SavedCounts:
         """Store one run's report, with its line items, requirements, results and evidence.

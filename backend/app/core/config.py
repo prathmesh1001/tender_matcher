@@ -440,6 +440,13 @@ class Settings(BaseSettings):
         description="Top rerank score (0-1) below this means insufficient evidence.",
     )
 
+    TENDER_UPLOAD_MAX_MB: int = Field(
+        default=50, ge=1, description="Largest bid.pdf the API accepts."
+    )
+    RUNS_LIST_LIMIT: int = Field(default=100, ge=1, description="Most runs `GET /runs` returns.")
+    RUN_ERROR_MAX_CHARS: int = Field(
+        default=2000, ge=1, description="Longest failure reason kept on a run."
+    )
     TENDER_LINK_RULES_FILE: Path = Field(
         default=Path("config/tender_links.yaml"),
         description="URL patterns deciding which links in a tender are fetched or skipped.",

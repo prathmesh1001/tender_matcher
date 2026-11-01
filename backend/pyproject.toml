@@ -22,6 +22,7 @@ dependencies = [
     "pint>=0.24",            # unit conversion to ontology canonical units (kg/cm2 -> bar)
     "snowballstemmer>=2.2",  # pure-Python stemmer for search_text ("valves" -> "valv")
     "httpx>=0.27",           # download documents linked from tender bid.pdf
+    "python-multipart>=0.0.20",  # FastAPI needs it to read file uploads (POST /tenders)
     "openpyxl>=3.1",         # read ATC/BOQ spreadsheets (.xlsx) linked from tenders
     "pgvector>=0.3",         # SQLAlchemy type + cosine distance for the vector column
     # Local embeddings (bge-m3). For the GPU, install PyTorch first from the CUDA index:

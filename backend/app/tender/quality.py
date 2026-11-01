@@ -4,8 +4,9 @@ A wrong schedule gives confident-looking results about the wrong things, and no 
 notice that. So the extraction itself is judged, by what it looks like and never by which
 tender it is: titles that name no product and read as fragments or sentences, an item holding
 far more requirements than one product has, items that only come from the bid's Item Category
-row, requirements read from low-confidence OCR. Any of these marks the tender unreliable; that
-sends every result to review and changes no status.
+row, requirements read from low-confidence OCR, linked files that could not be fetched (the
+specification may be in one). Any of these marks the tender unreliable; that sends every result
+to review and changes no status.
 """
 
 from collections.abc import Sequence
@@ -156,8 +157,22 @@ def _fallback_issue(from_item_category: bool) -> ExtractionIssue | None:
     )
 
 
+def _fetch_issue(unfetched: Sequence[str]) -> ExtractionIssue | None:
+    """Linked files are missing, so requirements in them were not read."""
+    if not unfetched:
+        return None
+    return ExtractionIssue(
+        code=ExtractionIssueCode.FILES_NOT_FETCHED,
+        reason=f"{len(unfetched)} linked files could not be fetched or read, so requirements "
+        f"in them are missing: {_examples(unfetched)}",
+    )
+
+
 def extraction_quality(
-    items: Sequence[ItemFacts], from_item_category: bool, rules: QualityRules
+    items: Sequence[ItemFacts],
+    from_item_category: bool,
+    rules: QualityRules,
+    unfetched: Sequence[str] = (),
 ) -> ExtractionQuality:
     """Judge one tender's extraction.
 
@@ -165,6 +180,7 @@ def extraction_quality(
         items: The extracted items.
         from_item_category: No schedule was found: the bid's Item Category row gave the items.
         rules: Thresholds.
+        unfetched: Linked files that could not be fetched or read.
 
     Returns:
         `unreliable` with every reason found, else `ok` with none.
@@ -174,6 +190,7 @@ def extraction_quality(
         _size_issue(items, rules),
         _fallback_issue(from_item_category),
         _ocr_issue(items, rules),
+        _fetch_issue(unfetched),
     )
     reasons = [issue for issue in found if issue is not None]
     status = ExtractionStatus.UNRELIABLE if reasons else ExtractionStatus.OK

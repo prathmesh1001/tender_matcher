@@ -6,7 +6,7 @@ per manufacturer: evaluate each catalogue declaring the type on its own, keep th
 manufacturer without a catalogue for the type gets `unsupported` for every requirement.
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
 from app.ingestion.product_tagger import ProductMatcher
@@ -188,13 +188,19 @@ def item_for_review(report: ItemReport, note: str, options: SelectionOptions) ->
     return report.model_copy(update={"manufacturers": manufacturers})
 
 
-def match_item(entry: ItemInput, source: ChunkSource, options: SelectionOptions) -> ItemReport:
+def match_item(
+    entry: ItemInput,
+    source: ChunkSource,
+    options: SelectionOptions,
+    manufacturers: Collection[str] | None = None,
+) -> ItemReport:
     """Match one item against every manufacturer of the categories declaring its type.
 
     Args:
         entry: The item, its requirements and ontology context.
         source: Catalogue chunks and page text.
         options: Comparator, scoring and verification settings.
+        manufacturers: Only these; None for every registered one.
 
     Returns:
         The item report; manufacturers sorted by name.
@@ -210,7 +216,7 @@ def match_item(entry: ItemInput, source: ChunkSource, options: SelectionOptions)
     atomic = leaves(entry.requirements)
     reports: list[ManufacturerItemReport] = []
     sub_type: str | None = None
-    for manufacturer in sorted(every):
+    for manufacturer in sorted(every if manufacturers is None else every & set(manufacturers)):
         chunks = [
             chunk
             for category in categories

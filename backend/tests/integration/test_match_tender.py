@@ -201,3 +201,12 @@ def test_unreliable_extraction_sends_everything_to_review_and_changes_no_status(
 
     keys = list(json.loads(write_json_report(flagged, tmp_path / "r.json").read_text("utf-8")))
     assert keys.index("extraction_quality") < keys.index("items")
+
+
+def test_only_the_asked_manufacturers_are_matched(service: MatchService) -> None:
+    assert [m.manufacturer for m in service.match_tender(TENDER).items[0].manufacturers] == [
+        "Acme Valves"
+    ]
+    report = service.match_tender(TENDER, manufacturers=["Someone Else"])
+    assert report.items[0].manufacturers == []
+    assert report.ranking == []

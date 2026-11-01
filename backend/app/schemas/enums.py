@@ -87,6 +87,7 @@ class ExtractionIssueCode(StrEnum):
     OVERSIZED_ITEM = "oversized_item"
     ITEM_CATEGORY_FALLBACK = "item_category_fallback"
     LOW_CONFIDENCE_OCR = "low_confidence_ocr"
+    FILES_NOT_FETCHED = "files_not_fetched"
 
 
 class RunStatus(StrEnum):

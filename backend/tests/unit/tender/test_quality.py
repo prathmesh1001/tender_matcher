@@ -108,9 +108,17 @@ def test_low_confidence_ocr_share_is_inclusive() -> None:
     assert _codes([below]) == set()
 
 
+def test_linked_files_that_could_not_be_fetched_mark_the_tender() -> None:
+    quality = extraction_quality([_item()], False, RULES, unfetched=["https://x.invalid/spec.pdf"])
+    [issue] = quality.reasons
+    assert issue.code is ExtractionIssueCode.FILES_NOT_FETCHED
+    assert "spec.pdf" in issue.reason
+
+
 def test_every_reason_is_reported() -> None:
     items = [ItemFacts("1", "Design", False, requirements=60, low_ocr_requirements=60)]
-    assert _codes(items, from_item_category=True) == set(ExtractionIssueCode)
+    quality = extraction_quality(items, True, RULES, unfetched=["a.pdf"])
+    assert {r.code for r in quality.reasons} == set(ExtractionIssueCode)
 
 
 def test_only_ocr_pages_below_the_confidence_are_low() -> None:

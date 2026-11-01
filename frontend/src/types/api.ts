@@ -27,6 +27,8 @@ export interface TenderUploadResponse {
   tender_id: string;
   filename: string;
   pages: number;
+  bid_number: string;
+  created: boolean;
 }
 
 /** Request body of POST /runs (Step 12). */
@@ -42,6 +44,11 @@ export type RunStatus = "queued" | "running" | "done" | "failed";
 export interface Run {
   run_id: string;
   tender_id: string;
+  category: string;
+  manufacturers: string[];
   status: RunStatus;
+  error: string | null;
   created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
 }
