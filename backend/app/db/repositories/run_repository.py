@@ -1,16 +1,21 @@
 """Queries for matching runs."""
 
 import uuid
+from collections.abc import Sequence
 
 from sqlalchemy import select
 
 from app.db.models.run import Run
+from app.db.models.tender import LineItem, Requirement
 from app.db.repositories.base import SqlRepository
 from app.schemas.enums import RunStatus
 
 
 class RunRepository(SqlRepository[Run]):
-    """Persistence for runs. Status transition rules live in the run service, not here."""
+    """Runs are the aggregate root: line items and requirements are written through `Run`.
+
+    Status transition rules live in the run service, not here.
+    """
 
     model = Run
 
@@ -39,3 +44,30 @@ class RunRepository(SqlRepository[Run]):
         if status is not None:
             stmt = stmt.where(Run.status == status)
         return list(self._session.scalars(stmt.limit(limit).offset(offset)))
+
+    def add_rows(self, line_items: Sequence[LineItem], requirements: Sequence[Requirement]) -> None:
+        """Stage what a run read and flush. Parent requirements must come before their parts.
+
+        Args:
+            line_items: New line items, with `run_id` set.
+            requirements: New requirements, with `run_id` and any links set.
+        """
+        self._session.add_all(line_items)
+        self._session.add_all(requirements)
+        self._session.flush()
+
+    def flush(self) -> None:
+        """Write pending changes to a run, so constraint errors surface now."""
+        self._session.flush()
+
+    def list_line_items(self, run_id: uuid.UUID) -> list[LineItem]:
+        """Return the line items a run read, in order."""
+        stmt = select(LineItem).where(LineItem.run_id == run_id).order_by(LineItem.position)
+        return list(self._session.scalars(stmt))
+
+    def list_requirements(self, run_id: uuid.UUID) -> list[Requirement]:
+        """Return every requirement of a run (parents, atomic parts, general ones), in order."""
+        stmt = (
+            select(Requirement).where(Requirement.run_id == run_id).order_by(Requirement.position)
+        )
+        return list(self._session.scalars(stmt))

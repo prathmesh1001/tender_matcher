@@ -1,15 +1,15 @@
-"""Queries for tenders, their linked documents and their requirements."""
+"""Queries for tenders and their linked documents."""
 
 import uuid
 
 from sqlalchemy import select
 
-from app.db.models.tender import Requirement, Tender, TenderDocument
+from app.db.models.tender import Tender, TenderDocument
 from app.db.repositories.base import SqlRepository
 
 
 class TenderRepository(SqlRepository[Tender]):
-    """Tenders are the aggregate root; requirements are written through `Tender.requirements`."""
+    """Tenders and the files linked to them; what a run read from them is on `Run`."""
 
     model = Tender
 
@@ -33,15 +33,6 @@ class TenderRepository(SqlRepository[Tender]):
             .order_by(Tender.created_at.desc(), Tender.id.desc())
             .limit(limit)
             .offset(offset)
-        )
-        return list(self._session.scalars(stmt))
-
-    def list_requirements(self, tender_id: uuid.UUID) -> list[Requirement]:
-        """Return every requirement (parents and atomic children) of a tender, in order."""
-        stmt = (
-            select(Requirement)
-            .where(Requirement.tender_id == tender_id)
-            .order_by(Requirement.position)
         )
         return list(self._session.scalars(stmt))
 

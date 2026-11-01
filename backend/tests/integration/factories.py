@@ -11,6 +11,7 @@ from app.db.models import (
     Chunk,
     Document,
     Evidence,
+    LineItem,
     MatchResult,
     Page,
     Requirement,
@@ -28,6 +29,8 @@ from app.schemas.enums import (
     RequirementType,
     RunStatus,
 )
+from app.schemas.matching import LabelBasis
+from app.schemas.requirements import ValueKind
 
 CATEGORY = "valves_pumps"
 FIXED_TIME = datetime(2026, 1, 1, tzinfo=UTC)
@@ -90,21 +93,44 @@ def make_tender() -> Tender:
     )
 
 
-def make_requirement(
-    tender: Tender, *, position: int, parent: Requirement | None = None
-) -> Requirement:
-    return Requirement(
-        tender=tender,
-        parent=parent,
+def make_line_item(run: Run, *, position: int = 0, item_no: str = "1") -> LineItem:
+    item = LineItem(
         position=position,
+        item_no=item_no,
+        title="test valve",
+        document="test_tender.pdf",
+        page_number=1,
+    )
+    run.line_items.append(item)
+    return item
+
+
+def make_requirement(
+    run: Run,
+    *,
+    position: int,
+    parent: Requirement | None = None,
+    line_item: LineItem | None = None,
+    ref: str = "1.1",
+) -> Requirement:
+    requirement = Requirement(
+        parent=parent,
+        ref=ref,
+        position=position,
+        document="test_tender.pdf",
         page_number=1,
         raw_text=f"requirement {position}",
         req_type=RequirementType.TECHNICAL,
+        kind=ValueKind.NUMERIC,
         operator=Operator.GTE,
         value_num=10.0,
         unit="bar",
         weight=1.0,
     )
+    run.requirements.append(requirement)
+    if line_item is not None:
+        line_item.requirements.append(requirement)
+    return requirement
 
 
 def make_run(tender: Tender, *, status: RunStatus = RunStatus.QUEUED) -> Run:
@@ -112,18 +138,32 @@ def make_run(tender: Tender, *, status: RunStatus = RunStatus.QUEUED) -> Run:
 
 
 def make_result(
-    run: Run, requirement: Requirement, *, manufacturer: str = "AcmePumps"
+    run: Run,
+    requirement: Requirement,
+    *,
+    manufacturer: str | None = "AcmePumps",
+    catalogue: str | None = "test.pdf",
+    tied: bool = False,
 ) -> MatchResult:
     return MatchResult(
         run_id=run.id,
         requirement_id=requirement.id,
         manufacturer=manufacturer,
+        catalogue=catalogue,
+        tied=tied,
         status=MatchStatus.FULL_MATCH,
         score=1.0,
-        confidence=0.9,
         decided_by=DecisionSource.RULE,
+        basis=LabelBasis.ATTRIBUTE,
     )
 
 
 def make_evidence(doc: Document, *, page: int = 1) -> Evidence:
-    return Evidence(document_id=doc.id, page_number=page, quote="synthetic quote", match_score=1.0)
+    return Evidence(
+        document_id=doc.id,
+        page_number=page,
+        label="synthetic label",
+        value="synthetic value",
+        quote="synthetic quote",
+        match_score=1.0,
+    )

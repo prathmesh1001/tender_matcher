@@ -24,6 +24,7 @@ EXPECTED_TABLES = {
     "runs",
     "results",
     "evidence",
+    "line_items",
 }
 
 

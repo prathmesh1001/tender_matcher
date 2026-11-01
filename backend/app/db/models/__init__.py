@@ -8,7 +8,7 @@ from app.db.models.result import Evidence, MatchResult
 from app.db.models.run import Run
 from app.db.models.section import DocumentSection
 from app.db.models.spec_fact import SpecFact
-from app.db.models.tender import Requirement, Tender, TenderDocument
+from app.db.models.tender import LineItem, Requirement, Tender, TenderDocument
 
 __all__ = [
     "Base",
@@ -16,6 +16,7 @@ __all__ = [
     "Document",
     "DocumentSection",
     "Evidence",
+    "LineItem",
     "MatchResult",
     "Page",
     "Requirement",

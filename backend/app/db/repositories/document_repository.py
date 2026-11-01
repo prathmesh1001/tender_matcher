@@ -1,6 +1,7 @@
 """Queries for stored documents (manufacturer and tender) and their pages."""
 
 import uuid
+from collections.abc import Collection
 
 from sqlalchemy import delete, select
 
@@ -17,6 +18,18 @@ class DocumentRepository(SqlRepository[Document]):
     def get_by_sha256(self, sha256: str) -> Document | None:
         """Return the document with this content hash (used for idempotent ingestion)."""
         return self._session.scalar(select(Document).where(Document.sha256 == sha256))
+
+    def ids_by_sha256(self, hashes: Collection[str]) -> dict[str, uuid.UUID]:
+        """Return the id of each stored document among these content hashes.
+
+        Args:
+            hashes: Content hashes to look up.
+
+        Returns:
+            Document id by hash; a hash with no stored document is absent.
+        """
+        stmt = select(Document.sha256, Document.id).where(Document.sha256.in_(hashes))
+        return {sha256: document_id for sha256, document_id in self._session.execute(stmt)}
 
     def find(
         self,
