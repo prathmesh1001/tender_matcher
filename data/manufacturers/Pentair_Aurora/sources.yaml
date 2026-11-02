@@ -1,0 +1,12 @@
+manufacturer: Pentair Aurora
+documents:
+- file: aurora_340a_360a_end_suction.pdf
+  category: valves_pumps
+  product_types:
+  - centrifugal_pump
+  title: Aurora 340A/360A series single stage end suction pumps
+  doc_type: brochure
+  url: https://www.genemco.com/cdn/shop/files/GENF_08_Aurora_341A_Pump_1.5x2-9A_3_HP.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: c3b5cc6c6563f00529335b2c48518f58a22772d7aa484abb8611772da7ec96eb
+  notes: Distributor copy (Genemco) of the Aurora brochure; series since replaced by 3800.

@@ -1,0 +1,12 @@
+manufacturer: DAB
+documents:
+- file: dab_kdn_end_suction.pdf
+  category: valves_pumps
+  product_types:
+  - centrifugal_pump
+  title: KDN standardised centrifugal electric pumps - technical sheet
+  doc_type: datasheet
+  url: https://www.saltech.co.il/_Uploads/dbsAttachedFiles/TS_KDN_ENG.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: ff6871bf40b047dbbdffe711dce3538d5f2fccdbbca9d81cbf0a119023ef1a57
+  notes: Distributor copy (Saltech, Israel) of the DAB technical sheet.

@@ -1,0 +1,12 @@
+manufacturer: Crane FS
+documents:
+- file: crane_33xu_cast_steel_gate.pdf
+  category: valves_pumps
+  product_types:
+  - gate_valve
+  title: 33XU-F cast steel gate valve Class 300 (General Valves catalogue p102)
+  doc_type: datasheet
+  url: https://getpipe.com/content/content-1/Crane_Cast_Steel_Valves/33XU-F-Gate-CraneFS-DS-1021-p102.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 9937d4e8ea18ff5d4525589205efc3a464258dec17a94e39ce5976c66bd130fd
+  notes: Distributor copy (GetPipe) of one Crane FS catalogue page.

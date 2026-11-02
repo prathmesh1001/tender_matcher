@@ -1,0 +1,12 @@
+manufacturer: Mueller
+documents:
+- file: mueller_2362_resilient_wedge_gate.pdf
+  category: valves_pumps
+  product_types:
+  - gate_valve
+  title: A-2362 resilient wedge gate valves 2-12 in / DN 50-300 (Form 14031r9-18)
+  doc_type: datasheet
+  url: https://www.muellercompany.com/sites/muellercompany.com/files/uploads/media/14031-muellerco-prod-specs-2362-resilient-wedge-gate-valves.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: b3d55f694d016a1b5d1a36f708b585b6b3f6264394063cf53753b304b0fd32f5
+  notes: Official Mueller document (muellercompany.com).

@@ -1,0 +1,12 @@
+manufacturer: Calpeda
+documents:
+- file: calpeda_nm_close_coupled.pdf
+  category: valves_pumps
+  product_types:
+  - centrifugal_pump
+  title: NM close-coupled centrifugal pumps with flanged connections (EN 733)
+  doc_type: catalogue
+  url: https://media.wildkamp.nl/pdf/799770_Calpeda_NM.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: ee73552a609b0abe5938139b22dbdff7700af1b718b837ff832192a89b60be74
+  notes: Distributor copy (Wildkamp) of the Calpeda catalogue section.

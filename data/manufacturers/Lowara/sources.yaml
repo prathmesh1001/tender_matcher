@@ -1,0 +1,12 @@
+manufacturer: Lowara
+documents:
+- file: lowara_e_nsc_industrial.pdf
+  category: valves_pumps
+  product_types:
+  - centrifugal_pump
+  title: e-NSC end suction pump series - industrial brochure
+  doc_type: brochure
+  url: https://siurbliai.lt/wp-content/uploads/2023/06/26391_xyl_e-nsc-industrial-brochure_ackey_a4lo-res.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 4c094f8de9cf06326e01a123ace19c8ca928ef90e96375aafcc5754865de8678
+  notes: Distributor copy (siurbliai.lt) of the Xylem Lowara brochure.

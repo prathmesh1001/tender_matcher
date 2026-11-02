@@ -1,0 +1,12 @@
+manufacturer: Goulds
+documents:
+- file: goulds_3196_i_frame.pdf
+  category: valves_pumps
+  product_types:
+  - centrifugal_pump
+  title: 3196 i-FRAME ANSI process pump
+  doc_type: brochure
+  url: https://cdn.shopify.com/s/files/1/0017/8749/4463/files/3196_i_FRAME_brochure.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: b829758b03833ae4f640c9bf76de358621c869cbd457e2ca4ecdcf6d137f2730
+  notes: Distributor copy (Shopify store CDN) of the Goulds (Xylem) brochure.

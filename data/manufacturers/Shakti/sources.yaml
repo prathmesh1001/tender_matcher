@@ -1,0 +1,12 @@
+manufacturer: Shakti
+documents:
+- file: shakti_2_5ss_3ss_submersible.pdf
+  category: valves_pumps
+  product_types:
+  - submersible_pump
+  title: Shakti 2.5SS & 3SS submersible pumps, 50 Hz leaflet
+  doc_type: datasheet
+  url: https://shaktipumps.com/wp-content/uploads/2025/04/Shakti_QF_S4RM_Pump_leaflet_L1_20March2023-3.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: ba38bd0e5eb7b49e5af67536e9fb0868c125d73b4fa5e238a1b18c17563f730c
+  notes: Official Shakti document (shaktipumps.com).

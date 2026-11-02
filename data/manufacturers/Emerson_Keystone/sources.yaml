@@ -1,0 +1,12 @@
+manufacturer: Keystone
+documents:
+- file: keystone_990_920_butterfly.pdf
+  category: valves_pumps
+  product_types:
+  - butterfly_valve
+  title: Keystone Figure 990 and 920 resilient seated butterfly valves (VCTDS-00027-EN)
+  doc_type: datasheet
+  url: https://assets.dultmeier.com/assets/pdfs/990-920-Series_Butterfly-Valves.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 57ce1ceefd85af38ca21098e303aba3298d03d60b2ad7db7d1c32b54f8dd4197
+  notes: Distributor copy (Dultmeier) of the Emerson datasheet.

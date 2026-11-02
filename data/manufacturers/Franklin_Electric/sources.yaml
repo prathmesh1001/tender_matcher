@@ -1,0 +1,12 @@
+manufacturer: Franklin Electric
+documents:
+- file: franklin_fps4400_submersible.pdf
+  category: valves_pumps
+  product_types:
+  - submersible_pump
+  title: 50 Hz 4 in submersible pumps (FPS 4400 Tri-Seal)
+  doc_type: catalogue
+  url: https://www.pumping.com.au/products/Franklin4inchFPS4400.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 3e3c2d0f563cd262ed2afcf58720a73dfc06a9225a9f9eedd9b5dc64cb0d7ab3
+  notes: Distributor copy (pumping.com.au) of the Franklin Electric catalogue.

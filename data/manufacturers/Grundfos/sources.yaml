@@ -1,0 +1,12 @@
+manufacturer: Grundfos
+documents:
+- file: grundfos_nb_nk_data_booklet.pdf
+  category: valves_pumps
+  product_types:
+  - centrifugal_pump
+  title: Data booklet NB, NBG, NK, NKG 125-400 / 150-125-400 / 150-315.1 / 200-150-315.1, 60 Hz
+  doc_type: datasheet
+  url: https://api.grundfos.com/literature/Grundfosliterature-4112587.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: c07c435b8141a132cc3275cda676dd862ed88aebd7984b9ecc61a3815f268293
+  notes: Official Grundfos document (api.grundfos.com); 60 Hz ratings.

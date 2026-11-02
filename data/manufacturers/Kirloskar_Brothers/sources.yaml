@@ -21,3 +21,13 @@ documents:
   fetched_at: '2026-10-29T14:07:08+00:00'
   sha256: e1f89ae832ccb0b9d18bdf8207241cb47354315f8d95377c95cfc37631a11616
   notes: KBL brochure hosted by the Moglix marketplace.
+- file: kbl_butterfly_valve_spec.pdf
+  category: valves_pumps
+  product_types:
+  - butterfly_valve
+  title: KBL butterfly valves to BS EN 593 / IS 13095 / AWWA C504 / API 609
+  doc_type: catalogue
+  url: https://cdn.shopify.com/s/files/1/0029/0131/1537/files/KIRLOSKAR_BFLY_01ca4417-e33f-4e02-b84d-0b189f54653e.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: b7b98a55007db8369f13912ba9a1d9e1b3b04887a73be36d2d83486112cc6a55
+  notes: Distributor copy (Shopify store CDN) of the KBL butterfly valve catalogue.

@@ -1,0 +1,12 @@
+manufacturer: Bray
+documents:
+- file: bray_series_31_butterfly.pdf
+  category: valves_pumps
+  product_types:
+  - butterfly_valve
+  title: Series 30/31 resilient seated butterfly valves
+  doc_type: brochure
+  url: https://www.industrialstores.com/media/industrialstores/product/attachments/Bray-Series-31-Butterfly-Valve-Brochure.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 2e2e8cd4a474f768297d9f2584d1e3bc3552ade181dda33a3a47729061c03f15
+  notes: Distributor copy (Industrial Stores) of the Bray brochure.

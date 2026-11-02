@@ -1,0 +1,13 @@
+manufacturer: Wilo
+documents:
+- file: wilo_product_range_india.pdf
+  category: valves_pumps
+  product_types:
+  - centrifugal_pump
+  - submersible_pump
+  title: WILO Mather and Platt - reliable and energy efficient pumps for the pharma industry
+  doc_type: brochure
+  url: https://cms.media.wilo.com/cdndoc/wilo442647/4897635/wilo442647.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 5f1e7f0d275ea365cc288ec063750f1abcd1113566a7e0bbe205e1a63880c34c
+  notes: Official Wilo document (cms.media.wilo.com); sector brochure, ranges only.

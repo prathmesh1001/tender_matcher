@@ -1,0 +1,13 @@
+manufacturer: Ebara
+documents:
+- file: ebara_ebrochure_2023.pdf
+  category: valves_pumps
+  product_types:
+  - centrifugal_pump
+  - submersible_pump
+  title: Standard pumps general brochure, Ebara Pumps Australia (January 2023)
+  doc_type: brochure
+  url: https://cdn.shopify.com/s/files/1/0529/9529/3345/files/Ebara_ebrochure_2023.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 0e6d641bc08cca6d7e41e1894c34beaaf8174da950f2a0e0ae145866a91d2984
+  notes: Distributor copy (Shopify store CDN) of the Ebara Australia brochure.

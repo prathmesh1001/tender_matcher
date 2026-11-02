@@ -1,0 +1,12 @@
+manufacturer: Watts
+documents:
+- file: watts_411_swing_check.pdf
+  category: valves_pumps
+  product_types:
+  - check_valve
+  title: Series 411 cast iron swing check valves (PF-Series_411 2602)
+  doc_type: brochure
+  url: https://www.watts.com/dfsmedia/0533dbba17714b1ab581ab07a4cbb521/667379-source/639110977540000000/pf-series-411-2602.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 28746b1d969662db7f03dc731570390db06c2ccb03e8cd02b555453777b2fb88
+  notes: Official Watts document (watts.com); one page.

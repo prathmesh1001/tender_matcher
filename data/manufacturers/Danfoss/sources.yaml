@@ -1,0 +1,12 @@
+manufacturer: Danfoss
+documents:
+- file: danfoss_vfy_wh_butterfly.pdf
+  category: valves_pumps
+  product_types:
+  - butterfly_valve
+  title: Data sheet Butterfly valves VFY-WH / VFY-LH (AI570730852257en-010101)
+  doc_type: datasheet
+  url: https://assets.danfoss.com/documents/600890/AI570730852257en-010101.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 97be46cf68aec8c8ac06155dbc3c53d1f85e3cc6fc0751e85ecf280a12eaac49
+  notes: Official Danfoss document (assets.danfoss.com).

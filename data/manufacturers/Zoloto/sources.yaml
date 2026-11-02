@@ -1,0 +1,12 @@
+manufacturer: Zoloto
+documents:
+- file: zoloto_1077_cs_gate_class150.pdf
+  category: valves_pumps
+  product_types:
+  - gate_valve
+  title: Cast Steel Gate Valve Class-150 (Flanged) Article No. 1077
+  doc_type: datasheet
+  url: https://taherbrothers.co.in/wp-content/uploads/2023/11/ZOLOTO_1077_CastSteelGateValveClass-150Flanged.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 12cb52963268773a9d8926c1ed50ab38a35245eb64dfb2d3ec246fd9935b29ef
+  notes: Distributor copy (Taher Brothers) of the Zoloto datasheet; one model.

@@ -1,0 +1,16 @@
+manufacturer: KITZ
+documents:
+- file: kitz_general_catalog.pdf
+  category: valves_pumps
+  product_types:
+  - gate_valve
+  - globe_valve
+  - check_valve
+  - ball_valve
+  - butterfly_valve
+  title: KITZ General Catalog
+  doc_type: catalogue
+  url: https://www.ramevalve.com/wp-content/uploads/2021/11/KITZ-GENERAL-.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 5aa5e8c863711e620ac04214c11383034fe38fffa0a9d4c8fb45b36558338673
+  notes: Distributor copy (Ramevalve) of the KITZ general catalogue.

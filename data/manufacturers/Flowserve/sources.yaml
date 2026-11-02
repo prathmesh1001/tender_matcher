@@ -1,0 +1,12 @@
+manufacturer: Flowserve
+documents:
+- file: flowserve_durco_mark3_pump.pdf
+  category: valves_pumps
+  product_types:
+  - centrifugal_pump
+  title: Durco Mark 3 ASME (ANSI) chemical process pumps
+  doc_type: brochure
+  url: https://www.dnow.com/hubfs/WC/PDF/Products/Pumps/Flowserve_Mark_3_pump_brochure.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 4ae3fe9a641b29fe9365c147c5dc941d4e0fc1c674cfdae76276c0f46742ef58
+  notes: Distributor copy (DNOW) of the Flowserve brochure.

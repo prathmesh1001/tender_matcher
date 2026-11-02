@@ -1,0 +1,12 @@
+manufacturer: Sulzer
+documents:
+- file: sulzer_ahlstar_end_suction.pdf
+  category: valves_pumps
+  product_types:
+  - centrifugal_pump
+  title: AHLSTAR end-suction single-stage centrifugal pumps (E10083)
+  doc_type: brochure
+  url: https://sulzer.ch/-/media/files/products/pumps/single-stage-pumps/brochures/ahlstarendsuctionsinglestage_e10083.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: eb77d47a7ab9b9036b39625cea656d168fa7d5f99198101be2ca6237ef037124
+  notes: Official Sulzer document (sulzer.ch).

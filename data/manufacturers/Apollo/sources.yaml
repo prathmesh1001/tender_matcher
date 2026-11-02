@@ -1,0 +1,12 @@
+manufacturer: Apollo
+documents:
+- file: apollo_70_140_ball_valve.pdf
+  category: valves_pumps
+  product_types:
+  - ball_valve
+  title: 70-140 series bronze ball valve
+  doc_type: datasheet
+  url: https://static.raptorsupplies.com/catalog/product/datasheet/apollo-valves-70b14664.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 1b320caeae590bcbd900817194112fbc227c3361b1e7390c2af5d73c87362ddb
+  notes: Distributor copy (Raptor Supplies) of the Apollo datasheet; one series.

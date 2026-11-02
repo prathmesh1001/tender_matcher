@@ -1,0 +1,14 @@
+manufacturer: Velan
+documents:
+- file: velan_sales_brochure.pdf
+  category: valves_pumps
+  product_types:
+  - gate_valve
+  - globe_valve
+  - check_valve
+  title: Cast steel valves gate, globe, and check - ASME Classes 150-1500 (CAT-CSV-12-12)
+  doc_type: catalogue
+  url: https://www.axflow.com/globalassets/catalog/ca/velan-sales-brochure-en.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 591e0066e72cdba1dec754b2f055a7186a633a6167ca8b3dd2b25a0d18e87d96
+  notes: Distributor copy (Axflow) of the 2012 Velan catalogue; may be outdated.

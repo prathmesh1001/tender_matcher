@@ -1,0 +1,12 @@
+manufacturer: Crompton
+documents:
+- file: crompton_centrifugal_pump.pdf
+  category: valves_pumps
+  product_types:
+  - centrifugal_pump
+  title: Crompton WIN DURA domestic monoblock pump leaflet
+  doc_type: brochure
+  url: https://document.moglix.com/catalog/product/documents/centrifugal-water-pump_1755868571614.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: e0440688e5212f3ca16e6355f972bd4a0b8eb00e76b2e1c80f030dae4828936e
+  notes: Dealer leaflet (Moglix document store); domestic pump, 2 pages.

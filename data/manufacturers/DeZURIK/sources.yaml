@@ -1,0 +1,12 @@
+manufacturer: DeZURIK
+documents:
+- file: dezurik_pec_pef_plug_valves.pdf
+  category: valves_pumps
+  product_types:
+  - plug_valve
+  title: PEC eccentric plug valves 0.5-3 in, Bulletin 12.00-1A (August 2023)
+  doc_type: datasheet
+  url: https://dezurik.com/wp-content/uploads/2024/10/dezurik-eccentric-plug-valves-pec-pef-pec-.5-3-eccentric-plug-valves-12_00_1a.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 551f32e3a2d2ff3537fa7f02526f8da75d102725d377af1b3a1648044b77cf36
+  notes: Official DeZURIK document (dezurik.com).

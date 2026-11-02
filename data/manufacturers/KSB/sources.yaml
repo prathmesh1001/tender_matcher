@@ -12,3 +12,13 @@ documents:
   sha256: 2bed50a9e056b512a78c7cd102725829d4e6fca297561a86724dd0d3bac23349
   notes: Official KSB brochure (KSB AG imprint, "12.14") hosted by an Australian distributor;
     ksb.com serves no direct PDF. 2 pages, only ranges (flow, head, materials), no curves.
+- file: ksb_boax_b_butterfly.pdf
+  category: valves_pumps
+  product_types:
+  - butterfly_valve
+  title: BOAX-B centred disc butterfly valves - type series booklet 8409.11/12-10
+  doc_type: catalogue
+  url: https://www.saltech.co.il/_Uploads/dbsAttachedFiles/Boax_B_tech.pdf
+  fetched_at: '2026-11-02T14:43:00+00:00'
+  sha256: 9e2d5f9d686498f4cfe4b2fa525ca6ccce381d70e46a865f7a63a51640d87797
+  notes: Distributor copy (Saltech, Israel) of the KSB booklet; not hosted by ksb.com.
