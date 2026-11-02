@@ -1,5 +1,5 @@
-# Local stack. Step 2: database only; backend/frontend/redis services are added in Step 16.
-#   docker compose up -d db
+# Full stack:      docker compose up -d --build     (web on :8080, API on :8000)
+# Database only:   docker compose up -d db          (for running the backend on the host)
 services:
   db:
     image: pgvector/pgvector:0.8.1-pg17
@@ -19,5 +19,56 @@ services:
       timeout: 3s
       retries: 10
 
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # Optional: GEMINI_API_KEY and any tuning. `environment` below wins over this file.
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-tender}:${POSTGRES_PASSWORD:-tender}@db:5432/${POSTGRES_DB:-tender_matcher}
+      FILE_STORE_ROOT: /data
+      MANUFACTURER_DATA_DIR: /data/manufacturers
+      TENDER_DATA_DIR: /data/tenders
+      REPORT_DIR: /app/.cache/reports
+      CHUNK_CACHE_DIR: /app/.cache/chunks
+      TESSERACT_CMD: tesseract
+      TESSDATA_DIR: /usr/share/tesseract-ocr/5/tessdata
+      HF_HOME: /hf-cache
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # PDFs are never in git or the image; uploads and fetched attachments are written here.
+      - ./data:/data
+      - app_cache:/app/.cache
+      # Named volume by default: the models download on first use. Set HF_CACHE_DIR to reuse a
+      # Hugging Face cache already on this machine.
+      - ${HF_CACHE_DIR:-hf_cache}:/hf-cache
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-8080}:80"
+
 volumes:
   pgdata:
+  app_cache:
+  hf_cache:
