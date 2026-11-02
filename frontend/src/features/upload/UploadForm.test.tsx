@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -16,6 +16,12 @@ const MANUFACTURERS: Manufacturer[] = [
     documents: 1,
   },
 ];
+const BOTH: Manufacturer = {
+  name: "Gamma_Works",
+  category: "valves_pumps",
+  product_types: ["gate_valve", "submersible_pump"],
+  documents: 2,
+};
 
 async function fillForm() {
   const user = userEvent.setup();
@@ -105,6 +111,43 @@ describe("UploadForm", () => {
     await waitFor(() => {
       expect(screen.getByText("No file chosen")).toBeInTheDocument();
     });
+  });
+
+  it("lists valve and pump vendors in their own sections", async () => {
+    stubFetch(() => json([...MANUFACTURERS, BOTH]));
+    renderWithProviders(<AppRoutes />);
+    const user = userEvent.setup();
+    await user.selectOptions(await screen.findByLabelText("Product category"), "valves_pumps");
+
+    const valves = within(screen.getByRole("region", { name: /Valves/ }));
+    const pumps = within(screen.getByRole("region", { name: /Pumps/ }));
+    expect(valves.getByLabelText(/Acme Valves/)).toBeInTheDocument();
+    expect(valves.queryByLabelText(/Beta Pumps/)).not.toBeInTheDocument();
+    expect(pumps.getByLabelText(/Beta Pumps/)).toBeInTheDocument();
+    // A vendor that makes both appears in both, with only that section's products.
+    expect(valves.getByText(/gate valve/)).toBeInTheDocument();
+    expect(pumps.getByText(/submersible pump/)).toBeInTheDocument();
+    expect(valves.queryByText(/submersible pump/)).not.toBeInTheDocument();
+  });
+
+  it("selects and clears a whole section", async () => {
+    stubFetch(() => json([...MANUFACTURERS, BOTH]));
+    renderWithProviders(<AppRoutes />);
+    const user = userEvent.setup();
+    await user.selectOptions(await screen.findByLabelText("Product category"), "valves_pumps");
+
+    const allValves = screen.getByLabelText("Select all valves");
+    await user.click(allValves);
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
+    // The shared vendor is now also ticked under Pumps, so Pumps is half selected.
+    const allPumps = screen.getByLabelText<HTMLInputElement>("Select all pumps");
+    expect(allPumps.checked).toBe(false);
+    expect(allPumps.indeterminate).toBe(true);
+
+    await user.click(allPumps);
+    expect(screen.getByText("3 selected")).toBeInTheDocument();
+    await user.click(allValves);
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
   });
 
   it("clears everything", async () => {

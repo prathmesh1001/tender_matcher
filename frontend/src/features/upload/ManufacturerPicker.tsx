@@ -2,6 +2,8 @@ import { Alert } from "../../components/ui/Alert";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { useManufacturers } from "../../hooks/queries";
 import type { Manufacturer } from "../../types/api";
+import { groupVendors } from "../../lib/vendorGroups";
+import { ManufacturerGroup } from "./ManufacturerGroup";
 
 interface ManufacturerPickerProps {
   category: string;
@@ -55,12 +57,7 @@ export function ManufacturerPicker({
     );
   }
 
-  const shown = data.filter((m) => m.category === category);
-  const toggle = (name: string) => {
-    onSelectedChange(
-      selected.includes(name) ? selected.filter((n) => n !== name) : [...selected, name],
-    );
-  };
+  const groups = groupVendors(data.filter((m) => m.category === category));
 
   return (
     <div className="space-y-4">
@@ -87,29 +84,16 @@ export function ManufacturerPicker({
         </select>
       </div>
       {category !== "" && (
-        <fieldset disabled={disabled}>
+        <fieldset disabled={disabled} className="space-y-4">
           <legend className="mb-2 text-sm font-medium">Manufacturers to compare</legend>
-          <ul className="divide-y divide-line rounded-lg border border-line">
-            {shown.map((m) => (
-              <li key={m.name}>
-                <label className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-canvas">
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(m.name)}
-                    onChange={() => {
-                      toggle(m.name);
-                    }}
-                    className="size-4 accent-brand-600"
-                  />
-                  <span className="flex-1 font-medium">{label(m.name)}</span>
-                  <span className="text-xs text-ink-600">
-                    {m.documents} catalogue{m.documents === 1 ? "" : "s"} ·{" "}
-                    {m.product_types.map(label).join(", ")}
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
+          {groups.map((g) => (
+            <ManufacturerGroup
+              key={g.id}
+              group={g}
+              selected={selected}
+              onSelectedChange={onSelectedChange}
+            />
+          ))}
         </fieldset>
       )}
     </div>
