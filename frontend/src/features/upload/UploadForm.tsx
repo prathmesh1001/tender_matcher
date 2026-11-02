@@ -87,7 +87,7 @@ export function UploadForm() {
       {matching.error !== null && (
         <Alert tone="error" title="Matching could not start">
           {matching.error.isUnavailable
-            ? "The upload API is not running yet (plan step 12). Your selection is kept."
+            ? "Cannot reach the upload API. Your selection is kept."
             : matching.error.message}
         </Alert>
       )}

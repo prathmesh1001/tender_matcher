@@ -28,6 +28,7 @@ export interface TenderUploadResponse {
   filename: string;
   pages: number;
   bid_number: string;
+  revision: number;
   created: boolean;
 }
 

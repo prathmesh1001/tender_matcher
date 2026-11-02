@@ -72,7 +72,7 @@ describe("UploadForm", () => {
     });
   });
 
-  it("explains when the upload API is not running yet and keeps the selection", async () => {
+  it("explains when the upload API cannot be reached and keeps the selection", async () => {
     stubFetch((url) =>
       url.endsWith("/manufacturers")
         ? json(MANUFACTURERS)
@@ -83,7 +83,7 @@ describe("UploadForm", () => {
 
     await user.click(screen.getByRole("button", { name: "Start matching" }));
 
-    expect(await screen.findByText(/upload API is not running yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/Cannot reach the upload API/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start matching" })).toBeEnabled();
   });
 

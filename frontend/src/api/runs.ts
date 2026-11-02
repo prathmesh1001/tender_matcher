@@ -10,6 +10,11 @@ export function startRun(request: StartRunRequest): Promise<Run> {
   });
 }
 
+/** One run with its status, and the reason if it failed (GET /runs/{id}). */
+export function getRun(runId: string): Promise<Run> {
+  return apiRequest<Run>(`/runs/${runId}`);
+}
+
 /** List past runs, newest first (GET /runs). */
 export function listRuns(): Promise<Run[]> {
   return apiRequest<Run[]>("/runs");

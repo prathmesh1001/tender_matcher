@@ -30,7 +30,7 @@ export function RunsTable() {
   if (error !== null) {
     return (
       <Alert tone="error" title="Runs are not available">
-        {error.isUnavailable ? "The runs API is not running yet (plan step 12)." : error.message}
+        {error.isUnavailable ? "Cannot reach the backend." : error.message}
       </Alert>
     );
   }
@@ -54,6 +54,7 @@ export function RunsTable() {
           <th scope="col">Tender</th>
           <th scope="col">Started</th>
           <th scope="col">Status</th>
+          <th scope="col">Report</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-line">
@@ -68,6 +69,19 @@ export function RunsTable() {
               >
                 {run.status}
               </span>
+            </td>
+            <td>
+              {run.status === "done" && (
+                <Link
+                  className="font-medium text-brand-700 underline underline-offset-2"
+                  to={`/reports/${run.run_id}`}
+                >
+                  Open report
+                </Link>
+              )}
+              {run.status === "failed" && (
+                <span className="text-xs text-status-missing">{run.error}</span>
+              )}
             </td>
           </tr>
         ))}

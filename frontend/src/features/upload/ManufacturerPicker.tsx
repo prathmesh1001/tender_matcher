@@ -42,7 +42,7 @@ export function ManufacturerPicker({
     return (
       <Alert tone="error" title="Manufacturer list is not available">
         {error.isUnavailable
-          ? "The backend API for manufacturers is not running yet (plan step 12)."
+          ? "Cannot reach the backend, so manufacturers cannot be listed."
           : error.message}
       </Alert>
     );
