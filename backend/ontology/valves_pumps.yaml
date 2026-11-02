@@ -92,7 +92,8 @@ product_types:
 # Range", "Ends Parameter"). Any other word means the label names something else ("Stem Length").
 label_generic_words: [valve, moc, material, parameter, component, part, sl, "no", number, type,
                       spec, specification, description, detail, range, dim, dimension, scope,
-                      iso, asme, of, to, and, for, at, the, max, maximum, min, minimum]
+                      iso, asme, of, to, and, for, at, the, max, maximum, min, minimum,
+                      iss]
 
 attributes:
   - name: nominal_size
@@ -110,7 +111,7 @@ attributes:
   - name: pressure_class
     critical: true
     dimension: none
-    synonyms: [class, pressure class, rating, asme class, ansi class]
+    synonyms: [class, pressure class, rating, asme class, ansi class, nominal pressure, pn]
   - name: test_pressure
     dimension: pressure
     canonical_unit: bar
@@ -189,7 +190,8 @@ attributes:
   - name: design_standard
     critical: true
     dimension: none
-    synonyms: [design standard, design code, manufacturing standard, design, design mfg std]
+    synonyms: [design standard, design code, manufacturing standard, design, design mfg std,
+               governing specification]
   - name: test_standard
     dimension: none
     synonyms: [testing standard, test standard, inspection and testing]

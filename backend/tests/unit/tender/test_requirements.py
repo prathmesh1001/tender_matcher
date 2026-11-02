@@ -263,6 +263,66 @@ def test_a_unit_may_follow_the_attribute(ontology: Ontology) -> None:
     assert resolve_attribute("Design Pressure (Bar)", parsed, ontology) == "pressure_rating"
 
 
+@pytest.mark.parametrize(
+    ("label", "value", "number", "unit", "attribute"),
+    [
+        # GeM bid tables print the unit in the label and leave the value bare.
+        ("Nominal Size (DN) (mm)", "100", 100.0, "mm", "nominal_size"),
+        ("Working Pressure (bar)", "10", 10.0, "bar", "pressure_rating"),
+        # A unit next to the value wins over the label's.
+        ("Nominal Size (DN) (mm)", "4 inch", 4.0, "inch", "nominal_size"),
+        # Two known units in brackets: the label says nothing certain.
+        ("Size (mm) (inch)", "100", 100.0, None, None),
+        # A bracket that is not a unit is not one.
+        ("Rated Pressure (Max)", "16", 16.0, None, None),
+    ],
+)
+def test_a_bare_value_takes_the_unit_printed_in_its_label(
+    label: str,
+    value: str,
+    number: float,
+    unit: str | None,
+    attribute: str | None,
+    ontology: Ontology,
+) -> None:
+    parsed = parse_value(label, value, ontology, 2)
+    assert (parsed.number, parsed.unit) == (number, unit)
+    assert resolve_attribute(label, parsed, ontology) == attribute
+
+
+@pytest.mark.parametrize(
+    ("label", "value", "pn"),
+    [
+        ("Nominal Pressure (PN) (MPa)", "1.6", 16.0),
+        ("Nominal Pressure (PN) (MPa)", "2.5", 25.0),
+        ("PN", "10 bar", 10.0),
+    ],
+)
+def test_a_pressure_under_a_pn_label_is_the_pn_designation(
+    label: str, value: str, pn: float, ontology: Ontology
+) -> None:
+    parsed = parse_value(label, value, ontology, 2)
+    assert (parsed.number, parsed.unit, parsed.is_designation) == (pn, "pn", True)
+    assert resolve_attribute(label, parsed, ontology) == "pressure_class"
+
+
+def test_a_pn_label_keeps_a_pressure_that_is_not_a_whole_pn(ontology: Ontology) -> None:
+    parsed = parse_value("Nominal Pressure (PN) (MPa)", "1.55", ontology, 2)
+    assert (parsed.number, parsed.unit) == (1.55, "mpa")
+    assert resolve_attribute("Nominal Pressure (PN) (MPa)", parsed, ontology) == "pressure_rating"
+
+
+def test_a_pressure_without_pn_in_its_label_stays_a_pressure(ontology: Ontology) -> None:
+    parsed = parse_value("Pressure Rating", "16 bar", ontology, 2)
+    assert (parsed.number, parsed.unit, parsed.is_designation) == (16.0, "bar", False)
+
+
+def test_governing_specification_is_the_design_standard(ontology: Ontology) -> None:
+    label = "Conformity to Governing Specification (ISS)"
+    parsed = parse_value(label, "IS 13095", ontology, 2)
+    assert resolve_attribute(label, parsed, ontology) == "design_standard"
+
+
 def test_a_temperature_value_never_fits_a_material_label(ontology: Ontology) -> None:
     parsed = parse_value("Body Temperature", "120 degC", ontology, 2)
     assert resolve_attribute("Body Temperature", parsed, ontology) == "max_temperature"

@@ -14,7 +14,7 @@ from functools import lru_cache
 from typing import Final
 
 from app.ontology.schema import Attribute, Ontology
-from app.ontology.units import units_compatible
+from app.ontology.units import convert, units_compatible
 from app.retrieval.text_normalizer import fold_text, stem_token
 from app.schemas.enums import Operator
 from app.schemas.requirements import ValueKind
@@ -32,6 +32,8 @@ _CODE: Final = re.compile(
     r"\b(?:(?=[A-Za-z-]*\d)(?=[\d-]*[A-Za-z])[A-Za-z0-9-]+|[A-Z]{2,}\s?\d{2,})\b"
 )
 _WORD: Final = re.compile(r"[a-z0-9]+")
+# A bracketed part of a folded label: "nominal pressure (pn) (mpa)" -> "pn", "mpa".
+_LABEL_BRACKET: Final = re.compile(r"\(([^()]+)\)")
 _COMPOUND: Final = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 # Labels and synonyms repeat across thousands of catalogue fields; stemming is pure.
 _STEMS_CACHE_SIZE: Final = 65536
@@ -48,6 +50,10 @@ _OPTION_OR: Final = re.compile(
 
 
 _TEMPERATURE_UNIT: Final = "degc"
+# A PN designation is the nominal pressure in bar (EN 1333): "Nominal Pressure (PN) (MPa) : 1.6"
+# is PN 16. Only whole PN numbers count; anything else stays a pressure.
+_PN_UNIT: Final = "bar"
+_PN_TOLERANCE: Final = 1e-6
 # Sizes and ratings are matched on folded text, so curly quotes are already straight.
 # A space joins a fraction only to one digit: "1 1/2" is 1.5, "15 1/2" may be DN15 next to 1/2 inch.
 _INCH_NUMBER: Final = r"\d+\s*-\s*\d+/\d+|\d\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?"
@@ -224,11 +230,57 @@ def operator_for(label: str | None, value: str) -> Operator:
     return Operator.EQ
 
 
+def label_unit(label: str | None, ontology: Ontology | None) -> str | None:
+    """The one known unit a label prints in brackets ("Nominal Size (DN) (mm)" -> "mm").
+
+    GeM bid tables put the unit in the label and leave the value bare ("100"). Only a
+    bracketed spelling the ontology knows counts; none or several known units give None.
+
+    Args:
+        label: The printed label, or None.
+        ontology: Category ontology, or None.
+
+    Returns:
+        The folded unit spelling, or None.
+    """
+    if label is None or ontology is None:
+        return None
+    found = {
+        unit
+        for part in _LABEL_BRACKET.findall(fold_text(label))
+        if (unit := part.strip()) in ontology.units
+    }
+    return next(iter(found)) if len(found) == 1 else None
+
+
+def pn_from_pressure(label: str | None, number: float, canonical_unit: str | None) -> float | None:
+    """The PN designation of a pressure whose label names PN, or None.
+
+    Args:
+        label: The printed label ("Nominal Pressure (PN) (MPa)").
+        number: The printed number (1.6).
+        canonical_unit: Its pint unit ("MPa"), or None.
+
+    Returns:
+        The whole PN number (16.0); None if the label does not name PN, the unit is not a
+        pressure, or the pressure is not a whole number of bar.
+    """
+    if canonical_unit is None or "pn" not in words(label or ""):
+        return None
+    if not units_compatible(canonical_unit, _PN_UNIT):
+        return None
+    in_bar = convert(number, canonical_unit, _PN_UNIT)
+    whole = round(in_bar)
+    return float(whole) if whole > 0 and abs(in_bar - whole) < _PN_TOLERANCE else None
+
+
 def _numeric(
     match: re.Match[str], label: str | None, value: str, ontology: Ontology | None
 ) -> ParsedValue:
     designation = match.group("designation")
     unit = fold_text(designation or match.group("unit") or "").strip() or None
+    if unit is None:
+        unit = label_unit(label, ontology)
     canonical = None
     if unit and not designation and ontology is not None:
         canonical = ontology.units.get(unit)
@@ -236,6 +288,9 @@ def _numeric(
         unit = "class"  # "CLASS : 800 OR HIGHER": the label says what the bare number is
     number2 = match.group("num2")
     operator = Operator.RANGE if number2 else operator_for(label, value)
+    pn = None if number2 else pn_from_pressure(label, float(match.group("num")), canonical)
+    if pn is not None:
+        return ParsedValue(kind=ValueKind.NUMERIC, operator=operator, number=pn, unit="pn")
     return ParsedValue(
         kind=ValueKind.NUMERIC,
         operator=operator,
