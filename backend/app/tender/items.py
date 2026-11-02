@@ -9,6 +9,10 @@ file gives duplicates and non-items. The order, first that gives items:
 3. the bid's "Item Category" row as one item, with each specification chunk read for its
    requirements, because then nothing tells which line belongs to which product.
 
+A tender with a single item left nearly empty gets the rows of its GeM category specification
+table ("Specification Name: Head; Bid Requirement (Allowed Values): 14.0 (meter)") as that item's
+requirements: with one item, they can only be about it. Other general lines stay general.
+
 Specification text cut at item boundaries (`segments`) then joins its items, and whatever is not
 used becomes a general requirement. An item with no description keeps its title as its one
 requirement, so it is still reported.
@@ -42,6 +46,7 @@ from app.tender.splitter import leaves
 ITEM_LABEL: Final = "ITEM"
 _CATEGORY_ITEM_NO: Final = "1"
 _NOT_A_FILE_NAME_CHAR: Final = re.compile(r"[^A-Za-z0-9]+")
+_DEVANAGARI: Final = re.compile("[ऀ-ॿ]")
 
 
 class ItemSource(StrEnum):
@@ -362,6 +367,73 @@ def _general(
     return out
 
 
+def spec_row_line(text: str, labels: tuple[str, str]) -> str | None:
+    """A GeM category specification row as "name : value", or None for any other line.
+
+    Args:
+        text: A general requirement's printed text.
+        labels: The row's name label and value label.
+
+    Returns:
+        e.g. "Head : 14.0 (meter)".
+    """
+    name_label, value_label = labels
+    if not name_label or not value_label:
+        return None
+    pattern = re.compile(
+        rf"{re.escape(name_label)}\s*:\s*(?P<name>[^;]+);.*?{re.escape(value_label)}\s*:\s*"
+        r"(?P<value>.+)$",
+        re.IGNORECASE | re.DOTALL,
+    )
+    found = pattern.search(text)
+    if found is None:
+        return None
+    name, value = found["name"].strip(), " ".join(found["value"].split())
+    # The table's own header rows repeat the labels (with their Hindi text): not requirements.
+    if _DEVANAGARI.search(name) or _DEVANAGARI.search(value):
+        return None
+    if value.lower() in value_label.lower():
+        return None
+    # "Capacity, liter/hour" is one name; a comma would split it into two requirements.
+    return f"{name.replace(',', '')} : {value}"
+
+
+def _with_spec_rows(
+    found: TenderRequirements, options: RequirementOptions, ontologies: Sequence[Ontology]
+) -> TenderRequirements:
+    """A single nearly empty item takes the tender's specification rows from the general list."""
+    if len(found.items) != 1:
+        return found
+    entry = found.items[0]
+    if len(leaves(entry.requirements)) > options.quality.nearly_empty_item:
+        return found
+    rows = [(r, spec_row_line(r.raw_text, options.spec_row_labels)) for r in found.general]
+    moved = [(r, line) for r, line in rows if line is not None]
+    if not moved:
+        return found
+    item = entry.item
+    added: list[Requirement] = []
+    for index, (row, line) in enumerate(moved):
+        part = item.model_copy(
+            update={
+                "description_lines": [line],
+                "document": row.document,
+                "page_number": row.page_number,
+                "item_no": f"{item.item_no}.spec{index}",
+            }
+        )
+        added.extend(
+            r.model_copy(update={"item_no": item.item_no})
+            for r in item_entry(part, options, ontologies).requirements
+        )
+    taken = {id(r) for r, _ in moved}
+    merged = ItemRequirements(
+        item, entry.category, [*entry.requirements, *added], entry.product_type
+    )
+    general = [r for r in found.general if id(r) not in taken]
+    return TenderRequirements([merged], general, found.source)
+
+
 def parse_tender_files(
     files: Sequence[TenderFile], options: RequirementOptions, ontologies: Sequence[Ontology] = ()
 ) -> TenderRequirements:
@@ -382,11 +454,13 @@ def parse_tender_files(
         items = _unique_numbers(attached)
         general = _general(files, set(), set(chosen), options, held)
         sized = [with_title_size(_once(e), options, ontologies) for e in items]
-        return TenderRequirements([_with_title(e) for e in sized], general, source)
+        found = TenderRequirements([_with_title(e) for e in sized], general, source)
+        return _with_spec_rows(found, options, ontologies)
     category = _category_entry(files, options, ontologies)
     if category is None:
         return TenderRequirements([], _general(files, set(), set(), options), ItemSource.NONE)
     entry, used = category
     general = _general(files, used, set(), options)
     sized_entry = with_title_size(_once(entry), options, ontologies)
-    return TenderRequirements([_with_title(sized_entry)], general, ItemSource.ITEM_CATEGORY)
+    found = TenderRequirements([_with_title(sized_entry)], general, ItemSource.ITEM_CATEGORY)
+    return _with_spec_rows(found, options, ontologies)

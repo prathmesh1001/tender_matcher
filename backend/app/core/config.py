@@ -199,6 +199,13 @@ class Settings(BaseSettings):
         default_factory=lambda: ["item category"],
         description="Label of the bid row naming the items, the last source of items (JSON list).",
     )
+    TENDER_SPEC_ROW_LABELS: list[str] = Field(
+        default_factory=lambda: ["Specification Name", "Bid Requirement (Allowed Values)"],
+        min_length=2,
+        max_length=2,
+        description="Name and value labels of a GeM category specification row; a tender with "
+        "one nearly empty item gets these rows as its requirements (JSON list of two).",
+    )
     TENDER_ITEM_UNIT_HEADERS: list[str] = Field(
         default_factory=lambda: ["unit", "uom"],
         description="Header labels of the unit-of-measure column (JSON list).",

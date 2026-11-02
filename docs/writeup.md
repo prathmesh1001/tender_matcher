@@ -189,10 +189,22 @@ How to read this:
 8169451. Full tables, with precision and recall per status and confusion matrices, are in
 [eval/results.md](../eval/results.md).
 
-| Run | Coverage | Decided accuracy | Stronger than label | Citation on a labelled page |
+Before and after the last round of changes (recall attempts, all reverted, and the pump spec-row
+fix, kept):
+
+| Measure | Rules before | Rules after | Rules + judge before | Rules + judge after |
 |---|---|---|---|---|
-| Rules | 43% (43/99) | 74% (32/43) | 3 | 72% (23/32) |
-| Rules + judge | 49% (49/99) | 76% (37/49) | 4 | 68% (25/37) |
+| Coverage | 43% (43/99) | 43% (43/99) | 49% (49/99) | 51% (50/99) |
+| Decided accuracy | 74% (32/43) | 74% (32/43) | 76% (37/49) | 74% (37/50) |
+| `full_match` precision | 93% (27/29) | 93% (27/29) | 91% (31/34) | 91% (31/34) |
+| `partial_match` precision | 33% (4/12) | 33% (4/12) | 38% (5/13) | 36% (5/14) |
+| Stronger than label | 3 | 3 | 4 | 4 |
+| Citation on a labelled page | 72% (23/32) | 72% (23/32) | 68% (25/37) | 68% (25/37) |
+| Flagged tenders | 10 of 19 | 9 of 19 | 10 of 19 | 9 of 19 |
+
+The rules columns are identical: the kept change touched no labelled row. The judge columns run the
+same code on every labelled row, so their difference is run-to-run noise of the judge: "Trim : 12
+-> 16" was `unsupported` in the first run and `partial_match` (label `full_match`) in the second.
 
 These include the "/" rule of 2026-11-02. It changed 3 labelled rows: "Bolting : B7/2H"
 (7956201) and "SHAFT MOC : A479 Type SS 410/17-4PH SS" (8119613) now agree with their
@@ -205,13 +217,13 @@ label says `partial_match`, so it counts as stronger. That label predates the ru
   companion flanges"), and the catalogue does show flanged ends. The label is coarser than the
   requirement, so this is not clearly a judge error.
 - **`full_match` is precise, `partial_match` is not.** With the judge, a `full_match` agrees with
-  the label 91% of the time (31 of 34); a `partial_match` 38% (5 of 13). Most wrong partials are
+  the label 91% of the time (31 of 34); a `partial_match` 36% (5 of 14). Most wrong partials are
   labelled `full_match`: the system is cautious.
-- **Recall is the weak side.** Of 64 rows labelled `full_match`, the system finds 31 and leaves 26
+- **Recall is the weak side.** Of 64 rows labelled `full_match`, the system finds 31 and leaves 25
   `unsupported`.
 - **Confidence does separate right from wrong.** With the judge, 19% of decisions at full
-  confidence are wrong against 38% below it (rules only: 19% against 57%). The samples are small:
-  36 and 13 decisions.
+  confidence are wrong against 43% below it (rules only: 19% against 57%). The samples are small:
+  36 and 14 decisions.
 - **Pump tender: half its specification never reached the matcher.** Speed, size, seal, motor,
   spares and base plate were lost in extraction from the scanned page. Of the 12 labelled rows,
   9 agree and 3 are not decided; nothing is wrong, but the rows that would test pump duty were
@@ -220,7 +232,7 @@ label says `partial_match`, so it counts as stronger. That label predates the ru
 ### All 19 tenders
 
 All 19 run without a crash. By a read-through of the reports, not a measurement, 7 look right, 6
-partly right and 6 wrong. The extraction warning flags those 6 and 4 more:
+partly right and 6 wrong. The extraction warning flags those 6 and 3 more, 9 of 19:
 
 | Tender | Warning reasons | Items found |
 |---|---|---|
@@ -229,7 +241,6 @@ partly right and 6 wrong. The extraction warning flags those 6 and 4 more:
 | 7959356 | specification outside the items | 1 |
 | 8026686 | titles are not products | 3 |
 | 8063368 | titles are not products | 62 |
-| 8071357 | specification outside the items | 1 |
 | 8123915 | merged item category | 1 |
 | 8132165 | titles are not products | 2 |
 | 8167974 | merged item category | 1 |
@@ -237,10 +248,16 @@ partly right and 6 wrong. The extraction warning flags those 6 and 4 more:
 
 "Specification outside the items" is new: every item holds at most 2 requirements
 (`EXTRACTION_NEARLY_EMPTY_ITEM`) while at least 10 catalogue-checkable lines are general
-requirements (`EXTRACTION_MIN_SPEC_OUTSIDE_ITEMS`). It flags the two pump tenders it was made for
+requirements (`EXTRACTION_MIN_SPEC_OUTSIDE_ITEMS`). It flagged the two pump tenders it was made for
 (7959356: 1 requirement on its item, 73 such general lines; 8071357: 1 and 29), and also 7865644,
 a thermocouple tender whose 34 items each hold only a part code while 76 such lines are general.
-No other tender changed flag.
+
+**Pump fix.** A tender with a single item left nearly empty now gets the rows of its GeM category
+specification table ("Specification Name: Head; Bid Requirement (Allowed Values): 14.0 (meter)")
+as that item's requirements, read as "Head : 14.0 (meter)" (labels in `TENDER_SPEC_ROW_LABELS`).
+8071357 went from 1 requirement to 15 (width, length, height, material, capacity, power, head,
+insulation, phase, voltage, speed, frequency, weight, warranty) and is no longer flagged; 8054155
+(a pesticide, outside the catalogues) also gained its 11 rows. No labelled row changed.
 
 The flag warns but does not fix anything. Two tenders with garbled scanned lines (8011173 and
 8169451) are not flagged, so a clean report does not prove clean extraction.
@@ -249,22 +266,44 @@ The flag warns but does not fix anything. Two tenders with garbled scanned lines
 
 **Accuracy**
 
-- Retrieval rejects many short lines before the judge sees them. "ZERO LEAKAGE" and "HAND GEAR
-  OPERATED" both have labels saying L&T complies, and both stay `unsupported`. The reranker scores
-  exact spec lines low, and the threshold has not been tuned.
+- Recall: 25 rows labelled `full_match` stay `unsupported` with the judge. By cause, of the 37
+  labelled decisions left undecided: 15 have no catalogue field naming the attribute (codes stated
+  in prose, such as "Testing Standard : API 598"), 8 get no search hit above `RERANK_MIN_SCORE`
+  ("ZERO LEAKAGE", "HAND GEAR OPERATED", "Spring"), 5 are correct judge answers whose quote fails
+  the page check because table chunks are rebuilt as "Header: value" text. Three fixes were tried
+  and measured; each raised coverage but failed the gate (decided accuracy must not drop, stronger
+  than label must not rise), so all three were reverted:
+
+  | Change tried | Coverage with judge | Decided accuracy | Stronger | New wrong rows |
+  |---|---|---|---|---|
+  | Baseline | 49% | 76% | 4 | |
+  | All three together | 57% | 73% | 5 | "Spring", "Operator : Gear/HW", "Body seat : Stellite 21" |
+  | Quote checked piece by piece, alone | 53% | 75% | 5 | "Gasket : Graphite or equivalent" |
+
+  Product type in front of short queries added only the wrong "Spring" row; sending coded rows
+  with no field to the judge added 1 right and 2 weaker rows.
+- The judge is not fully repeatable at temperature 0: "Gasket : Graphite or equivalent" was
+  `partial_match` in one run and `full_match` in the next. Single-row differences between runs
+  are within this noise.
 - Evidence can come from another model in the same PDF. Catalogues with several product headings
   are read by heading, and unclear cases are capped at `partial_match`, but this is not solved.
 - Wrong item rows on 8026686 and 8132165 are flagged, not fixed.
-- Pump specifications often do not reach the items, and the parser is not fixed for it:
-  - 7959356 (60 HP centrifugal pump): its item holds 1 requirement, "Starter Panel"; the pump's
-    specification table became 73 general requirements that catalogues could check.
-  - 8071357 (submersible sewerage pump): its item holds 1 requirement; 29 such lines are general.
+- Pump specifications often do not reach the items:
+  - 7959356 (60 HP centrifugal pump): still flagged. Its item holds 1 requirement, "Starter Panel".
+    Of its 73 catalogue-checkable general lines, 64 are ATC text about performance guarantees
+    filed as performance requirements; the pump table on `buyer_spec.pdf` page 2 came out as one
+    merged line. It needs a table-extraction fix, not the spec-row fix, so it gets no technical
+    result.
+  - 8071357 (submersible sewerage pump): fixed by the spec-row rule (1 requirement to 15).
   - 8169451 (water circulation pump, scanned): 6 of its 11 specification rows never became
-    requirements: pump speed, size, seal, motor, spares and base plate. This one is not flagged,
-    because its item still holds 20 requirements.
-
-  The first two are now flagged (`spec_outside_items`), so their results go to review. General
-  requirements are never matched against catalogues, so these pumps get no technical result.
+    requirements: pump speed, size, seal, motor, spares and base plate. They are lost in the scan,
+    not in the general list, so the spec-row rule cannot recover them. Not flagged, because its
+    item still holds 20 requirements.
+- Scanned tenders are not fixed. 8011173 (submersible pump) reads "SS304" as "55304" and splits
+  its table into 38 rows such as "No. il" and "3 4"; 8169451 loses 6 of 11 rows. Neither is
+  flagged.
+- 99 labelled rows on 5 tenders (1 pump) are too few for firm figures: one row moves decided
+  accuracy by about 2 points.
 - Tied catalogues are not judged.
 
 **Not built yet**
@@ -288,9 +327,10 @@ The flag warns but does not fix anything. Two tenders with garbled scanned lines
 
 ## What to do next
 
-1. Raise recall: 24 rows labelled `full_match` stay `unsupported`. Tune retrieval on short spec
-   lines and rerun `eval/run_eval.py` to see whether it helps.
-2. Fix extraction on scanned specification tables (the pump tender lost half its rows) and on the
-   flagged tenders, starting with item boundaries.
+1. Raise recall with changes that pass the gate: a quote check that stays strict on table chunks
+   (cells checked in their own row), and judge prompts that keep "or equivalent" and "spring"
+   cautious. Rerun `eval/run_eval.py` after each.
+2. Fix extraction on scanned specification tables (8169451, 8011173) and the pump table of
+   7959356, then the flagged tenders, starting with item boundaries.
 3. Label more tenders, especially pumps, so the figures rest on more than 99 rows.
 4. Add the remaining manufacturers.

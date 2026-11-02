@@ -44,6 +44,7 @@ class RequirementOptions:
     bid_role: str
     item_category_labels: tuple[str, ...]
     quality: QualityRules
+    spec_row_labels: tuple[str, str] = ("", "")
 
     @classmethod
     def from_settings(cls, settings: Settings) -> RequirementOptions:
@@ -62,6 +63,10 @@ class RequirementOptions:
             bid_role=BID_ROLE,
             item_category_labels=tuple(settings.TENDER_ITEM_CATEGORY_LABELS),
             quality=QualityRules.from_settings(settings),
+            spec_row_labels=(
+                settings.TENDER_SPEC_ROW_LABELS[0],
+                settings.TENDER_SPEC_ROW_LABELS[1],
+            ),
         )
 
 
