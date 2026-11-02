@@ -37,6 +37,8 @@ function result(id: string, status: Comparison["status"], cited: boolean): Compa
     needs_review: status !== "full_match",
     reason: cited ? "" : "no catalogue field names this",
     capability: cited ? "Body: WCB" : null,
+    confidence: status === "full_match" ? 0.7 : null,
+    confidence_factors: status === "full_match" ? ["LLM decision x0.7"] : [],
     evidence: cited
       ? [
           {
@@ -174,6 +176,13 @@ describe("reportRows", () => {
 });
 
 describe("ReportPage", () => {
+  it("shows a decided row's confidence and what lowered it", async () => {
+    serve();
+    await openReport();
+    expect(screen.getByText("Confidence 70%: LLM decision x0.7")).toBeInTheDocument();
+    expect(screen.queryAllByText(/^Confidence/)).toHaveLength(1);
+  });
+
   it("shows the revision, ranking, formula and export links", async () => {
     serve();
     await openReport();

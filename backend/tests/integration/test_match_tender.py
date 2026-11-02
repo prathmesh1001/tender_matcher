@@ -18,6 +18,7 @@ from app.ingestion.chunker import table_row_text
 from app.ingestion.processing import ProcessedDocument, ProcessedPage, ProcessingOptions
 from app.ingestion.product_tagger import ProductMatcher
 from app.matching.chunk_source import InMemoryChunkSource
+from app.matching.confidence import ConfidenceOptions
 from app.matching.documents import SelectionOptions
 from app.ontology.loader import load_ontologies
 from app.reporting.json_report import write_json_report
@@ -123,6 +124,7 @@ def _service(tmp_path: Path, settings: Settings) -> MatchService:
         tender_options=options.for_tender(),
         requirement_options=RequirementOptions.from_settings(settings),
         selection=SelectionOptions.from_settings(settings),
+        confidence=ConfidenceOptions.from_settings(settings),
         ontologies=ontologies,
         tender_root=tmp_path,
     )

@@ -146,6 +146,7 @@ def _result_row(
         score=ctx.status_scores.get(comparison.status),
         capability=comparison.capability,
         needs_review=comparison.needs_review,
+        confidence=comparison.confidence,
         decided_by=comparison.decided_by,
         basis=comparison.basis,
         reasoning=comparison.reason,

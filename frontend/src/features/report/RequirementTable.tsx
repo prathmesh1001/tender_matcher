@@ -134,6 +134,13 @@ export function RequirementTable({ report }: { report: TenderReport }) {
                     {row.result.needs_review && (
                       <p className="mt-1 text-xs font-semibold text-status-partial">Needs review</p>
                     )}
+                    {row.result.confidence !== null && (
+                      <p className="mt-1 text-xs text-ink-600">
+                        Confidence {Math.round(row.result.confidence * 100)}%
+                        {row.result.confidence_factors.length > 0 &&
+                          `: ${row.result.confidence_factors.join(", ")}`}
+                      </p>
+                    )}
                   </td>
                   <td className="pr-3 py-3">{row.score === null ? "—" : row.score}</td>
                   <td className="py-3">

@@ -23,6 +23,10 @@ export interface Comparison {
   reason: string;
   evidence: Evidence[];
   capability: string | null;
+  /** 0-1; null when nothing was decided. */
+  confidence: number | null;
+  /** What lowered the confidence, e.g. "LLM decision x0.7". */
+  confidence_factors: string[];
 }
 
 export interface Requirement {

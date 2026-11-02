@@ -29,7 +29,7 @@ from app.matching.values import Quantity, code_tokens, quantities
 from app.ontology.schema import Attribute, Ontology
 from app.ontology.units import canonical_number, class_to_pn
 from app.retrieval.text_normalizer import SearchVocabulary, fold_text, is_code, stem_token
-from app.schemas.enums import DecisionSource, MatchStatus, Operator, RequirementType
+from app.schemas.enums import DecisionSource, MatchStatus, Operator, RequirementType, ReviewFlag
 from app.schemas.matching import Comparison, Evidence, LabelBasis
 from app.schemas.requirements import Requirement, ValueKind
 from app.schemas.sections import EvidenceSource
@@ -95,6 +95,7 @@ class MatchContext:
 _UNREADABLE: Final = "printed value is impossible, so it was misread: ignored"
 _GLUED_DEGREE: Final = "number ending in 0 right before C may be a misread degree sign: ignored"
 _MISREADS: Final = frozenset({_UNREADABLE, _GLUED_DEGREE})
+_NEAR_MISS: Final = "near miss: only part of the code found"
 # "4250C" may print 425 °C with the degree sign extracted as 0; "425 C" and "425C" cannot.
 _ZERO_BEFORE_C: Final = re.compile(r"(?<![\d.])-?\d+0c\b")
 
@@ -369,7 +370,7 @@ def judge_code(
     if not any(_coded(w) for w in wanted) and _coded(have):
         return _Outcome(None, "tender names words, catalogue names codes: not like-for-like")
     if any(w & have for w in wanted):
-        return _Outcome(MatchStatus.PARTIAL_MATCH, "near miss: only part of the code found")
+        return _Outcome(MatchStatus.PARTIAL_MATCH, _NEAR_MISS)
     if same_material:
         return _Outcome(MatchStatus.PARTIAL_MATCH, "same material, grade not printed")
     knows_materials = ctx.ontology is not None and bool(ctx.ontology.equivalents)
@@ -574,6 +575,9 @@ def _decide(
     best = max(decided, key=lambda e: _RANK[e.status] if e.status else 0)
     status = best.status or MatchStatus.UNSUPPORTED
     support = [e for e in decided if e.status is status]
+    flags = [ReviewFlag.MISREAD] if misread else []
+    if best.reason == _NEAR_MISS:
+        flags.append(ReviewFlag.NEAR_MISS)
     return Comparison(
         requirement_id=requirement.id,
         status=status,
@@ -582,4 +586,5 @@ def _decide(
         basis=basis,
         reason=f"{best.reason}; {misread}".strip("; ") if misread else best.reason,
         evidence=support[: options.max_evidence],
+        flags=flags,
     )

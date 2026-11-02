@@ -94,7 +94,7 @@ class _Progress:
     decisions: dict[tuple[str, str, str], _Decision] = field(default_factory=dict)
 
 
-def _passage(chunk: Chunk) -> Passage:
+def _passage(chunk: Chunk, code_only: bool) -> Passage:
     """A stored chunk as the judge reads it."""
     return Passage(
         chunk_id=str(chunk.id),
@@ -104,6 +104,7 @@ def _passage(chunk: Chunk) -> Passage:
         page_number=chunk.page_number,
         raw_text=chunk.raw_text,
         section=chunk.section,
+        code_only=code_only,
     )
 
 
@@ -140,9 +141,12 @@ class DbEvidenceFinder:
                 params=self.params,
             )
             result = retriever.retrieve(request)
-            ids = [hit.chunk_id for hit in retriever.evidence_hits(result)]
-            found = {c.id: c for c in chunks.list_by_ids(ids)}
-            return FoundEvidence(result.outcome, tuple(_passage(found[i]) for i in ids))
+            hits = retriever.evidence_hits(result)
+            found = {c.id: c for c in chunks.list_by_ids([h.chunk_id for h in hits])}
+            passages = tuple(
+                _passage(found[h.chunk_id], h.rerank_score < self.params.min_score) for h in hits
+            )
+            return FoundEvidence(result.outcome, passages)
 
 
 class JudgeService:

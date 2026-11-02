@@ -65,6 +65,16 @@ class MatchStatus(StrEnum):
     NOT_APPLICABLE = "not_applicable"
 
 
+class ReviewFlag(StrEnum):
+    """A weakness a rule or the judge saw in its own decision; each lowers confidence."""
+
+    NEAR_MISS = "near_miss"  # only part of the code found
+    MISREAD = "misread"  # a printed value was impossible and ignored
+    HEADING_UNCLEAR = "heading_unclear"  # no product heading clearly owns the evidence
+    TIED_CATALOGUES = "tied_catalogues"  # nothing tells the best catalogues apart
+    CODE_ONLY_HIT = "code_only_hit"  # search accepted the passage only for a code it holds
+
+
 class DecisionSource(StrEnum):
     """What produced a match decision."""
 

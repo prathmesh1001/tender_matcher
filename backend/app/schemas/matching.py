@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from app.schemas.enums import DecisionSource, MatchStatus
+from app.schemas.enums import DecisionSource, MatchStatus, ReviewFlag
 
 
 class LabelBasis(StrEnum):
@@ -85,6 +85,15 @@ class Comparison(BaseModel):
         default_factory=list,
         description="Fields behind the status; for unsupported, labelled fields that decided "
         "nothing (cited so a reviewer can look).",
+    )
+    flags: list[ReviewFlag] = Field(
+        default_factory=list, description="Weaknesses seen while deciding; each lowers confidence."
+    )
+    confidence: float | None = Field(
+        default=None, ge=0, le=1, description="How far the decision can be trusted; None if none."
+    )
+    confidence_factors: list[str] = Field(
+        default_factory=list, description="What lowered the confidence, with each factor."
     )
 
     @computed_field  # type: ignore[prop-decorator]

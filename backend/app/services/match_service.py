@@ -28,6 +28,7 @@ from app.matching.chunk_source import (
     processing_fingerprint,
 )
 from app.matching.comparator import MatchContext
+from app.matching.confidence import ConfidenceOptions, items_with_confidence
 from app.matching.documents import SelectionOptions
 from app.matching.engine import (
     ItemInput,
@@ -101,6 +102,7 @@ class MatchService:
         tender_options: ProcessingOptions,
         requirement_options: RequirementOptions,
         selection: SelectionOptions,
+        confidence: ConfidenceOptions,
         ontologies: Sequence[Ontology],
         tender_root: Path,
         judge: ItemJudge | None = None,
@@ -109,6 +111,7 @@ class MatchService:
         self._tender_options = tender_options
         self._requirement_options = requirement_options
         self._selection = selection
+        self._confidence = confidence
         self._ontologies = list(ontologies)
         self._tender_root = tender_root
         self._judge = judge
@@ -224,6 +227,9 @@ class MatchService:
             if self._judge is not None and quality.status is not ExtractionStatus.UNRELIABLE:
                 judged = self._judge.judge_items(parsed.items, reports, self._source)
                 reports, decided_by = judged.reports, judged.decided_by
+            reports = items_with_confidence(
+                reports, self._source, self._confidence, self._selection.status_scores
+            )
         general = [general_result(r) for r in parsed.general]
         if quality.status is ExtractionStatus.UNRELIABLE:
             note = "extraction unreliable: " + ", ".join(r.code.value for r in quality.reasons)
@@ -301,6 +307,7 @@ def build_match_service(
         tender_options=options.for_tender(),
         requirement_options=RequirementOptions.from_settings(settings),
         selection=SelectionOptions.from_settings(settings),
+        confidence=ConfidenceOptions.from_settings(settings),
         ontologies=ontologies,
         tender_root=settings.TENDER_DATA_DIR,
         judge=judge,

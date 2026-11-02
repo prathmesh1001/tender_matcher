@@ -109,6 +109,14 @@ class ChunkSource(Protocol):
         """Text of one page of a document, or None if the page is unknown."""
         ...
 
+    def doc_type(self, sha256: str) -> DocType | None:
+        """A document's type, or None if it is not registered."""
+        ...
+
+    def page_ocr(self, sha256: str, page_number: int) -> bool:
+        """True if a page's text came from OCR."""
+        ...
+
 
 def declared_types_named(title: str, product_types: Iterable[str]) -> set[str]:
     """Declared product types whose name words all appear, in order, in the item title.
@@ -366,3 +374,15 @@ class InMemoryChunkSource:
             raise NotFoundError("Unknown catalogue for page lookup", details={"sha256": sha256})
         pages = self._load(source).pages
         return next((p.text for p in pages if p.page_number == page_number), None)
+
+    def doc_type(self, sha256: str) -> DocType | None:
+        """A document's type, or None if it is not registered."""
+        return next((s.doc_type for s in self.sources if s.sha256 == sha256), None)
+
+    def page_ocr(self, sha256: str, page_number: int) -> bool:
+        """True if a page's text came from OCR; False for an unknown document or page."""
+        source = next((s for s in self.sources if s.sha256 == sha256), None)
+        if source is None:
+            return False
+        pages = self._load(source).pages
+        return any(p.ocr for p in pages if p.page_number == page_number)

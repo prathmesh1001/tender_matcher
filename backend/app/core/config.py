@@ -374,6 +374,27 @@ class Settings(BaseSettings):
         default=None, description="Needed by every command that calls the LLM."
     )
     GEMINI_API_BASE: str = Field(default="https://generativelanguage.googleapis.com/v1beta")
+    CONFIDENCE_LLM_FACTOR: float = Field(
+        default=0.7, gt=0, le=1, description="Confidence factor of an LLM decision."
+    )
+    CONFIDENCE_BROCHURE_FACTOR: float = Field(
+        default=0.85, gt=0, le=1, description="Confidence factor when all evidence is brochures."
+    )
+    CONFIDENCE_OCR_FACTOR: float = Field(
+        default=0.8, gt=0, le=1, description="Confidence factor when a cited page was OCR'd."
+    )
+    CONFIDENCE_CODE_ONLY_FACTOR: float = Field(
+        default=0.8, gt=0, le=1, description="Confidence factor of a hit accepted only by a code."
+    )
+    CONFIDENCE_FLAG_FACTOR: float = Field(
+        default=0.8,
+        gt=0,
+        le=1,
+        description="Confidence factor of a rule flag: near miss, misread, unclear heading, tie.",
+    )
+    CONFIDENCE_REVIEW_THRESHOLD: float = Field(
+        default=0.75, ge=0, le=1, description="Decided results below this confidence need review."
+    )
     LLM_JUDGE_ENABLED: bool = Field(
         default=False,
         description="API runs send free-text requirements to the LLM judge (the CLI: --judge).",

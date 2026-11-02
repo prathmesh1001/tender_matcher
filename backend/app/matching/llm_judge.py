@@ -14,7 +14,7 @@ from typing import Final, Protocol
 from app.matching.comparator import ComparatorOptions, MatchContext, key_words
 from app.matching.engine import ItemInput
 from app.matching.evidence_verifier import PageTexts
-from app.schemas.enums import DecisionSource, MatchStatus
+from app.schemas.enums import DecisionSource, MatchStatus, ReviewFlag
 from app.schemas.matching import Comparison, Evidence, JudgeStatus, JudgeVerdict, LabelBasis
 from app.schemas.report import ItemReport
 from app.schemas.requirements import Requirement
@@ -55,6 +55,7 @@ class Passage:
     page_number: int
     raw_text: str
     section: str | None = None
+    code_only: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -196,4 +197,5 @@ def judged_comparison(
                 reason=reason,
             )
         ],
+        flags=[ReviewFlag.CODE_ONLY_HIT] if cited.code_only else [],
     )

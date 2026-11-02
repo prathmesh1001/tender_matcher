@@ -30,7 +30,7 @@ from app.matching.evidence_verifier import PageTexts, verify_comparison
 from app.matching.fields import located_fields, option_fields
 from app.matching.headings import ProductGroups, group_by_product
 from app.retrieval.text_normalizer import normalize_for_search
-from app.schemas.enums import DecisionSource, MatchStatus
+from app.schemas.enums import DecisionSource, MatchStatus, ReviewFlag
 from app.schemas.matching import Comparison, DocumentResult, ManufacturerItemResult, SubTypeFit
 from app.schemas.requirements import Requirement, ValueKind
 
@@ -193,11 +193,17 @@ def _chosen_heading(
 
 def _capped(comparison: Comparison) -> Comparison:
     """Evidence no heading clearly owns can't be full: partial + review."""
+    flags = [*comparison.flags, ReviewFlag.HEADING_UNCLEAR]
     if comparison.status is not MatchStatus.FULL_MATCH:
-        return comparison.model_copy(update={"needs_review": True})
+        return comparison.model_copy(update={"needs_review": True, "flags": flags})
     reason = "product heading unclear: capped at partial"
     return comparison.model_copy(
-        update={"status": MatchStatus.PARTIAL_MATCH, "needs_review": True, "reason": reason}
+        update={
+            "status": MatchStatus.PARTIAL_MATCH,
+            "needs_review": True,
+            "reason": reason,
+            "flags": flags,
+        }
     )
 
 

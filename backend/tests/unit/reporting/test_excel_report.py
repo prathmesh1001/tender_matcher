@@ -195,7 +195,7 @@ def test_summary_puts_warnings_before_the_ranking() -> None:
 
 def test_a_requirement_row_has_every_column_of_the_required_table() -> None:
     header, decided, undecided = _rows(_sheet(_report(), "Requirements"))
-    assert header[:10] == [
+    assert header[:11] == [
         "Item",
         "Requirement",
         "Manufacturer",
@@ -205,9 +205,10 @@ def test_a_requirement_row_has_every_column_of_the_required_table() -> None:
         "Document",
         "Page",
         "Quote",
+        "Confidence",
         "Needs review",
     ]
-    assert decided[:10] == [
+    assert decided[:11] == [
         "10",
         "BODY : WCB",
         "Acme",
@@ -217,10 +218,23 @@ def test_a_requirement_row_has_every_column_of_the_required_table() -> None:
         "alpha.pdf",
         "7",
         "Body: A216 WCB",
+        None,  # not computed for this synthetic row
         "no",
     ]
     assert undecided[4:6] == ["unsupported", None]  # excluded from the %, not a zero
-    assert undecided[9] == "yes"
+    assert undecided[9:11] == [None, "yes"]
+
+
+def test_confidence_shows_its_value_and_what_lowered_it() -> None:
+    report = _report()
+    item = report.items[0]
+    judged = _result("10.1", MatchStatus.FULL_MATCH, evidence=[EVIDENCE]).model_copy(
+        update={"confidence": 0.7, "confidence_factors": ["LLM decision x0.7"]}
+    )
+    m = item.manufacturers[0].model_copy(update={"results": [judged]})
+    report = report.model_copy(update={"items": [item.model_copy(update={"manufacturers": [m]})]})
+    _, row = _rows(_sheet(report, "Requirements"))
+    assert row[9] == "0.70 (LLM decision x0.7)"
 
 
 def test_a_quote_on_an_undecided_row_is_marked_as_not_evidence() -> None:

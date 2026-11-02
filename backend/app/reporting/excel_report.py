@@ -48,6 +48,7 @@ _REQUIREMENT_COLUMNS: Final = (
     ("Document", 34),
     ("Page", 8),
     ("Quote", 60),
+    ("Confidence", 12),
     ("Needs review", 12),
     ("Reason", 44),
 )
@@ -199,6 +200,14 @@ def _quotes(result: Comparison) -> str:
     return quotes
 
 
+def _confidence(result: Comparison) -> Value:
+    """Confidence with what lowered it, or blank for an undecided row."""
+    if result.confidence is None:
+        return ""
+    factors = "; ".join(result.confidence_factors)
+    return f"{result.confidence:.2f} ({factors})" if factors else f"{result.confidence:.2f}"
+
+
 def _requirement_row(
     item_no: str,
     requirement: Requirement,
@@ -217,6 +226,7 @@ def _requirement_row(
         catalogue or "",
         ", ".join(str(page) for page in sorted({e.page_number for e in result.evidence})),
         _quotes(result),
+        _confidence(result),
         "yes" if result.needs_review else "no",
         result.reason,
     ]

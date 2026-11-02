@@ -15,7 +15,7 @@ from app.matching.comparator import MatchContext, routed
 from app.matching.documents import ItemQuery, SelectionOptions, evaluate_item
 from app.matching.scorer import score
 from app.retrieval.text_normalizer import normalize_for_search
-from app.schemas.enums import DecisionSource, MatchStatus
+from app.schemas.enums import DecisionSource, MatchStatus, ReviewFlag
 from app.schemas.matching import Comparison, DocumentResult, LabelBasis, ManufacturerItemResult
 from app.schemas.report import (
     CandidateSummary,
@@ -84,7 +84,11 @@ def for_review(comparisons: Sequence[Comparison], note: str) -> list[Comparison]
 
 def _flagged(comparisons: Sequence[Comparison], tied: Sequence[str]) -> list[Comparison]:
     """A tied catalogue's rows, each for review and saying that no catalogue was picked."""
-    return for_review(comparisons, f"catalogues tie, none picked: {', '.join(tied)}")
+    note = f"catalogues tie, none picked: {', '.join(tied)}"
+    return [
+        c.model_copy(update={"flags": [*c.flags, ReviewFlag.TIED_CATALOGUES]})
+        for c in for_review(comparisons, note)
+    ]
 
 
 def _no_catalogue(
