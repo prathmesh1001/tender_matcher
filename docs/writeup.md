@@ -119,10 +119,12 @@ the others and clearly marked "low coverage", so a high score on little evidence
 ranking. Coverage is always shown. If every manufacturer is below the minimum, all are marked and
 the order within that group is still by compatibility.
 
-**Options written with "/".** A tender value such as "CA15/CF8M" does not say whether one option
-is enough. If the catalogue shows only some of the options, the result is `partial_match` with
-`needs_review`. If the tender writes "or" between options ("NITRILE OR SS"), one option found is a
-`full_match`. Qualifiers such as "or equivalent" and "or higher" are not options.
+**Options written with "/" or "or"** (decision of 2026-11-02, replacing that of 2026-10-31). In
+tenders, "/" means either option is acceptable, the same as "or": "Bolting: B7/2H" and "Shaft: SS
+410/17-4PH" are met by one of the two. If the catalogue shows at least one option, the result is
+`full_match`. Qualifiers such as "or equivalent" and "or higher" are not options. The other
+partial-match rules are unchanged: a value offered only in the options list while the table shows
+another, an unclear product heading, and near misses on sizes and codes.
 
 **Named makes.** A make named by the tender is recorded and shown, and never fails another make. A
 tender saying only one firm is acceptable gets a warning at the top of the report.
@@ -156,24 +158,28 @@ Valve", against a tender asking for triple offset.
 ### Against hand labels, rules only
 
 87 rows on 4 tenders were checked by hand ([manual check](manual_match_check.md)) and compared with
-the current code ([example diff](gold_diff_8119613.md)).
+the current code, rules only ([example diff](../eval/diffs/GEM_2026_B_8119613.md)).
 
 | Run | Agree | Not decided | Weaker than label | Stronger than label | Other catalogue |
 |---|---|---|---|---|---|
-| With ontology | 35 | 40 | 10 | 2 | 0 |
-| Without ontology | 13 | 42 | 5 | 3 | 24 |
+| With ontology | 36 | 40 | 8 | 3 | 0 |
+| Without ontology | 18 | 58 | 4 | 4 | 3 |
 
 How to read this:
 
 - **Not decided is the largest group.** The system often stays silent where a person found an
   answer, which fits "never guess" but limits coverage.
-- **Stronger is the dangerous direction**, because it claims more than a person would. There are 2
+- **Stronger is the dangerous direction**, because it claims more than a person would. There are 3
   rows: on 8017367, size DN300 is `partial_match` where the label is `missing_capability`, and size
   DN100 is `full_match` where the label is `unsupported` (this row belongs to a tie, so it is
-  already sent to review).
+  already sent to review); on 8119613, "DISC MOC : ASTM A217 Gr. CA15/CF8M" is `full_match` under
+  the "/" rule where its older label says `partial_match`.
 - **Weaker rows are mostly cautious.** For example, "API 609 5TH EDITION" is a near miss because
   the catalogue says API 609 without the edition.
-- **The ontology matters.** Without it, the system picks a different catalogue on 24 rows.
+- **The ontology matters.** Without it, the system agrees with half as many labels (18 against 36)
+  and leaves 58 rows undecided. On 7956201 it cannot tell the API 600 and API 602 catalogues
+  apart, so it picks neither and sends both to review; before the "/" rule it picked API 602, and
+  all 21 labelled rows counted as another catalogue.
 - **Labels cover some manufacturers and items only**, so these figures describe those rows, not
   every tender.
 
@@ -185,22 +191,27 @@ How to read this:
 
 | Run | Coverage | Decided accuracy | Stronger than label | Citation on a labelled page |
 |---|---|---|---|---|
-| Rules | 43% (43/99) | 72% (31/43) | 2 | 71% (22/31) |
-| Rules + judge | 49% (49/99) | 73% (36/49) | 3 | 67% (24/36) |
+| Rules | 43% (43/99) | 74% (32/43) | 3 | 72% (23/32) |
+| Rules + judge | 49% (49/99) | 76% (37/49) | 4 | 68% (25/37) |
+
+These include the "/" rule of 2026-11-02. It changed 3 labelled rows: "Bolting : B7/2H"
+(7956201) and "SHAFT MOC : A479 Type SS 410/17-4PH SS" (8119613) now agree with their
+`full_match` labels; "DISC MOC : ASTM A217 Gr. CA15/CF8M" (8119613) is now `full_match` where the
+label says `partial_match`, so it counts as stronger. That label predates the rule.
 
 - **The judge adds coverage without losing accuracy.** It decided 6 more rows: 5 agree with the
   label. The sixth, "Flanged Ended" on 7956201, is `full_match` where the label says
   `partial_match`, but that label covers a whole manual row ("flanged ends + tongue & groove
   companion flanges"), and the catalogue does show flanged ends. The label is coarser than the
   requirement, so this is not clearly a judge error.
-- **`full_match` is precise, `partial_match` is not.** A `full_match` agrees with the label 94% of
-  the time with the judge; a `partial_match` only 23%. Most wrong partials are labelled
-  `full_match`: the system is cautious.
-- **Recall is the weak side.** Of 62 rows labelled `full_match`, the system finds 29 and leaves 24
+- **`full_match` is precise, `partial_match` is not.** With the judge, a `full_match` agrees with
+  the label 91% of the time (31 of 34); a `partial_match` 38% (5 of 13). Most wrong partials are
+  labelled `full_match`: the system is cautious.
+- **Recall is the weak side.** Of 64 rows labelled `full_match`, the system finds 31 and leaves 26
   `unsupported`.
-- **Confidence does separate right from wrong.** With the judge, 23% of decisions at full
-  confidence are wrong against 36% below it (rules only: 23% against 50%). The samples are small:
-  35 and 14 decisions.
+- **Confidence does separate right from wrong.** With the judge, 19% of decisions at full
+  confidence are wrong against 38% below it (rules only: 19% against 57%). The samples are small:
+  36 and 13 decisions.
 - **Pump tender: half its specification never reached the matcher.** Speed, size, seal, motor,
   spares and base plate were lost in extraction from the scanned page. Of the 12 labelled rows,
   9 agree and 3 are not decided; nothing is wrong, but the rows that would test pump duty were
@@ -209,17 +220,27 @@ How to read this:
 ### All 19 tenders
 
 All 19 run without a crash. By a read-through of the reports, not a measurement, 7 look right, 6
-partly right and 6 wrong. The extraction warning flags those 6 plus one more:
+partly right and 6 wrong. The extraction warning flags those 6 and 4 more:
 
 | Tender | Warning reasons | Items found |
 |---|---|---|
+| 7865644 | specification outside the items | 34 |
 | 7951144 | titles are not products, oversized item | 1 |
+| 7959356 | specification outside the items | 1 |
 | 8026686 | titles are not products | 3 |
 | 8063368 | titles are not products | 62 |
+| 8071357 | specification outside the items | 1 |
 | 8123915 | merged item category | 1 |
 | 8132165 | titles are not products | 2 |
 | 8167974 | merged item category | 1 |
 | 8175587 | oversized item, merged item category | 1 |
+
+"Specification outside the items" is new: every item holds at most 2 requirements
+(`EXTRACTION_NEARLY_EMPTY_ITEM`) while at least 10 catalogue-checkable lines are general
+requirements (`EXTRACTION_MIN_SPEC_OUTSIDE_ITEMS`). It flags the two pump tenders it was made for
+(7959356: 1 requirement on its item, 73 such general lines; 8071357: 1 and 29), and also 7865644,
+a thermocouple tender whose 34 items each hold only a part code while 76 such lines are general.
+No other tender changed flag.
 
 The flag warns but does not fix anything. Two tenders with garbled scanned lines (8011173 and
 8169451) are not flagged, so a clean report does not prove clean extraction.
@@ -234,6 +255,16 @@ The flag warns but does not fix anything. Two tenders with garbled scanned lines
 - Evidence can come from another model in the same PDF. Catalogues with several product headings
   are read by heading, and unclear cases are capped at `partial_match`, but this is not solved.
 - Wrong item rows on 8026686 and 8132165 are flagged, not fixed.
+- Pump specifications often do not reach the items, and the parser is not fixed for it:
+  - 7959356 (60 HP centrifugal pump): its item holds 1 requirement, "Starter Panel"; the pump's
+    specification table became 73 general requirements that catalogues could check.
+  - 8071357 (submersible sewerage pump): its item holds 1 requirement; 29 such lines are general.
+  - 8169451 (water circulation pump, scanned): 6 of its 11 specification rows never became
+    requirements: pump speed, size, seal, motor, spares and base plate. This one is not flagged,
+    because its item still holds 20 requirements.
+
+  The first two are now flagged (`spec_outside_items`), so their results go to review. General
+  requirements are never matched against catalogues, so these pumps get no technical result.
 - Tied catalogues are not judged.
 
 **Not built yet**

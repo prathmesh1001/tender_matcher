@@ -158,7 +158,7 @@ class ParsedValue:
     unit: str | None = None  # folded spelling, or "class" / "pn" for designations
     canonical_unit: str | None = None  # pint unit via the ontology
     alternatives: tuple[str, ...] = ()
-    any_alternative: bool = False  # the tender wrote "or": any one option is enough
+    any_alternative: bool = False  # options written with "or" or "/": any one is enough
 
     @property
     def is_designation(self) -> bool:
@@ -195,7 +195,6 @@ def alternatives(value: str) -> tuple[str, ...]:
 def or_options(value: str) -> tuple[str, ...]:
     """Options when the tender writes "or" ("NITRILE OR SS"); "/" inside them also separates.
 
-    "/" alone does not say whether one option is enough, so only a written "or" does.
     Qualifiers ("OR EQUIVALENT", "OR HIGHER") are not options.
 
     Args:
@@ -297,11 +296,12 @@ def parse_value(
     if match:
         return _numeric(match, label, stripped, ontology)
     if has_code(stripped) or len(stripped.split()) <= enum_max_words:
-        options = or_options(stripped)
+        # "B7/2H" and "B7 OR 2H" mean the same in tenders: either option is acceptable.
+        options = or_options(stripped) or alternatives(stripped)
         return ParsedValue(
             kind=ValueKind.CODE,
             operator=Operator.IN,
-            alternatives=options or alternatives(stripped),
+            alternatives=options,
             any_alternative=bool(options),
         )
     return ParsedValue(kind=ValueKind.TEXT, operator=Operator.TEXT)

@@ -54,6 +54,7 @@ from app.schemas.report import (
     TenderReport,
 )
 from app.schemas.requirements import Requirement
+from app.schemas.sections import EvidenceSource
 from app.storage.file_store import FileStore, build_file_store
 from app.tender.items import ItemSource, TenderFile, TenderRequirements, parse_tender_files
 from app.tender.link_fetcher import MANIFEST_FILENAME, read_manifest
@@ -189,6 +190,7 @@ class MatchService:
             found.source is ItemSource.ITEM_CATEGORY,
             self._requirement_options.quality,
             unfetched,
+            spec_outside=sum(r.evidence is EvidenceSource.CATALOGUE for r in found.general),
         )
 
     def match_tender(

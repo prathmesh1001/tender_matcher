@@ -3,7 +3,8 @@
 A wrong schedule gives confident-looking results about the wrong things, and no comparison can
 notice that. So the extraction itself is judged, by what it looks like and never by which
 tender it is: titles that name no product and read as fragments or sentences, an item holding
-far more requirements than one product has, a bid's Item Category row merging several products
+far more requirements than one product has, items left nearly empty while the specification's
+lines sit among the general requirements, a bid's Item Category row merging several products
 into one item, requirements read from low-confidence OCR, linked files that could not be fetched
 (the specification may be in one). Any of these marks the tender unreliable; that sends every
 result to review and changes no status.
@@ -34,6 +35,8 @@ class QualityRules:
     merged_title_lead_words: int
     bad_title_share: float
     max_item_requirements: int
+    nearly_empty_item: int
+    min_spec_outside_items: int
     ocr_min_confidence: float
     low_ocr_share: float
 
@@ -47,6 +50,8 @@ class QualityRules:
             merged_title_lead_words=settings.EXTRACTION_MERGED_TITLE_LEAD_WORDS,
             bad_title_share=settings.EXTRACTION_BAD_TITLE_SHARE,
             max_item_requirements=settings.EXTRACTION_MAX_ITEM_REQUIREMENTS,
+            nearly_empty_item=settings.EXTRACTION_NEARLY_EMPTY_ITEM,
+            min_spec_outside_items=settings.EXTRACTION_MIN_SPEC_OUTSIDE_ITEMS,
             ocr_min_confidence=settings.EXTRACTION_OCR_MIN_CONFIDENCE,
             low_ocr_share=settings.EXTRACTION_LOW_OCR_SHARE,
         )
@@ -136,6 +141,23 @@ def _size_issue(items: Sequence[ItemFacts], rules: QualityRules) -> ExtractionIs
     )
 
 
+def _spec_outside_issue(
+    items: Sequence[ItemFacts], spec_outside: int, rules: QualityRules
+) -> ExtractionIssue | None:
+    """Every item is nearly empty while the specification's lines became general requirements."""
+    if not items or spec_outside < rules.min_spec_outside_items:
+        return None
+    if any(i.requirements > rules.nearly_empty_item for i in items):
+        return None
+    most = max(i.requirements for i in items)
+    return ExtractionIssue(
+        code=ExtractionIssueCode.SPEC_OUTSIDE_ITEMS,
+        reason=f"items hold at most {most} requirements while {spec_outside} lines that "
+        "catalogues could check are general requirements: the specification did not reach "
+        "the items",
+    )
+
+
 def _ocr_issue(items: Sequence[ItemFacts], rules: QualityRules) -> ExtractionIssue | None:
     """Enough item requirements were read from low-confidence OCR."""
     total = sum(i.requirements for i in items)
@@ -198,6 +220,7 @@ def extraction_quality(
     from_item_category: bool,
     rules: QualityRules,
     unfetched: Sequence[str] = (),
+    spec_outside: int = 0,
 ) -> ExtractionQuality:
     """Judge one tender's extraction.
 
@@ -206,6 +229,7 @@ def extraction_quality(
         from_item_category: No schedule was found: the bid's Item Category row gave the items.
         rules: Thresholds.
         unfetched: Linked files that could not be fetched or read.
+        spec_outside: General requirements that catalogues could check (evidence: catalogue).
 
     Returns:
         `unreliable` with every reason found, else `ok` with none.
@@ -213,6 +237,7 @@ def extraction_quality(
     found = (
         _title_issue(items, rules),
         _size_issue(items, rules),
+        _spec_outside_issue(items, spec_outside, rules),
         _merged_issue(items, from_item_category, rules),
         _ocr_issue(items, rules),
         _fetch_issue(unfetched),

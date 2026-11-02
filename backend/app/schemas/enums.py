@@ -98,6 +98,7 @@ class ExtractionIssueCode(StrEnum):
     MERGED_ITEM_CATEGORY = "merged_item_category"
     LOW_CONFIDENCE_OCR = "low_confidence_ocr"
     FILES_NOT_FETCHED = "files_not_fetched"
+    SPEC_OUTSIDE_ITEMS = "spec_outside_items"
 
 
 class RunStatus(StrEnum):

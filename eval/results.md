@@ -4,15 +4,15 @@ Tenders: GEM_2026_B_7956201, GEM_2026_B_8017367, GEM_2026_B_8119613, GEM_2026_B_
 
 | Run | Labelled | Other catalogue | Coverage | Decided accuracy | Stronger | Citations |
 |---|---|---|---|---|---|---|
-| rules | 99 | 0 | 43% (43/99) | 72% (31/43) | 2 | 71% (22/31) |
-| rules + judge | 99 | 0 | 49% (49/99) | 73% (36/49) | 3 | 67% (24/36) |
+| rules | 99 | 0 | 43% (43/99) | 74% (32/43) | 3 | 72% (23/32) |
+| rules + judge | 99 | 0 | 49% (49/99) | 76% (37/49) | 4 | 68% (25/37) |
 
 ## rules
 
 | Status | Labelled | Run gave | Correct | Precision | Recall |
 |---|---|---|---|---|---|
-| full_match | 64 | 26 | 25 | 96% | 39% |
-| partial_match | 17 | 15 | 5 | 33% | 29% |
+| full_match | 64 | 29 | 27 | 93% | 42% |
+| partial_match | 17 | 12 | 4 | 33% | 24% |
 | missing_capability | 4 | 2 | 1 | 50% | 25% |
 | unsupported | 14 | 56 | 13 | 23% | 93% |
 
@@ -20,19 +20,19 @@ Confusion matrix (rows: label, columns: run):
 
 | Label \ run | full_match | partial_match | missing_capability | unsupported |
 |---|---|---|---|---|
-| full_match | 25 | 9 | 0 | 30 |
-| partial_match | 0 | 5 | 1 | 11 |
+| full_match | 27 | 7 | 0 | 30 |
+| partial_match | 1 | 4 | 1 | 11 |
 | missing_capability | 0 | 1 | 1 | 2 |
 | unsupported | 1 | 0 | 0 | 13 |
 
-Wrong decisions at full confidence: 23% (8/35). Below full confidence: 50% (4/8).
+Wrong decisions at full confidence: 19% (7/36). Below full confidence: 57% (4/7).
 
 ## rules + judge
 
 | Status | Labelled | Run gave | Correct | Precision | Recall |
 |---|---|---|---|---|---|
-| full_match | 64 | 31 | 29 | 94% | 45% |
-| partial_match | 17 | 16 | 6 | 38% | 35% |
+| full_match | 64 | 34 | 31 | 91% | 48% |
+| partial_match | 17 | 13 | 5 | 38% | 29% |
 | missing_capability | 4 | 2 | 1 | 50% | 25% |
 | unsupported | 14 | 50 | 13 | 26% | 93% |
 
@@ -40,9 +40,9 @@ Confusion matrix (rows: label, columns: run):
 
 | Label \ run | full_match | partial_match | missing_capability | unsupported |
 |---|---|---|---|---|
-| full_match | 29 | 9 | 0 | 26 |
-| partial_match | 1 | 6 | 1 | 9 |
+| full_match | 31 | 7 | 0 | 26 |
+| partial_match | 2 | 5 | 1 | 9 |
 | missing_capability | 0 | 1 | 1 | 2 |
 | unsupported | 1 | 0 | 0 | 13 |
 
-Wrong decisions at full confidence: 23% (8/35). Below full confidence: 36% (5/14).
+Wrong decisions at full confidence: 19% (7/36). Below full confidence: 38% (5/13).

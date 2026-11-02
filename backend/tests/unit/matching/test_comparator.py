@@ -263,13 +263,24 @@ def test_single_value_without_direction_is_not_missing(
 
 
 @BOTH
-def test_only_one_of_two_options_found_is_partial(valves: Ontology, with_ontology: bool) -> None:
+def test_one_option_is_full_when_the_tender_writes_a_slash(
+    valves: Ontology, with_ontology: bool
+) -> None:
+    # "/" means either option is acceptable, the same as "or" (decision of 2026-11-02).
     disc = _row(PARTS, ["2", "Disc", "ASTM A351 Gr. CF8M"])
     result = _compare(
         "DISC MOC : ASTM A217 Gr. CA15/CF8M", [disc], _ontology(valves, with_ontology)
     )
-    assert (result.status, result.needs_review) == (PARTIAL, True)
-    assert result.reason == "1 of 2 options found"
+    assert (result.status, result.needs_review) == (FULL, False)
+
+
+@BOTH
+def test_no_option_of_a_slash_found_is_not_full(valves: Ontology, with_ontology: bool) -> None:
+    disc = _row(PARTS, ["2", "Disc", "ASTM A351 Gr. CF3M"])
+    result = _compare(
+        "DISC MOC : ASTM A217 Gr. CA15/CF8M", [disc], _ontology(valves, with_ontology)
+    )
+    assert result.status is not FULL
 
 
 @BOTH

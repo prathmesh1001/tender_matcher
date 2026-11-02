@@ -145,8 +145,10 @@ def test_every_reason_is_reported() -> None:
             low_ocr_requirements=60,
         )
     ]
-    quality = extraction_quality(items, True, RULES, unfetched=["a.pdf"])
-    assert {r.code for r in quality.reasons} == set(ExtractionIssueCode)
+    quality = extraction_quality(items, True, RULES, unfetched=["a.pdf"], spec_outside=100)
+    # Nearly empty items and an oversized item exclude each other.
+    expected = set(ExtractionIssueCode) - {ExtractionIssueCode.SPEC_OUTSIDE_ITEMS}
+    assert {r.code for r in quality.reasons} == expected
 
 
 def test_only_ocr_pages_below_the_confidence_are_low() -> None:
@@ -157,3 +159,36 @@ def test_only_ocr_pages_below_the_confidence_are_low() -> None:
         ProcessedPage(4, "not measured", ocr=True),
     ]
     assert low_confidence_pages("spec.pdf", pages, 0.7) == {("spec.pdf", 3), ("spec.pdf", 4)}
+
+
+def _spec_codes(requirements: list[int], spec_outside: int) -> set[ExtractionIssueCode]:
+    items = [_item(n=n) for n in requirements]
+    return {
+        r.code for r in extraction_quality(items, False, RULES, spec_outside=spec_outside).reasons
+    }
+
+
+def test_nearly_empty_items_with_the_spec_outside_them_mark_the_tender() -> None:
+    # 7959356: one item with 1 requirement, the pump's spec rows among the general requirements.
+    limit = RULES.min_spec_outside_items
+    assert ExtractionIssueCode.SPEC_OUTSIDE_ITEMS in _spec_codes([1], limit)
+    assert ExtractionIssueCode.SPEC_OUTSIDE_ITEMS in _spec_codes([RULES.nearly_empty_item], limit)
+
+
+def test_the_reason_gives_both_counts() -> None:
+    items = [_item(n=1)]
+    [issue] = extraction_quality(items, False, RULES, spec_outside=64).reasons
+    assert "at most 1 requirements while 64 lines" in issue.reason
+
+
+def test_few_general_spec_lines_do_not_mark_the_tender() -> None:
+    assert _spec_codes([1], RULES.min_spec_outside_items - 1) == set()
+
+
+def test_one_item_with_real_requirements_clears_the_check() -> None:
+    many = RULES.nearly_empty_item + 1
+    assert _spec_codes([1, many], 100) == set()
+
+
+def test_no_items_is_not_this_problem() -> None:
+    assert _spec_codes([], 100) == set()

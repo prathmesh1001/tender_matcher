@@ -104,8 +104,7 @@ class Requirement(BaseModel):
     )
     any_alternative: bool = Field(
         default=False,
-        description='The tender wrote "or": one option is enough. With "/" alone, finding only '
-        "some options is a partial match.",
+        description='Options written with "or" or "/": finding one of them is enough.',
     )
     raw_text: str = Field(description="Verbatim printed line(s); quotes come from here.")
     document: str

@@ -196,14 +196,15 @@ def test_parse_value(
 @pytest.mark.parametrize(
     ("value", "options", "any_option"),
     [
-        ("ASTM A217 Gr. CA15/CF8M", ("ASTM A217 Gr. CA15", "CF8M"), False),  # "/" alone
+        ("ASTM A217 Gr. CA15/CF8M", ("ASTM A217 Gr. CA15", "CF8M"), True),  # "/" alone
+        ("B7/2H", ("B7", "2H"), True),
         ("NITRILE OR SS", ("NITRILE", "SS"), True),
         ("CA15/CF8M or A105", ("CA15", "CF8M", "A105"), True),
         ("ASTM A216 WCB or equivalent", (), False),  # D4: a qualifier, not an option
         ("ASTM A216 WCB OR BETTER", (), False),
     ],
 )
-def test_written_or_means_any_option(
+def test_or_and_slash_mean_any_option(
     value: str, options: tuple[str, ...], any_option: bool
 ) -> None:
     parsed = parse_value("MOC", value, None, enum_max_words=3)

@@ -349,6 +349,17 @@ class Settings(BaseSettings):
         ge=1,
         description="Tender is unreliable if one item has more atomic requirements than this.",
     )
+    EXTRACTION_NEARLY_EMPTY_ITEM: int = Field(
+        default=2,
+        ge=0,
+        description="An item with at most this many atomic requirements is nearly empty.",
+    )
+    EXTRACTION_MIN_SPEC_OUTSIDE_ITEMS: int = Field(
+        default=10,
+        ge=1,
+        description="Tender is unreliable if every item is nearly empty while at least this many "
+        "catalogue-checkable lines are general requirements: the spec missed the items.",
+    )
     EXTRACTION_OCR_MIN_CONFIDENCE: float = Field(
         default=0.7,
         ge=0,
