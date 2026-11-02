@@ -79,8 +79,13 @@ to change:
 | `LLM_MODEL` | `gemini-3.8-flash` | Model id at the provider |
 | `LLM_JUDGE_ENABLED` | `false` | API runs send free-text lines to the LLM judge (CLI: `match-tender --judge`) |
 | `LLM_JUDGE_MAX_CALLS` | `200` | Most judge calls per tender; further lines stay `unsupported` |
+| `LLM_JUDGE_LOW_SCORE_HITS` | `3` | When the right product's passages all score below `RERANK_MIN_SCORE`, this many go to the judge (0 turns it off) |
 | `RANKING_MIN_COVERAGE_PCT` | `50` | Below this, a manufacturer is listed last as low coverage |
 | `TENDER_UPLOAD_MAX_MB` | `50` | Largest `bid.pdf` the API accepts |
+
+Judge answers are cached in the `judge_answers` table, keyed by a hash of the prompt version,
+model and full prompt (requirement text and passage chunk ids). A rerun gives the same answers and
+calls nothing; failed calls are not cached. Empty the table to ask again.
 
 Read by Compose from the shell or a `.env` next to `docker-compose.yml`, not from `backend/.env`:
 
@@ -169,14 +174,45 @@ python ../eval/run_eval.py --judge    # also rules + LLM judge; calls Gemini
 
 `backend/constraints.txt` pins the versions the image installs.
 
+## How good it is
+
+**A first-pass assistant with checked evidence.** Every decision cites a page and a quote found on
+that page. A person reviews the `unsupported` and `partial_match` rows. It is not fit for automatic
+bidder ranking.
+
+Against 99 hand-labelled rows on 5 tenders ([eval/results.md](eval/results.md)), before and after
+the judge cache and sending low-score passages to the judge:
+
+| Measure | Rules | Rules + judge before | Rules + judge after |
+|---|---|---|---|
+| Coverage | 43% (43/99) | 49% (49/99) | 51% (50/99) |
+| Decided accuracy | 74% (32/43) | 76% (37/49) | 74% (37/50) |
+| `full_match` precision | 93% (27/29) | 91% (31/34) | 91% (31/34) |
+| `partial_match` precision | 33% (4/12) | 38% (5/13) | 36% (5/14) |
+| Stronger than label | 3 | 4 | 4 |
+| Citation accuracy | 72% (23/32) | 68% (25/37) | 68% (25/37) |
+| Flagged tenders | 9 of 19 | 9 of 19 | 9 of 19 |
+| Gemini calls | 0 | 32 | 52 new + 32 cached |
+
+The rules-only run is the same before and after. Details and causes are in the
+[write-up](docs/writeup.md).
+
 ## Known limits
 
-- The LLM judge decides only free-text and unlabelled lines in an item's chosen catalogue. Every
-  decision goes to review. Lines in tied catalogues, and tenders with unreliable extraction, are
-  not judged. It needs chunks with vectors for hybrid search.
-- Retrieval rejects many short lines ("ZERO LEAKAGE") before the judge sees them. They stay
-  `unsupported`, so coverage is lower than it could be.
-- Files stay in the mounted `data/` folder. `FILE_STORE_BACKEND` has no Postgres option, because
-  the catalogue registry and tender manifests are still read from disk.
-- Jobs run in a queue inside the API process, so a restart fails any run in progress.
-- Item extraction is wrong on some tenders; those reports carry an `extraction_quality` warning.
+- 6 of 19 tenders give wrong reports; the extraction warning flags 9 of 19 and sends their results
+  to review.
+- Scanned pages are not fixed: 8011173 reads "SS304" as "55304". Pump extraction: 7959356's pump
+  table came out as one merged line; 8169451 lost 6 of its 11 specification rows.
+- Only 99 labelled rows on 5 tenders, so one row moves accuracy by about 2 points.
+- The judge varies by about 1 labelled row between fresh runs; the cache only fixes reruns.
+- Spec fact extraction has never run on real catalogues, so `spec_facts` is empty.
+- No Redis queue: jobs run inside the API process, so a restart fails any run in progress.
+- Files are not in Postgres; they stay in the mounted `data/` folder.
+- Docker images are not published; build them with `docker compose up --build`.
+- Duncan and Intervalve Poonawala catalogues are missing.
+
+## Next steps
+
+1. Label more tenders, especially pumps.
+2. Run spec fact extraction on the real catalogues.
+3. Gemini vision extraction for the flagged tenders and scanned pages.

@@ -3,6 +3,12 @@
 This describes what the system does, how it decides, how well it works today and where it falls
 short. Setup is in the [README](../README.md).
 
+**Verdict.** A first-pass assistant with checked evidence. Every decision cites a page and a quote
+that was found on that page; a `full_match` agrees with the hand label 91% of the time. A person
+reviews the `unsupported` and `partial_match` rows (about half the labelled rows stay undecided,
+and a `partial_match` agrees with its label only 36% of the time). It is not fit for automatic
+bidder ranking: 6 of 19 tenders give wrong reports, and the ranking rests on low coverage.
+
 ## The problem
 
 A GeM tender lists technical requirements, often in attachments rather than in `bid.pdf`. A buyer
@@ -104,6 +110,7 @@ and each weakness the facts show multiplies it down:
 | All evidence from brochures | 0.85 |
 | A cited page was OCR'd | 0.8 |
 | The judge's passage was found only by a code | 0.8 |
+| The judge's passage scored below `RERANK_MIN_SCORE` | 0.8 |
 | A rule flag: near miss, misread, unclear product heading, tied catalogues | 0.8 |
 
 Below 0.75 the result goes to review, so every LLM decision does, and so does any result with two
@@ -134,6 +141,17 @@ review, and the LLM is not called for them.
 
 **Judge off by default.** `LLM_JUDGE_ENABLED` defaults to `false`, and each tender has a call limit,
 because the API costs quota.
+
+**Judge cache.** Every judge answer is stored in `judge_answers`, keyed by a sha256 of the prompt
+version, the model and the full prompt (requirement text plus the passages with their chunk ids).
+A rerun asks nothing twice, costs no quota and gives the same answers; failed calls are not
+stored. Changing the prompt wording means raising `PROMPT_VERSION` in `llm_judge.py`.
+
+**Low-score passages go to the judge.** When the product filter finds the right product's
+passages but none reaches `RERANK_MIN_SCORE`, the best `LLM_JUDGE_LOW_SCORE_HITS` (3) go to the
+judge instead of ending `unsupported`. The usual checks still apply: the quote must be found on
+its page and name the attribute, else `unsupported` and review. Such decisions carry the
+"search score below threshold" factor, so they always go to review.
 
 **Files on disk.** The plan called for files stored in Postgres. They stay in a mounted `data/`
 folder, because the catalogue registry and tender manifests read from disk and moving them is a
@@ -189,8 +207,9 @@ How to read this:
 8169451. Full tables, with precision and recall per status and confusion matrices, are in
 [eval/results.md](../eval/results.md).
 
-Before and after the last round of changes (recall attempts, all reverted, and the pump spec-row
-fix, kept):
+Before and after the last change, low-score passages sent to the judge (kept). "Before" is commit
+d01bfd4's code. Both runs use the judge cache, so questions asked in both get the same answer and
+the difference comes from the change alone:
 
 | Measure | Rules before | Rules after | Rules + judge before | Rules + judge after |
 |---|---|---|---|---|
@@ -200,19 +219,30 @@ fix, kept):
 | `partial_match` precision | 33% (4/12) | 33% (4/12) | 38% (5/13) | 36% (5/14) |
 | Stronger than label | 3 | 3 | 4 | 4 |
 | Citation on a labelled page | 72% (23/32) | 72% (23/32) | 68% (25/37) | 68% (25/37) |
-| Flagged tenders | 10 of 19 | 9 of 19 | 10 of 19 | 9 of 19 |
+| Flagged tenders | 9 of 19 | 9 of 19 | 9 of 19 | 9 of 19 |
+| Gemini calls | 0 | 0 | 32 | 52 new + 32 from cache |
 
-The rules columns are identical: the kept change touched no labelled row. The judge columns run the
-same code on every labelled row, so their difference is run-to-run noise of the judge: "Trim : 12
--> 16" was `unsupported` in the first run and `partial_match` (label `full_match`) in the second.
+The gate for this change was: coverage goes up and "stronger than label" rises by at most 1. It
+passed (coverage +1 row, stronger unchanged), so it was kept. The rules columns are identical
+because the change only affects the judge. Of the labelled rows that were below threshold before,
+the judge now saw 12:
+
+- 1 new decision: "Ball & Stem : SS (ASTM A 182 or equivelent)" (8017367) is `partial_match`, label
+  `full_match` (weaker). The catalogue names A351 and A479 stainless steel, not A182.
+- 6 the judge answered "no evidence" ("ZERO LEAKAGE", "HAND GEAR OPERATED", pump speed).
+- 5 answers the checks rejected: 2 quotes not found on the page (one of them, "Spring", a
+  `full_match` the label calls `partial_match`), 2 quotes that do not name the attribute, 1
+  citing a passage it was not given. Each stays `unsupported` and goes to review.
+
+So the gain is small, but the guards stopped a stronger-than-label answer.
 
 These include the "/" rule of 2026-11-02. It changed 3 labelled rows: "Bolting : B7/2H"
 (7956201) and "SHAFT MOC : A479 Type SS 410/17-4PH SS" (8119613) now agree with their
 `full_match` labels; "DISC MOC : ASTM A217 Gr. CA15/CF8M" (8119613) is now `full_match` where the
 label says `partial_match`, so it counts as stronger. That label predates the rule.
 
-- **The judge adds coverage without losing accuracy.** It decided 6 more rows: 5 agree with the
-  label. The sixth, "Flanged Ended" on 7956201, is `full_match` where the label says
+- **The judge adds coverage at little cost in accuracy.** It decided 7 more rows: 5 agree with the
+  label and "Ball & Stem" (above) is weaker. The seventh, "Flanged Ended" on 7956201, is `full_match` where the label says
   `partial_match`, but that label covers a whole manual row ("flanged ends + tongue & groove
   companion flanges"), and the catalogue does show flanged ends. The label is coarser than the
   requirement, so this is not clearly a judge error.
@@ -264,15 +294,32 @@ The flag warns but does not fix anything. Two tenders with garbled scanned lines
 
 ## Known limits
 
+**Extraction**
+
+- 6 of 19 tenders give wrong reports (by a read-through, not a measurement), and the extraction
+  warning flags 9 of 19 (those 6 and 3 more). A flagged report sends every result to review; it
+  does not fix the items. Wrong item rows on 8026686 and 8132165 are flagged, not fixed.
+- Scanned pages are not fixed. 8011173 (submersible pump) reads "SS304" as "55304" and splits its
+  table into 38 rows such as "No. il" and "3 4". It is not flagged, so a clean report does not
+  prove clean extraction.
+- Pump extraction:
+  - 7959356 (60 HP centrifugal pump): the pump table on `buyer_spec.pdf` page 2 came out as one
+    merged line, so its item holds 1 requirement, "Starter Panel", and it gets no technical
+    result. It is flagged.
+  - 8169451 (water circulation pump, scanned): 6 of its 11 specification rows never became
+    requirements (pump speed, size, seal, motor, spares, base plate). Not flagged, because its
+    item still holds 20 requirements.
+  - 8071357 (submersible sewerage pump) is fixed by the spec-row rule (1 requirement to 15).
+
 **Accuracy**
 
-- Recall: 25 rows labelled `full_match` stay `unsupported` with the judge. By cause, of the 37
-  labelled decisions left undecided: 15 have no catalogue field naming the attribute (codes stated
-  in prose, such as "Testing Standard : API 598"), 8 get no search hit above `RERANK_MIN_SCORE`
-  ("ZERO LEAKAGE", "HAND GEAR OPERATED", "Spring"), 5 are correct judge answers whose quote fails
-  the page check because table chunks are rebuilt as "Header: value" text. Three fixes were tried
-  and measured; each raised coverage but failed the gate (decided accuracy must not drop, stronger
-  than label must not rise), so all three were reverted:
+- Only 99 labelled rows on 5 tenders (1 pump). One row moves decided accuracy by about 2 points,
+  so the figures are not firm.
+- Recall: 25 rows labelled `full_match` stay `unsupported` with the judge. Most have no catalogue
+  field naming the attribute (codes stated in prose, such as "Testing Standard : API 598"), or a
+  correct judge answer whose quote fails the page check because table chunks are rebuilt as
+  "Header: value" text. Sending low-score passages to the judge added 1 row (above). Three earlier
+  fixes raised coverage but failed their gate and were reverted:
 
   | Change tried | Coverage with judge | Decided accuracy | Stronger | New wrong rows |
   |---|---|---|---|---|
@@ -280,57 +327,40 @@ The flag warns but does not fix anything. Two tenders with garbled scanned lines
   | All three together | 57% | 73% | 5 | "Spring", "Operator : Gear/HW", "Body seat : Stellite 21" |
   | Quote checked piece by piece, alone | 53% | 75% | 5 | "Gasket : Graphite or equivalent" |
 
-  Product type in front of short queries added only the wrong "Spring" row; sending coded rows
-  with no field to the judge added 1 right and 2 weaker rows.
-- The judge is not fully repeatable at temperature 0: "Gasket : Graphite or equivalent" was
-  `partial_match` in one run and `full_match` in the next. Single-row differences between runs
-  are within this noise.
+- Judge variation: at temperature 0 the judge still changes about 1 labelled row between fresh
+  runs ("Gasket : Graphite or equivalent" `partial_match` once, `full_match` the next; "Trim : 12
+  -> 16" `unsupported` once, `partial_match` the next). The cache makes reruns repeat the stored
+  answer, but any new question, prompt version or model gets a fresh, possibly different answer.
 - Evidence can come from another model in the same PDF. Catalogues with several product headings
   are read by heading, and unclear cases are capped at `partial_match`, but this is not solved.
-- Wrong item rows on 8026686 and 8132165 are flagged, not fixed.
-- Pump specifications often do not reach the items:
-  - 7959356 (60 HP centrifugal pump): still flagged. Its item holds 1 requirement, "Starter Panel".
-    Of its 73 catalogue-checkable general lines, 64 are ATC text about performance guarantees
-    filed as performance requirements; the pump table on `buyer_spec.pdf` page 2 came out as one
-    merged line. It needs a table-extraction fix, not the spec-row fix, so it gets no technical
-    result.
-  - 8071357 (submersible sewerage pump): fixed by the spec-row rule (1 requirement to 15).
-  - 8169451 (water circulation pump, scanned): 6 of its 11 specification rows never became
-    requirements: pump speed, size, seal, motor, spares and base plate. They are lost in the scan,
-    not in the general list, so the spec-row rule cannot recover them. Not flagged, because its
-    item still holds 20 requirements.
-- Scanned tenders are not fixed. 8011173 (submersible pump) reads "SS304" as "55304" and splits
-  its table into 38 rows such as "No. il" and "3 4"; 8169451 loses 6 of 11 rows. Neither is
-  flagged.
-- 99 labelled rows on 5 tenders (1 pump) are too few for firm figures: one row moves decided
-  accuracy by about 2 points.
 - Tied catalogues are not judged.
 
 **Not built yet**
 
-- Confidence has no factor for conflicting documents, and none for the source priority (datasheet
-  over catalogue), because conflicts are not detected.
-- Spec fact extraction exists but has never run on real documents, so `spec_facts` is empty. The
+- Spec fact extraction exists but has never run on real catalogues, so `spec_facts` is empty. The
   comparator reads labelled fields from chunks instead of the structured lookup the design planned.
-- Duncan and Intervalve Poonawala catalogues. The current manufacturers are Delval, KSB, Kirloskar
-  Brothers and L&T.
+- Confidence has no factor for conflicting documents, and none for source priority (datasheet over
+  catalogue), because conflicts are not detected.
+- Duncan and Intervalve Poonawala catalogues are missing. The current manufacturers are Delval,
+  KSB, Kirloskar Brothers and L&T.
 
 **Operations**
 
-- Jobs run in a queue inside the single API process, so a restart fails any run in progress. RQ and
-  Redis from the plan are not added.
+- No Redis queue: jobs run in a queue inside the single API process, so a restart fails any run in
+  progress. RQ and Redis from the plan are not added.
+- Files are not in Postgres: they stay in the mounted `data/` folder, and PDFs are not in git or
+  the images, so a fresh clone must supply them.
+- Docker images are not published to a registry; they are built locally with `docker compose up
+  --build`.
 - The Docker image is CPU only: 20 chunks took about 160 seconds to embed, so a new database should
   be embedded on a GPU host. A run with the judge took about 7 minutes on CPU.
-- PDFs are not in git or the images, so a fresh clone must supply them.
-- Gemini quota is unknown. A full pass over the 13 reliable tenders has 184 distinct lines to judge,
-  checked per manufacturer catalogue.
+- Gemini quota is unknown. The evaluation asked the judge 84 distinct questions on 5 tenders; a
+  full pass over the 13 reliable tenders has 184 distinct lines to judge, per catalogue.
 
 ## What to do next
 
-1. Raise recall with changes that pass the gate: a quote check that stays strict on table chunks
-   (cells checked in their own row), and judge prompts that keep "or equivalent" and "spring"
-   cautious. Rerun `eval/run_eval.py` after each.
-2. Fix extraction on scanned specification tables (8169451, 8011173) and the pump table of
-   7959356, then the flagged tenders, starting with item boundaries.
-3. Label more tenders, especially pumps, so the figures rest on more than 99 rows.
-4. Add the remaining manufacturers.
+1. Label more tenders, especially pumps, so the figures rest on more than 99 rows on 5 tenders.
+2. Run spec fact extraction on the real catalogues, so `spec_facts` is filled and numeric checks
+   use the structured lookup instead of text fields.
+3. Use Gemini vision extraction for the flagged tenders and the scanned pages (8011173, 8169451,
+   the pump table of 7959356).

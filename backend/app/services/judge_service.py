@@ -3,7 +3,8 @@
 Runs after the catalogue is chosen, so the judge never changes which document an item uses, and
 never mixes documents (B10). Retrieval comes first; with no evidence hit the LLM is not called.
 A run has a call limit and stops calling after repeated failures, so an exhausted quota costs
-some `unsupported` results instead of the run.
+some `unsupported` results instead of the run. Answers are cached by prompt and model, so a rerun
+gives the same results and calls nothing; failures are never cached.
 """
 
 import logging
@@ -17,7 +18,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import Settings
 from app.core.exceptions import ExternalServiceError
 from app.db.models import Chunk
-from app.db.repositories import ChunkRepository, EmbeddingRepository
+from app.db.repositories import ChunkRepository, EmbeddingRepository, JudgeAnswerRepository
 from app.db.session import session_scope
 from app.llm.base import LLMClient
 from app.llm.factory import build_llm_client
@@ -25,9 +26,11 @@ from app.matching.comparator import ComparatorOptions, needs_judge
 from app.matching.engine import ItemInput
 from app.matching.evidence_verifier import PageTexts, verify_comparison
 from app.matching.llm_judge import (
+    PROMPT_VERSION,
     JudgedItems,
     Passage,
     build_prompt,
+    cache_key,
     judged_comparison,
     undecided,
 )
@@ -54,6 +57,38 @@ class FoundEvidence:
 
     outcome: RetrievalOutcome
     passages: tuple[Passage, ...] = ()
+
+
+class VerdictCache(Protocol):
+    """Judge answers already given, by cache key."""
+
+    def get(self, key: str) -> JudgeVerdict | None:
+        """The stored answer, or None."""
+        ...
+
+    def put(self, key: str, model: str, verdict: JudgeVerdict) -> None:
+        """Store an answer."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class DbVerdictCache:
+    """Judge answers in the `judge_answers` table, one short transaction each."""
+
+    session_factory: sessionmaker[Session]
+
+    def get(self, key: str) -> JudgeVerdict | None:
+        """The stored answer, or None."""
+        with session_scope(self.session_factory) as session:
+            stored = JudgeAnswerRepository(session).verdict(key)
+        return JudgeVerdict.model_validate(stored) if stored is not None else None
+
+    def put(self, key: str, model: str, verdict: JudgeVerdict) -> None:
+        """Store an answer under its key."""
+        with session_scope(self.session_factory) as session:
+            JudgeAnswerRepository(session).store(
+                key, model, PROMPT_VERSION, verdict.model_dump(mode="json")
+            )
 
 
 class EvidenceFinder(Protocol):
@@ -89,12 +124,13 @@ class _Progress:
     """One tender's calls, failures and verdicts (a repeated line is judged once)."""
 
     calls: int = 0
+    cached: int = 0
     failed: int = 0
     failures_in_a_row: int = 0
     decisions: dict[tuple[str, str, str], _Decision] = field(default_factory=dict)
 
 
-def _passage(chunk: Chunk, code_only: bool) -> Passage:
+def _passage(chunk: Chunk, code_only: bool, low_score: bool = False) -> Passage:
     """A stored chunk as the judge reads it."""
     return Passage(
         chunk_id=str(chunk.id),
@@ -105,6 +141,7 @@ def _passage(chunk: Chunk, code_only: bool) -> Passage:
         raw_text=chunk.raw_text,
         section=chunk.section,
         code_only=code_only,
+        low_score=low_score,
     )
 
 
@@ -117,15 +154,17 @@ class DbEvidenceFinder:
     reranker: Reranker
     vocabulary: QueryVocabulary
     params: RetrievalParams
+    low_score_hits: int = 0
 
     def find(self, request: RetrievalRequest) -> FoundEvidence:
-        """Search one catalogue; only hits that count as evidence are returned.
+        """Search one catalogue; hits that count as evidence, else the best few below it.
 
         Args:
             request: The requirement and the catalogue to search.
 
         Returns:
-            The outcome and the accepted passages, best first.
+            The outcome and the passages, best first: the accepted ones, or, when the product's
+            passages all score below the threshold, the best `low_score_hits` marked low_score.
 
         Raises:
             ExternalServiceError: If the embedder or reranker fails.
@@ -142,9 +181,13 @@ class DbEvidenceFinder:
             )
             result = retriever.retrieve(request)
             hits = retriever.evidence_hits(result)
+            low = not hits and result.outcome is RetrievalOutcome.BELOW_THRESHOLD
+            if low:
+                hits = result.hits[: self.low_score_hits]
             found = {c.id: c for c in chunks.list_by_ids([h.chunk_id for h in hits])}
             passages = tuple(
-                _passage(found[h.chunk_id], h.rerank_score < self.params.min_score) for h in hits
+                _passage(found[h.chunk_id], not low and h.rerank_score < self.params.min_score, low)
+                for h in hits
             )
             return FoundEvidence(result.outcome, passages)
 
@@ -152,10 +195,17 @@ class DbEvidenceFinder:
 class JudgeService:
     """Decide free-text and unlabelled requirements with retrieval and the LLM."""
 
-    def __init__(self, llm: LLMClient, finder: EvidenceFinder, options: JudgeOptions) -> None:
+    def __init__(
+        self,
+        llm: LLMClient,
+        finder: EvidenceFinder,
+        options: JudgeOptions,
+        cache: VerdictCache | None = None,
+    ) -> None:
         self._llm = llm
         self._finder = finder
         self._options = options
+        self._cache = cache
 
     def judge_items(
         self, inputs: Sequence[ItemInput], reports: Sequence[ItemReport], pages: PageTexts
@@ -182,10 +232,13 @@ class JudgeService:
             )
             for entry, report in zip(inputs, reports, strict=True)
         ]
-        logger.info("judge done", extra={"calls": progress.calls, "failed": progress.failed})
-        if not progress.calls:
+        logger.info(
+            "judge done",
+            extra={"calls": progress.calls, "cached": progress.cached, "failed": progress.failed},
+        )
+        if not progress.calls and not progress.cached:
             return JudgedItems(judged, "rules")
-        summary = f"{progress.calls} calls, {progress.failed} failed"
+        summary = f"{progress.calls} calls, {progress.cached} cached, {progress.failed} failed"
         return JudgedItems(judged, f"rules + {self._llm.model_name} ({summary})")
 
     def _manufacturer(
@@ -258,10 +311,15 @@ class JudgeService:
             found = self._finder.find(request)
             if not found.passages:
                 return _Decision(note=f"no evidence in this catalogue ({found.outcome.value})")
+            prompt = build_prompt(requirement, request.product_type, heading, found.passages)
+            key = cache_key(prompt, self._llm.model_name)
+            cached = self._cache.get(key) if self._cache else None
+            if cached is not None:
+                progress.cached += 1
+                return _Decision(verdict=cached, passages=found.passages)
             if progress.calls >= options.max_calls:
                 return _Decision(note="LLM judge skipped: call limit for this run reached")
             progress.calls += 1
-            prompt = build_prompt(requirement, request.product_type, heading, found.passages)
             verdict = self._llm.generate_json(prompt, JudgeVerdict)
         except ExternalServiceError as exc:
             progress.failed += 1
@@ -269,6 +327,8 @@ class JudgeService:
             logger.warning("judge failed", extra={"error": exc.message})
             return _Decision(note=f"LLM judge failed: {exc.message}")
         progress.failures_in_a_row = 0
+        if self._cache:
+            self._cache.put(key, self._llm.model_name, verdict)
         return _Decision(verdict=verdict, passages=found.passages)
 
 
@@ -300,6 +360,7 @@ def build_judge_service(settings: Settings, session_factory: sessionmaker[Sessio
             build_reranker(settings),
             vocabulary,
             RetrievalParams.from_settings(settings),
+            settings.LLM_JUDGE_LOW_SCORE_HITS,
         ),
         JudgeOptions(
             comparator=ComparatorOptions.from_settings(settings),
@@ -308,4 +369,5 @@ def build_judge_service(settings: Settings, session_factory: sessionmaker[Sessio
             max_calls=settings.LLM_JUDGE_MAX_CALLS,
             max_failures=settings.LLM_JUDGE_MAX_FAILURES,
         ),
+        DbVerdictCache(session_factory),
     )

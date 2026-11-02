@@ -73,6 +73,7 @@ class ReviewFlag(StrEnum):
     HEADING_UNCLEAR = "heading_unclear"  # no product heading clearly owns the evidence
     TIED_CATALOGUES = "tied_catalogues"  # nothing tells the best catalogues apart
     CODE_ONLY_HIT = "code_only_hit"  # search accepted the passage only for a code it holds
+    LOW_SCORE_HIT = "low_score_hit"  # no passage reached the rerank threshold
 
 
 class DecisionSource(StrEnum):

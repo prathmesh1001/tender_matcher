@@ -6,6 +6,7 @@ the quote must name the attribute (like for like), and the caller verifies the q
 Anything that fails stays `unsupported` + needs_review. Every LLM decision goes to review.
 """
 
+import hashlib
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -19,6 +20,9 @@ from app.schemas.matching import Comparison, Evidence, JudgeStatus, JudgeVerdict
 from app.schemas.report import ItemReport
 from app.schemas.requirements import Requirement
 from app.tender.normalizer import stems
+
+# Raise when the prompt's wording changes, so cached answers to the old wording are not reused.
+PROMPT_VERSION: Final = "1"
 
 _PROMPT: Final = """\
 You check one requirement from a government tender against passages from one manufacturer's \
@@ -56,6 +60,7 @@ class Passage:
     raw_text: str
     section: str | None = None
     code_only: bool = False
+    low_score: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +107,20 @@ def build_prompt(
             for p in passages
         ),
     )
+
+
+def cache_key(prompt: str, model: str) -> str:
+    """Key of one judge question: the same prompt to the same model gets the same answer.
+
+    Args:
+        prompt: The full prompt (requirement text and passages with their chunk ids).
+        model: The model asked.
+
+    Returns:
+        sha256 of prompt version, model and prompt.
+    """
+    text = f"{PROMPT_VERSION}\n{model}\n{prompt}"
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def names_attribute(
@@ -197,5 +216,8 @@ def judged_comparison(
                 reason=reason,
             )
         ],
-        flags=[ReviewFlag.CODE_ONLY_HIT] if cited.code_only else [],
+        flags=[
+            *([ReviewFlag.CODE_ONLY_HIT] if cited.code_only else []),
+            *([ReviewFlag.LOW_SCORE_HIT] if cited.low_score else []),
+        ],
     )

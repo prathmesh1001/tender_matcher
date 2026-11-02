@@ -420,6 +420,12 @@ class Settings(BaseSettings):
     LLM_JUDGE_MAX_CALLS: int = Field(
         default=200, ge=1, description="Most LLM judge calls for one tender, to protect the quota."
     )
+    LLM_JUDGE_LOW_SCORE_HITS: int = Field(
+        default=3,
+        ge=0,
+        description="When the right product's passages all score below RERANK_MIN_SCORE, this "
+        "many of the best go to the judge instead of ending unsupported (0 turns it off).",
+    )
     LLM_JUDGE_MAX_FAILURES: int = Field(
         default=3, ge=1, description="LLM judge failures in a row before a run stops calling."
     )

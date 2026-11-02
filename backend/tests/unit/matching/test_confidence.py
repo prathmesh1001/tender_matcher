@@ -147,3 +147,11 @@ def test_items_get_confidence_on_results_and_tied_rows_and_rescored() -> None:
     assert m.results[0].confidence == 0.7
     assert m.tied_rows[0].results[0].confidence == 0.7
     assert m.score.needs_review == 1
+
+
+def test_a_low_score_hit_lowers_an_llm_decision_further() -> None:
+    result = _result(decided_by=DecisionSource.LLM, flags=[ReviewFlag.LOW_SCORE_HIT])
+    judged = with_confidence(result, _Facts(), OPTIONS)
+    assert judged.confidence == 0.56
+    assert judged.confidence_factors == ["LLM decision x0.7", "search score below threshold x0.8"]
+    assert judged.needs_review

@@ -1,9 +1,10 @@
 """How far a decided result can be trusted (CLAUDE.md section 7, confidence).
 
 Confidence starts at 1.0 and each weakness found in the facts multiplies it down: an LLM
-decision, evidence only from brochures, an OCR page, a search hit accepted only by a code, a
-rule flag (near miss, misread, unclear heading, tied catalogues). A weakness is counted only
-when the facts show it, never guessed. Below the threshold the result goes to review.
+decision, evidence only from brochures, an OCR page, a search hit accepted only by a code or
+scoring below the threshold, a rule flag (near miss, misread, unclear heading, tied
+catalogues). A weakness is counted only when the facts show it, never guessed. Below the
+threshold the result goes to review.
 `unsupported` and `not_applicable` decide nothing, so they get no confidence.
 
 Conflicting documents would lower it too, but no conflicts are detected yet (`spec_facts`
@@ -85,6 +86,9 @@ def weaknesses(
     if "code_only_hit" in flags:
         flags.remove("code_only_hit")
         found.append(("found only by a code", options.code_only))
+    if "low_score_hit" in flags:
+        flags.remove("low_score_hit")
+        found.append(("search score below threshold", options.code_only))
     if flags:
         found.append((f"rule flag: {', '.join(f.replace('_', ' ') for f in flags)}", options.flag))
     return found

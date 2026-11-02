@@ -9,7 +9,13 @@ from app.matching.comparator import ComparatorOptions, MatchContext
 from app.matching.engine import ItemInput
 from app.matching.llm_judge import JudgedItems, Passage
 from app.matching.scorer import score
-from app.schemas.enums import DecisionSource, MatchStatus, Operator, RequirementType
+from app.schemas.enums import (
+    DecisionSource,
+    MatchStatus,
+    Operator,
+    RequirementType,
+    ReviewFlag,
+)
 from app.schemas.matching import Comparison, JudgeStatus, JudgeVerdict, LabelBasis, SubTypeFit
 from app.schemas.report import CandidateSummary, ItemReport, ManufacturerItemReport
 from app.schemas.requirements import LineItem, Requirement, ValueKind
@@ -170,7 +176,7 @@ def test_a_verified_verdict_becomes_a_scored_llm_decision() -> None:
     assert result.needs_review
     assert result.evidence[0].verified is True
     assert judged.reports[0].manufacturers[0].score.compatibility_pct == 100.0
-    assert judged.decided_by == "rules + fake-model (1 calls, 0 failed)"
+    assert judged.decided_by == "rules + fake-model (1 calls, 0 cached, 0 failed)"
 
 
 def test_search_stays_inside_the_chosen_catalogue() -> None:
@@ -209,7 +215,7 @@ def test_an_llm_failure_leaves_the_requirement_unsupported_and_the_run_alive() -
     judged = _service(llm, _Finder()).judge_items(inputs, reports, _Pages())
     assert _results(judged)[0].status is MatchStatus.UNSUPPORTED
     assert "LLM judge failed" in _results(judged)[0].reason
-    assert judged.decided_by == "rules + fake-model (1 calls, 1 failed)"
+    assert judged.decided_by == "rules + fake-model (1 calls, 0 cached, 1 failed)"
 
 
 def test_a_retrieval_failure_leaves_the_requirement_unsupported() -> None:
@@ -265,3 +271,68 @@ def test_a_tie_or_missing_catalogue_is_not_judged() -> None:
     assert llm.prompts == []
     assert judged.reports[0] == reports[0]
     assert judged.decided_by == "rules"
+
+
+class _Cache:
+    def __init__(self) -> None:
+        self.stored: dict[str, JudgeVerdict] = {}
+
+    def get(self, key: str) -> JudgeVerdict | None:
+        return self.stored.get(key)
+
+    def put(self, key: str, model: str, verdict: JudgeVerdict) -> None:
+        self.stored[key] = verdict
+
+
+def _cached_service(llm: _Llm, cache: _Cache) -> JudgeService:
+    service = _service(llm, _Finder())
+    return JudgeService(llm, _Finder(), service._options, cache)
+
+
+def test_a_rerun_answers_from_the_cache_without_calling() -> None:
+    cache, llm = _Cache(), _Llm()
+    inputs, reports = _inputs([_requirement()])
+    first = _cached_service(llm, cache).judge_items(inputs, reports, _Pages())
+    second = _cached_service(llm, cache).judge_items(inputs, reports, _Pages())
+    assert len(llm.prompts) == 1
+    assert _results(second) == _results(first)
+    assert second.decided_by == "rules + fake-model (0 calls, 1 cached, 0 failed)"
+
+
+def test_a_failure_is_not_cached() -> None:
+    cache = _Cache()
+    inputs, reports = _inputs([_requirement()])
+    _cached_service(_Llm(ExternalServiceError("HTTP 429")), cache).judge_items(
+        inputs, reports, _Pages()
+    )
+    assert cache.stored == {}
+
+
+def test_another_model_or_prompt_gets_another_key() -> None:
+    from app.matching.llm_judge import cache_key
+
+    assert cache_key("prompt", "model-a") != cache_key("prompt", "model-b")
+    assert cache_key("prompt", "model-a") != cache_key("prompt 2", "model-a")
+    assert cache_key("prompt", "model-a") == cache_key("prompt", "model-a")
+
+
+def test_low_score_passages_reach_the_judge_and_are_flagged() -> None:
+    llm = _Llm()
+    weak = Passage("chunk-1", "s.pdf", SHA, "Synthetic", 7, f"{QUOTE} as standard", low_score=True)
+    finder = _Finder(FoundEvidence(RetrievalOutcome.BELOW_THRESHOLD, (weak,)))
+    inputs, reports = _inputs([_requirement()])
+    judged = _service(llm, finder).judge_items(inputs, reports, _Pages())
+    result = _results(judged)[0]
+    assert len(llm.prompts) == 1
+    assert result.status is MatchStatus.FULL_MATCH
+    assert ReviewFlag.LOW_SCORE_HIT in result.flags
+    assert result.needs_review
+
+
+def test_a_low_score_quote_off_the_page_stays_unsupported() -> None:
+    weak = Passage("chunk-1", "s.pdf", SHA, "Synthetic", 7, f"{QUOTE} as standard", low_score=True)
+    finder = _Finder(FoundEvidence(RetrievalOutcome.BELOW_THRESHOLD, (weak,)))
+    inputs, reports = _inputs([_requirement()])
+    judged = _service(_Llm(), finder).judge_items(inputs, reports, _Pages("Something else"))
+    assert _results(judged)[0].status is MatchStatus.UNSUPPORTED
+    assert _results(judged)[0].needs_review
