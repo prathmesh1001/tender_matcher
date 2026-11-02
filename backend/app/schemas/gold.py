@@ -90,6 +90,7 @@ class RunCell(BaseModel):
         description="Status agrees and a gold page is cited; None if gold cites no page or "
         "the status differs."
     )
+    confidence: float | None = Field(default=None, description="The run's confidence, if any.")
 
 
 class RowDiff(BaseModel):

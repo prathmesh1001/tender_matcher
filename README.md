@@ -159,6 +159,14 @@ cd backend  && ruff check . && mypy && pytest      # DB tests skip if the db con
 cd frontend && npm run lint && npm run typecheck && npm test
 ```
 
+Accuracy against the hand labels in `eval/gold/` (writes `eval/results.md` and `eval/diffs/`):
+
+```sh
+cd backend
+python ../eval/run_eval.py            # rules only
+python ../eval/run_eval.py --judge    # also rules + LLM judge; calls Gemini
+```
+
 `backend/constraints.txt` pins the versions the image installs.
 
 ## Known limits

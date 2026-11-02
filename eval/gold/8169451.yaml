@@ -1,0 +1,97 @@
+# Hand labels for tender GEM/2026/B/8169451 (single stage water circulation pump).
+#
+# Drafted by Claude on 2026-11-02 from the rendered image of buyer_spec.pdf page 1 (the text layer
+# is OCR and partly garbled) and from the catalogue pages, never from the system's output.
+# Checked by the user on 2026-11-02.
+#
+# Only the technical rows that reached the item are labelled. Of the 11 rows of the tender's
+# specification table, these did not reach the item as requirements at all, so nothing here can
+# score them: pump speed 2930 RPM, size 65 x 80 mm, mechanical/gland seal, motor 15 kW (20 HP)
+# 3 phase IP 55, the spares list and the common base plate. Flow 110.160 m3/h (30.60 L/s) at
+# 32.20 m is merged into the pump description row.
+#
+# Kirloskar: the duty (2 pole, 15 kW / 20 HP) fits only model KDS-2050+** of the KDS family, so
+# every Kirloskar label is read for the KDS family and never mixes in another family's values.
+# KDS-2050+ gives 28.8 L/s at 32 m head (p2 chart), short of the 30.6 L/s asked, and its pipe
+# sizes are 100 x 80 mm, not 65 x 80 mm.
+#
+# Status: full_match | partial_match | missing_capability | unsupported.
+tender: GEM_2026_B_8169451
+source: Claude draft from buyer_spec.pdf p1 and catalogue pages, checked by the user
+
+evaluations:
+  - item_no: "1"
+    manufacturer: Kirloskar Brothers
+    document: kbl_monobloc_kds_ks_kdt_srf_kdi.pdf
+    requirements:
+      - id: "1.buyer_spec.pdf.1.1"
+        manual_row: Pump description, centrifugal single stage, motor on MS base plate (flow merged in)
+        status: partial_match
+        pages: [2]
+        evidence: 'p2 "2 POLE, MONOBLOC PUMPS"; KDS-2050+ gives 28.8 L/s at 32 m'
+        note: >-
+          Centrifugal water pump, but a monobloc (pump and motor share one shaft), not a pump with
+          its motor on a base plate; the flow merged into this row is a near miss (28.8 vs 30.6 L/s).
+          Could be argued as missing_capability for the duty point.
+      - id: "1.buyer_spec.pdf.2.1"
+        manual_row: Casing cast iron IS 210 FG 260
+        status: partial_match
+        pages: [2]
+        evidence: 'p2 "Delivery Casing  Cast Iron" (KDS column)'
+        note: Cast iron stated, grade FG 260 not printed.
+      - id: "1.buyer_spec.pdf.2.2.1"
+        manual_row: Impeller bronze IS 318 GR-LTB2
+        status: partial_match
+        pages: [2]
+        evidence: 'p2 "Impeller  Cast Iron/ Bronze /Stainless Steel" (KDS column)'
+        note: Bronze is one of the options, grade LTB2 not printed.
+      - id: "1.buyer_spec.pdf.2.2.2"
+        manual_row: Impeller type enclosed
+        status: unsupported
+        evidence: impeller type not stated
+      - id: "1.buyer_spec.pdf.2.3"
+        manual_row: Shaft SS ASTM A276-410
+        status: partial_match
+        pages: [2]
+        evidence: 'p2 "Pump Shaft  Carbon Steel /Stainless Steel" (KDS column)'
+        note: Stainless steel is one of the options, grade 410 not printed.
+      - id: "1.buyer_spec.pdf.3.1"
+        manual_row: Liquid water at ambient temperature
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "Performance applicable to liquid of specific gravity 1 and viscosity as of water."'
+        note: No temperature is printed; ambient water is read as covered by the water note.
+
+  - item_no: "1"
+    manufacturer: KSB
+    document: ksb_etanorm_brochure.pdf
+    requirements:
+      - id: "1.buyer_spec.pdf.1.1"
+        manual_row: Pump description, centrifugal single stage, motor on MS base plate (flow merged in)
+        status: unsupported
+        evidence: >-
+          "Standardised Water Pumps" for "Cooling circuits" (p1); single stage, centrifugal and
+          base plate are not stated, and no performance curve is given (only "Up to 640 m3/h").
+      - id: "1.buyer_spec.pdf.2.1"
+        manual_row: Casing cast iron IS 210 FG 260
+        status: unsupported
+        evidence: >-
+          p2 lists "Grey cast iron EN-GJL-250" as a material variant of the pump, without naming
+          the casing: no value for this component.
+      - id: "1.buyer_spec.pdf.2.2.1"
+        manual_row: Impeller bronze IS 318 GR-LTB2
+        status: unsupported
+        evidence: p2 lists "Bronze CC480K-GS" as a material variant, without naming the impeller.
+      - id: "1.buyer_spec.pdf.2.2.2"
+        manual_row: Impeller type enclosed
+        status: unsupported
+        evidence: impeller type not stated
+      - id: "1.buyer_spec.pdf.2.3"
+        manual_row: Shaft SS ASTM A276-410
+        status: unsupported
+        evidence: shaft material not stated
+      - id: "1.buyer_spec.pdf.3.1"
+        manual_row: Liquid water at ambient temperature
+        status: full_match
+        pages: [1, 2]
+        evidence: 'p1 "Water supply systems", "Cooling circuits"; p2 "Fluid temperature -30 °C to +140 °C"'

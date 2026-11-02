@@ -93,7 +93,12 @@ def _cell(gold: GoldRequirement, found: Comparison | None, same_catalogue: bool)
     result = verdict(gold.status, found.status)
     agrees = bool(set(pages) & set(gold.pages)) if gold.pages and result is Verdict.AGREE else None
     return RunCell(
-        status=found.status, pages=pages, reason=found.reason, verdict=result, page_agrees=agrees
+        status=found.status,
+        pages=pages,
+        reason=found.reason,
+        verdict=result,
+        page_agrees=agrees,
+        confidence=found.confidence,
     )
 
 
