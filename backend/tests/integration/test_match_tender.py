@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 import yaml
 from openpyxl import Workbook
+from pydantic import HttpUrl
 
 from app.core.config import Settings
 from app.ingestion.chunker import table_row_text
@@ -98,7 +99,7 @@ def _source() -> RegisteredSource:
         sub_types=["triple_offset"],
         title="Synthetic triple offset catalogue",
         doc_type=DocType.CATALOGUE,
-        url="https://example.com/synthetic.pdf",
+        url=HttpUrl("https://example.com/synthetic.pdf"),
         fetched_at=datetime(2026, 1, 1, tzinfo=UTC),
         publish_date=None,
         sha256="c" * 64,

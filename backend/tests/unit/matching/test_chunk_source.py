@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from pydantic import HttpUrl
 
 from app.core.exceptions import NotFoundError
 from app.ingestion.processing import ProcessedDocument, ProcessedPage
@@ -31,7 +32,7 @@ def _source(sha: str, product_types: list[str], manufacturer: str = "Acme") -> R
         sub_types=[],
         title=f"Synthetic catalogue {sha[0]}",
         doc_type=DocType.CATALOGUE,
-        url="https://example.com/synthetic.pdf",
+        url=HttpUrl("https://example.com/synthetic.pdf"),
         fetched_at=datetime(2026, 1, 1, tzinfo=UTC),
         publish_date=None,
         sha256=sha,

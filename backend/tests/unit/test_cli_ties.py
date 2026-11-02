@@ -91,7 +91,7 @@ def test_match_tender_shows_a_tie_with_its_shared_score(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     monkeypatch.setattr(cli, "build_match_service", lambda settings: _Service())
-    settings = Settings(_env_file=None, DATABASE_URL="postgresql+psycopg://u:p@localhost/db")  # type: ignore[call-arg]
+    settings = Settings(_env_file=None, DATABASE_URL="postgresql+psycopg://u:p@localhost/db")  # type: ignore[arg-type]
     code = cli.run_match(settings, "T", use_ontology=True, out=str(tmp_path / "r.json"))
     line = next(x for x in capsys.readouterr().out.splitlines() if "Acme" in x)
     assert code == 0

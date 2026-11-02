@@ -20,7 +20,7 @@ from app.tender.splitter import SplitOptions, item_requirements, leaves
 
 ONTOLOGY_DIR = Path(__file__).resolve().parents[3] / "ontology"
 OPTIONS = ComparatorOptions.from_settings(
-    Settings(_env_file=None, DATABASE_URL="postgresql+psycopg://u:p@localhost/db")  # type: ignore[call-arg]
+    Settings(_env_file=None, DATABASE_URL="postgresql+psycopg://u:p@localhost/db")  # type: ignore[arg-type]
 )  # config defaults
 SPLIT = SplitOptions(label_max_words=6, enum_max_words=2)
 DOC = CatalogueDocument(

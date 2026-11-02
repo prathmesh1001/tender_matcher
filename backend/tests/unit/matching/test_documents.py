@@ -26,7 +26,7 @@ from app.tender.splitter import SplitOptions, item_requirements, leaves
 
 ONTOLOGY_DIR = Path(__file__).resolve().parents[3] / "ontology"
 OPTIONS = SelectionOptions.from_settings(
-    Settings(_env_file=None, DATABASE_URL="postgresql+psycopg://u:p@localhost/db")  # type: ignore[call-arg]
+    Settings(_env_file=None, DATABASE_URL="postgresql+psycopg://u:p@localhost/db")  # type: ignore[arg-type]
 )
 TITLE = "TRIPLE OFFSET BUTTERFLY VALVE,250MM"
 BOTH = pytest.mark.parametrize("with_ontology", [True, False], ids=["ontology", "no-ontology"])
