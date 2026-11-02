@@ -225,8 +225,10 @@ class IngestionService:
         manifest = (
             read_manifest(manifest_path) if manifest_path.is_file() else init_manifest(tender_dir)
         )
+        new = not manifest_path.is_file()
         report = self._crawler(client).crawl(self.store.ref_for(tender_dir), manifest)
-        write_manifest(manifest_path, manifest)
+        if new or report.fetched:  # a tracked provenance file: only rewritten when it changes
+            write_manifest(manifest_path, manifest)
         return report
 
     def ingest_tenders(

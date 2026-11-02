@@ -2,7 +2,7 @@
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.schemas.enums import DecisionSource, MatchStatus
 
@@ -67,6 +67,13 @@ class Comparison(BaseModel):
         description="Fields behind the status; for unsupported, labelled fields that decided "
         "nothing (cited so a reviewer can look).",
     )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def capability(self) -> str | None:
+        """What the catalogue states for this requirement: the field that decided it, as printed."""
+        deciding = next((e for e in self.evidence if e.status is not None), None)
+        return f"{deciding.label}: {deciding.value}" if deciding else None
 
 
 class DocumentResult(BaseModel):

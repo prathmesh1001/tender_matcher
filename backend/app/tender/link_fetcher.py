@@ -294,9 +294,18 @@ def bid_number_from_pdf(path: Path) -> str:
     return match.group(0)
 
 
-def tender_folder(bid_number: str) -> str:
-    """The folder of a tender ("GEM/2026/B/1234567" -> "GEM_2026_B_1234567")."""
-    return bid_number.replace("/", "_")
+def tender_folder(bid_number: str, revision: int = 1) -> str:
+    """The folder of a tender revision.
+
+    Args:
+        bid_number: "GEM/2026/B/1234567".
+        revision: Which bid.pdf of that bid.
+
+    Returns:
+        "GEM_2026_B_1234567", with "_r2" and so on after the first revision.
+    """
+    folder = bid_number.replace("/", "_")
+    return folder if revision == 1 else f"{folder}_r{revision}"
 
 
 def init_manifest(tender_dir: Path) -> TenderManifest:

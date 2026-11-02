@@ -144,6 +144,7 @@ def _result_row(
         tied=source.tied,
         status=comparison.status,
         score=ctx.status_scores.get(comparison.status),
+        capability=comparison.capability,
         needs_review=comparison.needs_review,
         decided_by=comparison.decided_by,
         basis=comparison.basis,

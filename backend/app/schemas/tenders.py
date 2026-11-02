@@ -14,4 +14,5 @@ class TenderUploadResponse(BaseModel):
     filename: str
     pages: int
     bid_number: str
+    revision: int
     created: bool

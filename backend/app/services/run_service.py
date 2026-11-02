@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import Settings
 from app.core.exceptions import AppError, InvalidInputError
 from app.core.logging import log_context
-from app.db.models import Run
+from app.db.models import Run, Tender
 from app.db.repositories import RunRepository, TenderRepository
 from app.db.session import session_scope
 from app.schemas.enums import RunStatus
@@ -62,6 +62,17 @@ def _response(run: Run) -> RunResponse:
         started_at=run.started_at,
         finished_at=run.finished_at,
     )
+
+
+def _folder(tender: Tender) -> str:
+    """The tender revision's folder name.
+
+    Raises:
+        InvalidInputError: If the tender has no bid number, so it has no folder.
+    """
+    if tender.bid_number is None:
+        raise InvalidInputError(f"Tender {tender.id} has no bid number")
+    return tender_folder(tender.bid_number, tender.revision)
 
 
 def failure_reason(exc: Exception, max_chars: int) -> str:
@@ -167,27 +178,19 @@ class RunService:
             run = RunRepository(session).get_or_raise(run_id)
             run.status = RunStatus.RUNNING
             run.started_at = datetime.now(UTC)
-            folder = self._folder(session, run)
+            tender = TenderRepository(session).get_or_raise(run.tender_id)
+            folder = _folder(tender)
+            used = {"tender_revision": tender.revision, "bid_sha256": tender.sha256}
             names = run.manufacturers
         unfetched = self._fetch_links(folder)
         report = self._matcher().match_tender(folder, manufacturers=names, unfetched=unfetched)
+        report = report.model_copy(update=used)
         with session_scope(self._session_factory) as session:
             build_report_service(session, self._settings).save(run_id, report)
             run = RunRepository(session).get_or_raise(run_id)
             run.status = RunStatus.DONE
             run.finished_at = datetime.now(UTC)
         logger.info("run done")
-
-    def _folder(self, session: Session, run: Run) -> str:
-        """The tender's folder name.
-
-        Raises:
-            InvalidInputError: If the tender has no bid number, so it has no folder.
-        """
-        tender = TenderRepository(session).get_or_raise(run.tender_id)
-        if tender.bid_number is None:
-            raise InvalidInputError(f"Tender {tender.id} has no bid number")
-        return tender_folder(tender.bid_number)
 
     def _finish_failed(self, run_id: uuid.UUID, reason: str) -> None:
         with session_scope(self._session_factory) as session:

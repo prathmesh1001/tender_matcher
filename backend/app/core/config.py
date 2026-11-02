@@ -332,6 +332,12 @@ class Settings(BaseSettings):
         description="Words that make an item title a sentence, never one that is also a code "
         "('IS 6438') (JSON list).",
     )
+    EXTRACTION_MERGED_TITLE_LEAD_WORDS: int = Field(
+        default=2,
+        ge=1,
+        description="Comma-separated parts of an Item Category row starting with this many same "
+        "words are several products merged into one item.",
+    )
     EXTRACTION_BAD_TITLE_SHARE: float = Field(
         default=0.5,
         ge=0,

@@ -45,6 +45,30 @@ def score(comparisons: Sequence[Comparison], status_scores: Mapping[MatchStatus,
     )
 
 
+def score_explanation(status_scores: Mapping[MatchStatus, float], min_coverage_pct: float) -> str:
+    """How the numbers of a report are worked out, in plain words.
+
+    Args:
+        status_scores: Score of each decided status.
+        min_coverage_pct: Coverage below this marks a manufacturer `low_coverage`.
+
+    Returns:
+        The explanation, with the scores and minimum in force.
+    """
+    scores = ", ".join(f"{s.value} = {v:g}" for s, v in status_scores.items())
+    return (
+        f"Each requirement a catalogue can decide gets a score: {scores}. "
+        "Compatibility % is the total score divided by the number of decided requirements, times "
+        "100; every requirement counts the same. Requirements with no evidence (unsupported) are "
+        "left out of it, so they cannot lower or raise it. Coverage % is the decided requirements "
+        "divided by all requirements except not_applicable, times 100, and shows how much of the "
+        "tender that compatibility rests on. Manufacturers are ranked by compatibility, then "
+        f"coverage; those below {min_coverage_pct:g}% coverage are marked low coverage and listed "
+        "after the others, so a high score on little evidence cannot lead. General requirements "
+        "(warranty, turnover, certificates) are listed separately and never enter the score."
+    )
+
+
 def rank(
     by_manufacturer: Mapping[str, Sequence[Comparison]],
     with_catalogue: Mapping[str, int],

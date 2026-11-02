@@ -35,9 +35,10 @@ from app.matching.engine import (
     item_for_review,
     match_item,
 )
-from app.matching.scorer import rank
+from app.matching.scorer import rank, score_explanation
 from app.ontology.loader import load_ontologies
 from app.ontology.schema import Ontology
+from app.reporting.status_lists import status_lists
 from app.reporting.warnings import single_firm_warning
 from app.retrieval.text_normalizer import SearchVocabulary
 from app.schemas.enums import ExtractionStatus
@@ -229,6 +230,11 @@ class MatchService:
             ontology_used=use_ontology,
             items=reports,
             ranking=self._ranking(reports),
+            score_explanation=score_explanation(
+                self._selection.status_scores, self._selection.min_coverage_pct
+            ),
+            status_scores=self._selection.status_scores,
+            status_lists=status_lists(reports),
             general_requirements=parsed.general,
             general_results=general,
             named_makes=parsed.named_makes,

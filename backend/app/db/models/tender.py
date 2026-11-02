@@ -22,9 +22,14 @@ if TYPE_CHECKING:
 
 
 class Tender(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """A GeM bid, identified by its bid.pdf. Unique by bid.pdf hash so re-uploads reuse it."""
+    """One revision of a GeM bid, identified by its bid.pdf.
+
+    Unique by bid.pdf hash, so re-uploads reuse it. A different bid.pdf for the same bid number is
+    a new revision with its own row and folder; older ones and their runs stay as they are.
+    """
 
     __tablename__ = "tenders"
+    __table_args__ = (UniqueConstraint("bid_number", "revision"),)
 
     filename: Mapped[str] = mapped_column(String(512))
     file_path: Mapped[str] = mapped_column(Text)
@@ -32,6 +37,9 @@ class Tender(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     category: Mapped[str | None] = mapped_column(String(64))
     title: Mapped[str | None] = mapped_column(Text)
     bid_number: Mapped[str | None] = mapped_column(String(128))
+    revision: Mapped[int] = mapped_column(
+        default=1, server_default="1", comment="1 = first bid.pdf stored for this bid number."
+    )
     gem_bid_id: Mapped[str | None] = mapped_column(String(32))
     page_count: Mapped[int] = mapped_column(default=0)
 

@@ -85,7 +85,7 @@ class ExtractionIssueCode(StrEnum):
 
     TITLES_NOT_PRODUCTS = "titles_not_products"
     OVERSIZED_ITEM = "oversized_item"
-    ITEM_CATEGORY_FALLBACK = "item_category_fallback"
+    MERGED_ITEM_CATEGORY = "merged_item_category"
     LOW_CONFIDENCE_OCR = "low_confidence_ocr"
     FILES_NOT_FETCHED = "files_not_fetched"
 

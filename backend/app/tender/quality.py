@@ -3,10 +3,10 @@
 A wrong schedule gives confident-looking results about the wrong things, and no comparison can
 notice that. So the extraction itself is judged, by what it looks like and never by which
 tender it is: titles that name no product and read as fragments or sentences, an item holding
-far more requirements than one product has, items that only come from the bid's Item Category
-row, requirements read from low-confidence OCR, linked files that could not be fetched (the
-specification may be in one). Any of these marks the tender unreliable; that sends every result
-to review and changes no status.
+far more requirements than one product has, a bid's Item Category row merging several products
+into one item, requirements read from low-confidence OCR, linked files that could not be fetched
+(the specification may be in one). Any of these marks the tender unreliable; that sends every
+result to review and changes no status.
 """
 
 from collections.abc import Sequence
@@ -21,6 +21,7 @@ from app.tender.normalizer import words
 
 _EXAMPLES: Final = 3
 _EXAMPLE_CHARS: Final = 40
+_TITLE_PART_SEPARATOR: Final = ","
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +31,7 @@ class QualityRules:
     fragment_max_words: int
     sentence_min_words: int
     sentence_words: frozenset[str]
+    merged_title_lead_words: int
     bad_title_share: float
     max_item_requirements: int
     ocr_min_confidence: float
@@ -42,6 +44,7 @@ class QualityRules:
             fragment_max_words=settings.EXTRACTION_TITLE_FRAGMENT_MAX_WORDS,
             sentence_min_words=settings.EXTRACTION_TITLE_SENTENCE_MIN_WORDS,
             sentence_words=frozenset(settings.EXTRACTION_TITLE_SENTENCE_WORDS),
+            merged_title_lead_words=settings.EXTRACTION_MERGED_TITLE_LEAD_WORDS,
             bad_title_share=settings.EXTRACTION_BAD_TITLE_SHARE,
             max_item_requirements=settings.EXTRACTION_MAX_ITEM_REQUIREMENTS,
             ocr_min_confidence=settings.EXTRACTION_OCR_MIN_CONFIDENCE,
@@ -146,14 +149,36 @@ def _ocr_issue(items: Sequence[ItemFacts], rules: QualityRules) -> ExtractionIss
     )
 
 
-def _fallback_issue(from_item_category: bool) -> ExtractionIssue | None:
-    """No schedule was found, so the bid's Item Category row gave the items."""
+def title_merges_products(title: str, lead_words: int) -> bool:
+    """True if comma-separated parts of a title start alike ("Globe Valve 40 NB, Globe Valve 50").
+
+    Args:
+        title: The item title.
+        lead_words: How many first words must be the same.
+
+    Returns:
+        Whether at least two parts share them; commas inside one product's description do not.
+    """
+    leads = [tuple(words(part)[:lead_words]) for part in title.split(_TITLE_PART_SEPARATOR)]
+    full = [lead for lead in leads if len(lead) == lead_words]
+    return len(set(full)) < len(full)
+
+
+def _merged_issue(
+    items: Sequence[ItemFacts], from_item_category: bool, rules: QualityRules
+) -> ExtractionIssue | None:
+    """The Item Category row names several products, so they became one item."""
     if not from_item_category:
         return None
+    merged = [
+        i.title for i in items if title_merges_products(i.title, rules.merged_title_lead_words)
+    ]
+    if not merged:
+        return None
     return ExtractionIssue(
-        code=ExtractionIssueCode.ITEM_CATEGORY_FALLBACK,
-        reason="no item schedule found: items come from the bid's Item Category row, so "
-        "nothing tells which specification line belongs to which product",
+        code=ExtractionIssueCode.MERGED_ITEM_CATEGORY,
+        reason="no item schedule found and the bid's Item Category row names several products, "
+        f"so they are read as one item: {_examples(merged)}",
     )
 
 
@@ -188,7 +213,7 @@ def extraction_quality(
     found = (
         _title_issue(items, rules),
         _size_issue(items, rules),
-        _fallback_issue(from_item_category),
+        _merged_issue(items, from_item_category, rules),
         _ocr_issue(items, rules),
         _fetch_issue(unfetched),
     )

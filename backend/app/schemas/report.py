@@ -141,6 +141,26 @@ class ExtractionQuality(BaseModel):
     reasons: list[ExtractionIssue] = Field(default_factory=list)
 
 
+class StatusListEntry(BaseModel):
+    """One requirement in a status list."""
+
+    model_config = ConfigDict(frozen=True)
+
+    item_no: str
+    requirement_id: str
+    requirement: str = Field(description="The requirement as printed.")
+    needs_review: bool
+
+
+class ManufacturerStatusList(BaseModel):
+    """Every requirement of one manufacturer, listed under its status."""
+
+    model_config = ConfigDict(frozen=True)
+
+    manufacturer: str
+    lists: dict[MatchStatus, list[StatusListEntry]]
+
+
 class TenderReport(BaseModel):
     """Everything one match run produced for one tender."""
 
@@ -148,6 +168,11 @@ class TenderReport(BaseModel):
 
     tender: str = Field(description="Tender folder name (bid number with underscores).")
     bid_number: str
+    tender_revision: int | None = Field(
+        default=None,
+        description="Which revision of bid.pdf this run used; None outside a stored run.",
+    )
+    bid_sha256: str | None = Field(default=None, description="That bid.pdf's content hash.")
     extraction_quality: ExtractionQuality = Field(
         default_factory=ExtractionQuality,
         description="If unreliable, every result of this tender is marked needs_review.",
@@ -162,6 +187,13 @@ class TenderReport(BaseModel):
     decided_by: str = Field(default="rules", description="Rules only: no LLM judge yet.")
     items: list[ItemReport]
     ranking: list[RankingEntry]
+    score_explanation: str = Field(default="", description="How the % are worked out, in words.")
+    status_scores: dict[MatchStatus, float] = Field(
+        default_factory=dict, description="Score of each decided status."
+    )
+    status_lists: list[ManufacturerStatusList] = Field(
+        default_factory=list, description="Requirements under each status, per manufacturer."
+    )
     general_requirements: list[Requirement] = Field(
         default_factory=list, description="Requirements outside the item schedule."
     )

@@ -1,7 +1,9 @@
 """Use case: store an uploaded bid.pdf as a tender folder and a tender row.
 
 Upload only stores the file, so it answers quickly. Linked files are fetched and read when a run
-starts. It commits before returning, so a run started right after always finds the tender.
+starts. It commits before returning, so a run started right after always finds the tender. A
+different bid.pdf for a known bid number becomes a new revision in its own folder: stored files
+are never overwritten, because past runs cite them.
 """
 
 import logging
@@ -57,31 +59,32 @@ class TenderService:
             content: The file.
 
         Returns:
-            The tender, its page count and bid number, and whether it is new.
+            The tender, its page count, bid number and revision, and whether it is new.
 
         Raises:
-            InvalidInputError: If it is not a PDF, is too large, or another bid.pdf is already
-                stored for this bid number: it is never overwritten, past runs cite it.
+            InvalidInputError: If it is not a PDF or is too large.
             TenderParseError: If no GeM bid number is printed on page 1.
             DocumentParseError: If the PDF cannot be opened.
         """
         self._check(content)
         bid_number, pages = _read_bid(content)
-        folder = tender_folder(bid_number)
         sha256 = sha256_hex(content)
         with session_scope(self._session_factory) as session:
             repo = TenderRepository(session)
             existing = repo.get_by_sha256(sha256)
-            other = repo.get_by_bid_number(bid_number)
-            if existing is None and other is not None:
-                raise _different_bid(bid_number, sha256, other.sha256)
-            ref = self._store_files(folder, bid_number, sha256, content)
+            revision = (
+                existing.revision
+                if existing
+                else self._free_revision(bid_number, sha256, repo.latest_revision(bid_number) + 1)
+            )
+            ref = self._store_files(tender_folder(bid_number, revision), content)
             tender = existing or repo.add(
                 Tender(
                     filename=BID_FILENAME,
                     file_path=ref,
                     sha256=sha256,
                     bid_number=bid_number,
+                    revision=revision,
                     page_count=pages,
                 )
             )
@@ -90,6 +93,7 @@ class TenderService:
                 filename=filename,
                 pages=pages,
                 bid_number=bid_number,
+                revision=tender.revision,
                 created=existing is None,
             )
         logger.info("tender stored", extra={"tender_id": str(response.tender_id)})
@@ -105,12 +109,19 @@ class TenderService:
                 details={"bytes": len(content)},
             )
 
-    def _store_files(self, folder: str, bid_number: str, sha256: str, content: bytes) -> str:
+    def _free_revision(self, bid_number: str, sha256: str, first: int) -> int:
+        """The first revision from `first` whose folder has no other bid.pdf (never overwrite)."""
+        revision = first
+        while True:
+            bid = self._tender_root / tender_folder(bid_number, revision) / BID_FILENAME
+            if not bid.is_file() or sha256_hex(bid.read_bytes()) == sha256:
+                return revision
+            revision += 1
+
+    def _store_files(self, folder: str, content: bytes) -> str:
         """Write bid.pdf and tender.yaml unless the folder has them; return bid.pdf's reference."""
         tender_dir = self._tender_root / folder
         bid = tender_dir / BID_FILENAME
-        if bid.is_file() and sha256_hex(bid.read_bytes()) != sha256:
-            raise _different_bid(bid_number, sha256, sha256_hex(bid.read_bytes()))
         ref = self._store.ref_for(bid)
         if not bid.is_file():
             self._store.write(ref, content)
@@ -128,10 +139,3 @@ def _read_bid(content: bytes) -> tuple[str, int]:
         bid_number = bid_number_from_pdf(path)
         with open_pdf(path) as doc:
             return bid_number, doc.page_count
-
-
-def _different_bid(bid_number: str, uploaded: str, stored: str) -> InvalidInputError:
-    return InvalidInputError(
-        f"A different bid.pdf is already stored for {bid_number}",
-        details={"bid_number": bid_number, "uploaded_sha256": uploaded, "stored_sha256": stored},
-    )

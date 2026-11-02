@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.db.models.tender import Tender, TenderDocument
 from app.db.repositories.base import SqlRepository
@@ -36,9 +36,10 @@ class TenderRepository(SqlRepository[Tender]):
         )
         return list(self._session.scalars(stmt))
 
-    def get_by_bid_number(self, bid_number: str) -> Tender | None:
-        """Return the tender with this GeM bid number (e.g. "GEM/2026/B/8119613"), or None."""
-        return self._session.scalar(select(Tender).where(Tender.bid_number == bid_number))
+    def latest_revision(self, bid_number: str) -> int:
+        """Return the highest stored revision of this GeM bid number, or 0 if it has none."""
+        stmt = select(func.max(Tender.revision)).where(Tender.bid_number == bid_number)
+        return self._session.scalar(stmt) or 0
 
     def linked_document_ids(self, tender_id: uuid.UUID) -> set[uuid.UUID]:
         """Return the ids of every document already linked to a tender."""

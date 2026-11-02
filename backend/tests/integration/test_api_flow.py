@@ -4,17 +4,21 @@ The PDFs and the report are synthetic. Matching is faked, so nothing here is rea
 everything else (routes, services, queue, database) is real.
 """
 
+import hashlib
 import uuid
 from collections.abc import Callable, Iterator, Sequence
 from datetime import UTC, datetime
 from functools import cache
+from io import BytesIO
 from pathlib import Path
 
 import pymupdf
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 from sqlalchemy import Engine, text
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_manufacturer_service
 from app.main import create_app
@@ -26,6 +30,7 @@ from app.schemas.sources import RegisteredSource
 from app.services.manufacturer_service import ManufacturerService
 from app.services.run_service import Matcher, RunService
 from tests.conftest import make_test_settings
+from tests.integration.factories import make_document
 
 BID = "GEM/2099/B/1234567"
 SCORE = Score(compatibility_pct=None, coverage_pct=0, decided=0, total=0, needs_review=0, counts={})
@@ -245,16 +250,94 @@ def test_uploading_the_same_file_reuses_its_tender(client: TestClient) -> None:
     assert second["created"] is False
 
 
-def test_a_different_file_for_the_same_bid_is_refused_and_keeps_the_stored_one(
-    client: TestClient, tmp_path: Path
+def test_a_different_file_for_the_same_bid_is_a_new_revision_and_the_old_run_stays(
+    app: FastAPI, client: TestClient, tmp_path: Path
 ) -> None:
-    _upload(client)
+    matcher = _Matcher(_report())
+    _use(app, matcher)
+    first_id = _upload(client)
+    first_run = _start(client, first_id)["run_id"]
+    report_before = client.get(f"/api/v1/reports/{first_run}").json()
+    assert report_before["tender_revision"] == 1
+
     other = _pdf(extra="corrigendum")
     response = client.post("/api/v1/tenders", files={"file": ("bid.pdf", other)})
-    assert response.status_code == 422
-    assert BID in response.json()["error"]["message"]
-    stored = tmp_path / "tenders" / "GEM_2099_B_1234567" / "bid.pdf"
-    assert stored.read_bytes() == PDF
+    assert response.status_code == 201
+    body = response.json()
+    assert (body["bid_number"], body["revision"], body["created"]) == (BID, 2, True)
+    assert body["tender_id"] != first_id
+
+    folder = tmp_path / "tenders"
+    assert (folder / "GEM_2099_B_1234567" / "bid.pdf").read_bytes() == PDF
+    assert (folder / "GEM_2099_B_1234567_r2" / "bid.pdf").read_bytes() == other
+    assert (folder / "GEM_2099_B_1234567_r2" / "tender.yaml").is_file()
+
+    second_run = _start(client, body["tender_id"])["run_id"]
+    assert matcher.calls[-1][0] == "GEM_2099_B_1234567_r2"
+    report = client.get(f"/api/v1/reports/{second_run}").json()
+    assert report["tender_revision"] == 2
+    assert report["bid_sha256"] == hashlib.sha256(other).hexdigest()
+    assert client.get(f"/api/v1/reports/{first_run}").json() == report_before
+
+
+def test_uploading_an_old_revision_again_reuses_it(client: TestClient) -> None:
+    first_id = _upload(client)
+    other = _pdf(extra="corrigendum")
+    client.post("/api/v1/tenders", files={"file": ("bid.pdf", other)})
+    again = client.post("/api/v1/tenders", files={"file": ("bid.pdf", PDF)}).json()
+    assert (again["tender_id"], again["revision"], again["created"]) == (first_id, 1, False)
+
+
+def test_a_file_on_disk_is_never_overwritten_even_without_its_row(
+    client: TestClient, tmp_path: Path
+) -> None:
+    orphan = tmp_path / "tenders" / "GEM_2099_B_1234567" / "bid.pdf"
+    orphan.parent.mkdir(parents=True)
+    orphan.write_bytes(b"%PDF an older copy")
+    body = client.post("/api/v1/tenders", files={"file": ("bid.pdf", PDF)}).json()
+    assert body["revision"] == 2
+    assert orphan.read_bytes() == b"%PDF an older copy"
+
+
+def test_excel_downloads_for_a_finished_run_only(app: FastAPI, client: TestClient) -> None:
+    _use(app, _Matcher(ValueError("broken")))
+    failed = _start(client, _upload(client))["run_id"]
+    response = client.get(f"/api/v1/reports/{failed}/excel")
+    assert response.status_code == 409
+    assert "broken" in response.json()["error"]["details"]["error"]
+
+    _use(app, _Matcher(_report()))
+    done = _start(client, _upload(client))["run_id"]
+    response = client.get(f"/api/v1/reports/{done}/excel")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/vnd.openxmlformats")
+    assert f"_{done}.xlsx" in response.headers["content-disposition"]
+    book = load_workbook(BytesIO(response.content))
+    assert book.sheetnames == ["Summary", "Requirements", "By status", "General"]
+
+
+def test_a_stored_document_opens_inline(
+    app: FastAPI, client: TestClient, tmp_path: Path, db_engine: Engine
+) -> None:
+    (tmp_path / "cat.pdf").write_bytes(PDF)
+    with Session(db_engine) as session:
+        document = make_document()
+        document.file_path = "cat.pdf"
+        session.add(document)
+        session.commit()
+        sha256 = document.sha256
+    response = client.get(f"/api/v1/documents/{sha256}/file")
+    assert response.status_code == 200
+    assert response.content == PDF
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.headers["content-disposition"] == 'inline; filename="cat.pdf"'
+
+
+@pytest.mark.parametrize(
+    ("sha256", "code"), [("f" * 64, 404), ("..%2F..%2Fsecret", 404), ("ABC", 422)]
+)
+def test_only_a_stored_hash_gives_a_file(client: TestClient, sha256: str, code: int) -> None:
+    assert client.get(f"/api/v1/documents/{sha256}/file").status_code == code
 
 
 @pytest.mark.parametrize(
@@ -287,7 +370,9 @@ def test_run_goes_from_upload_to_report(app: FastAPI, client: TestClient) -> Non
 
     report = client.get(f"/api/v1/reports/{run_id}")
     assert report.status_code == 200
-    assert TenderReport.model_validate(report.json()) == _report()
+    got = TenderReport.model_validate(report.json())
+    assert got.tender_revision == 1
+    assert got.model_copy(update={"tender_revision": None, "bid_sha256": None}) == _report()
     assert [r["run_id"] for r in client.get("/api/v1/runs").json()] == [run_id]
 
 

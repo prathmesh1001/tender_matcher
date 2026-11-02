@@ -95,10 +95,30 @@ def test_the_reason_names_the_worst_item() -> None:
     assert "item 7 has 566" in issue.reason
 
 
-def test_item_category_fallback_marks_the_tender() -> None:
-    assert _codes([_item()], from_item_category=True) == {
-        ExtractionIssueCode.ITEM_CATEGORY_FALLBACK
+def test_item_category_naming_one_product_is_fine() -> None:
+    titles = [
+        "Submersible Sewerage Pump (Q3)",
+        "SINGLE STAGE WATER PUMP WITH MOTOR ON M. S. BASE PLATE, CENTRIFUGAL, BRONZE IMPELL",
+    ]
+    for title in titles:
+        assert _codes([_item(title)], from_item_category=True) == set()
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Globe Valve 40 NB with Flanges , Globe Valve 50 NB with Flanges",
+        "CENTRIFUGAL HORIZONTAL PUMP FOR ACID,Centrifugal Horizontal Pump for lye",
+    ],
+)
+def test_item_category_merging_several_products_marks_the_tender(title: str) -> None:
+    assert _codes([_item(title)], from_item_category=True) == {
+        ExtractionIssueCode.MERGED_ITEM_CATEGORY
     }
+
+
+def test_repeated_title_parts_mean_nothing_when_a_schedule_gave_the_items() -> None:
+    assert _codes([_item("Globe Valve 40, Globe Valve 50")]) == set()
 
 
 def test_low_confidence_ocr_share_is_inclusive() -> None:
@@ -116,7 +136,15 @@ def test_linked_files_that_could_not_be_fetched_mark_the_tender() -> None:
 
 
 def test_every_reason_is_reported() -> None:
-    items = [ItemFacts("1", "Design", False, requirements=60, low_ocr_requirements=60)]
+    items = [
+        ItemFacts(
+            "1",
+            "Spare part shall, Spare part shall",
+            False,
+            requirements=60,
+            low_ocr_requirements=60,
+        )
+    ]
     quality = extraction_quality(items, True, RULES, unfetched=["a.pdf"])
     assert {r.code for r in quality.reasons} == set(ExtractionIssueCode)
 

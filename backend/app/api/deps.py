@@ -11,7 +11,9 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings, get_settings
+from app.db.repositories import DocumentRepository
 from app.db.session import session_scope
+from app.services.document_service import DocumentService
 from app.services.health_service import HealthService
 from app.services.manufacturer_service import (
     ManufacturerService,
@@ -123,3 +125,19 @@ def get_report_service(session: DbSessionDep, settings: SettingsDep) -> ReportSe
 
 
 ReportServiceDep = Annotated[ReportService, Depends(get_report_service)]
+
+
+def get_document_service(session: DbSessionDep, settings: SettingsDep) -> DocumentService:
+    """Provide a `DocumentService` bound to the request's session.
+
+    Args:
+        session: Injected session.
+        settings: Injected application settings.
+
+    Returns:
+        A document service.
+    """
+    return DocumentService(DocumentRepository(session), build_file_store(settings))
+
+
+DocumentServiceDep = Annotated[DocumentService, Depends(get_document_service)]

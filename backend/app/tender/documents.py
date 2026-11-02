@@ -113,6 +113,7 @@ def _get_or_create_tender(
         sha256=sha,
         title=manifest.item_category,
         bid_number=manifest.bid_number,
+        revision=repo.latest_revision(manifest.bid_number) + 1,
         gem_bid_id=None if manifest.gem_bid_id is None else str(manifest.gem_bid_id),
     )
     return repo.add(tender), True
