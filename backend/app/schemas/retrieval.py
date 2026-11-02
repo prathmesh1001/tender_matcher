@@ -86,6 +86,9 @@ class RetrievalRequest(BaseModel):
     product_type: str = Field(min_length=1)
     text: str = Field(min_length=1)
     attribute: str | None = Field(default=None, description="Canonical ontology attribute.")
+    document_sha256: str | None = Field(
+        default=None, description="Search only this catalogue; None for all of the manufacturer's."
+    )
 
 
 class DocumentIndexStatus(BaseModel):

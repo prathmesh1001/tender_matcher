@@ -51,6 +51,25 @@ class SubTypeFit(StrEnum):
     MISMATCH = "mismatch"  # the document declares other sub-types only
 
 
+class JudgeStatus(StrEnum):
+    """What the LLM judge may answer (`not_applicable` is never its call)."""
+
+    FULL_MATCH = "full_match"
+    PARTIAL_MATCH = "partial_match"
+    MISSING_CAPABILITY = "missing_capability"
+    UNSUPPORTED = "unsupported"
+
+
+class JudgeVerdict(BaseModel):
+    """The LLM judge's answer for one requirement; never trusted until verified."""
+
+    status: JudgeStatus
+    capability: str
+    chunk_id: str
+    quote: str
+    reasoning: str
+
+
 class Comparison(BaseModel):
     """Decision for one requirement against one manufacturer."""
 

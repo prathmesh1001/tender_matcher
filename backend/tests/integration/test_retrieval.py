@@ -269,3 +269,55 @@ def test_hnsw_matches_exact_inside_the_filter_and_restores_settings(db_session: 
     nearest_exact = sorted(exact, key=lambda h: exact[h])[:5]
     assert set(hnsw) == set(nearest_exact)
     assert db_session.scalar(select(func.current_setting("enable_seqscan"))) == "on"
+
+
+def test_search_can_be_limited_to_one_catalogue(
+    db_session: Session, vocabularies: tuple[SearchVocabulary, QueryVocabulary]
+) -> None:
+    search, vocab = vocabularies
+    wanted = _doc(db_session, search, ["check_valve"], [("Check valve PN16", "check_valve")])
+    _doc(db_session, search, ["check_valve"], [("Check valve PN25", "check_valve")])
+    reranker = KeywordReranker("PN")
+    request = RetrievalRequest(
+        manufacturer="Acme",
+        category=CATEGORY,
+        product_type="check_valve",
+        text="check valve",
+        document_sha256=wanted.sha256,
+    )
+
+    result = _retriever(db_session, vocab, reranker).retrieve(request)
+
+    assert result.candidates_searched == 1
+    assert reranker.passages == ["Check valve PN16"]
+
+
+def test_evidence_hits_keep_only_accepted_hits(
+    db_session: Session, vocabularies: tuple[SearchVocabulary, QueryVocabulary]
+) -> None:
+    search, vocab = vocabularies
+    _doc(
+        db_session,
+        search,
+        ["check_valve"],
+        [("Check valve flanged", "check_valve"), ("Check valve wafer", "check_valve")],
+    )
+    retriever = _retriever(db_session, vocab, KeywordReranker("flanged"))
+
+    result = retriever.retrieve(_request("check valve"))
+
+    assert len(result.hits) == 2
+    assert [h.rerank_score for h in retriever.evidence_hits(result)] == [0.9]
+
+
+def test_evidence_hits_are_empty_below_the_threshold(
+    db_session: Session, vocabularies: tuple[SearchVocabulary, QueryVocabulary]
+) -> None:
+    search, vocab = vocabularies
+    _doc(db_session, search, ["check_valve"], [("Check valve", "check_valve")])
+    retriever = _retriever(db_session, vocab, KeywordReranker("nothing-matches"))
+
+    result = retriever.retrieve(_request("check valve"))
+
+    assert result.outcome == RetrievalOutcome.BELOW_THRESHOLD
+    assert retriever.evidence_hits(result) == ()

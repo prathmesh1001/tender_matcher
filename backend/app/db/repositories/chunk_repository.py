@@ -1,6 +1,7 @@
 """Queries for retrieval chunks."""
 
 import uuid
+from collections.abc import Sequence
 
 from sqlalchemy import delete, func, select
 
@@ -28,7 +29,13 @@ class ChunkRepository(SqlRepository[Chunk]):
         )
         return list(self._session.scalars(stmt))
 
-    def list_for_product(self, manufacturer: str, category: str, product_type: str) -> list[Chunk]:
+    def list_by_ids(self, ids: Sequence[uuid.UUID]) -> list[Chunk]:
+        """Return the chunks with these ids, in no particular order."""
+        return list(self._session.scalars(select(Chunk).where(Chunk.id.in_(ids))))
+
+    def list_for_product(
+        self, manufacturer: str, category: str, product_type: str, *, sha256: str | None = None
+    ) -> list[Chunk]:
         """A manufacturer's chunks that can be evidence for one product type.
 
         That is chunks tagged with the type, plus untagged ("general") chunks of documents that
@@ -39,6 +46,7 @@ class ChunkRepository(SqlRepository[Chunk]):
             manufacturer: Exact manufacturer name.
             category: Ontology category.
             product_type: Ontology product type, e.g. "butterfly_valve".
+            sha256: Only this document; None for all of them.
 
         Returns:
             Chunks in a stable order (document, page, position).
@@ -54,6 +62,8 @@ class ChunkRepository(SqlRepository[Chunk]):
             )
             .order_by(Chunk.document_id, Chunk.page_number, Chunk.position)
         )
+        if sha256 is not None:
+            stmt = stmt.where(Document.sha256 == sha256)
         return list(self._session.scalars(stmt))
 
     def list_for_tender(self, tender_id: uuid.UUID) -> list[Chunk]:

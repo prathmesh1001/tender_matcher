@@ -24,6 +24,7 @@ from app.schemas.enums import RunStatus
 from app.schemas.report import TenderReport
 from app.schemas.runs import RunResponse, StartRunRequest
 from app.services.ingestion_service import build_ingestion_service
+from app.services.judge_service import build_judge_service
 from app.services.manufacturer_service import ManufacturerService, build_manufacturer_service
 from app.services.match_service import build_match_service
 from app.services.report_service import build_report_service
@@ -227,7 +228,14 @@ def build_run_service(
     Returns:
         A ready service.
     """
-    matcher = cache(lambda: build_match_service(settings))
+    matcher = cache(
+        lambda: build_match_service(
+            settings,
+            judge=build_judge_service(settings, session_factory)
+            if settings.LLM_JUDGE_ENABLED
+            else None,
+        )
+    )
     ingestion = cache(lambda: build_ingestion_service(settings))
 
     def fetch_links(folder: str) -> list[str]:

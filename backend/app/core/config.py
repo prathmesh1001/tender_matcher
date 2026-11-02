@@ -374,6 +374,16 @@ class Settings(BaseSettings):
         default=None, description="Needed by every command that calls the LLM."
     )
     GEMINI_API_BASE: str = Field(default="https://generativelanguage.googleapis.com/v1beta")
+    LLM_JUDGE_ENABLED: bool = Field(
+        default=False,
+        description="API runs send free-text requirements to the LLM judge (the CLI: --judge).",
+    )
+    LLM_JUDGE_MAX_CALLS: int = Field(
+        default=200, ge=1, description="Most LLM judge calls for one tender, to protect the quota."
+    )
+    LLM_JUDGE_MAX_FAILURES: int = Field(
+        default=3, ge=1, description="LLM judge failures in a row before a run stops calling."
+    )
     LLM_TEMPERATURE: float = Field(default=0.0, ge=0, le=2)
     LLM_MAX_OUTPUT_TOKENS: int = Field(default=16384, ge=1)
     LLM_TIMEOUT_SECONDS: float = Field(default=120.0, gt=0)

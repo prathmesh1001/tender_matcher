@@ -184,7 +184,7 @@ class TenderReport(BaseModel):
     tender_files: list[str]
     generated_at: datetime
     ontology_used: bool
-    decided_by: str = Field(default="rules", description="Rules only: no LLM judge yet.")
+    decided_by: str = Field(default="rules", description="Rules, plus the LLM model if it ran.")
     items: list[ItemReport]
     ranking: list[RankingEntry]
     score_explanation: str = Field(default="", description="How the % are worked out, in words.")

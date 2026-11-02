@@ -114,8 +114,8 @@ def general_result(requirement: Requirement) -> Comparison:
         requirement: A general requirement.
 
     Returns:
-        Its routed result; one that catalogues could prove is free text with no product to
-        look in, so it waits for the LLM judge.
+        Its routed result; one that catalogues could prove has no product to look in, so it
+        stays unsupported.
     """
     return routed(requirement) or Comparison(
         requirement_id=requirement.id,
@@ -123,7 +123,7 @@ def general_result(requirement: Requirement) -> Comparison:
         needs_review=True,
         decided_by=DecisionSource.NONE,
         basis=LabelBasis.NONE,
-        reason="free text: needs the LLM judge (not enabled)",
+        reason="free text outside any item: no product to look in",
     )
 
 

@@ -10,7 +10,7 @@ Usage (from backend/):
     python -m app.cli index [--category valves_pumps] [--reprocess]  # catalogues + their vectors
     python -m app.cli index-status                                  # chunks, vectors, facts
     python -m app.cli ingest-all [--fetch] [--reprocess]            # catalogues + tenders
-    python -m app.cli match-tender --tender GEM_2026_B_8119613 [--no-ontology] [--out FILE]
+    python -m app.cli match-tender --tender GEM_2026_B_8119613 [--no-ontology] [--judge]
     python -m app.cli parse-tender --tender GEM_2026_B_8119613      # requirements, no matching
     python -m app.cli gold-diff --gold ../eval/gold/8119613.yaml [--out FILE]
     python -m app.cli extract-specs [--manufacturer NAME] [--reprocess]   # calls the LLM
@@ -27,6 +27,7 @@ from pathlib import Path
 from app.core.config import Settings, get_settings
 from app.core.exceptions import InvalidInputError
 from app.core.logging import configure_logging
+from app.db.session import create_db_engine, create_session_factory
 from app.ingestion.pipeline import IngestOutcome
 from app.reporting.gold_diff import gold_diff, load_gold, render_gold_diff
 from app.reporting.json_report import write_json_report
@@ -39,6 +40,7 @@ from app.services.ingestion_service import (
     IngestionService,
     build_ingestion_service,
 )
+from app.services.judge_service import build_judge_service
 from app.services.match_service import build_match_service
 from app.services.spec_service import build_spec_service
 from app.tender.documents import TenderIngestOutcome
@@ -155,9 +157,19 @@ def run_classify_sections(service: IngestionService) -> int:
     return _report_failures(result)
 
 
-def run_match(settings: Settings, tender: str, *, use_ontology: bool, out: str | None) -> int:
+def run_match(
+    settings: Settings, tender: str, *, use_ontology: bool, out: str | None, judge: bool = False
+) -> int:
     """Match one tender, write the JSON report, print the ranking and item summaries."""
-    report = build_match_service(settings).match_tender(tender, use_ontology=use_ontology)
+    service = (
+        build_match_service(
+            settings,
+            judge=build_judge_service(settings, create_session_factory(create_db_engine(settings))),
+        )
+        if judge
+        else build_match_service(settings)
+    )
+    report = service.match_tender(tender, use_ontology=use_ontology)
     suffix = "" if use_ontology else "_no_ontology"
     path = write_json_report(
         report, Path(out) if out else settings.REPORT_DIR / f"{tender}{suffix}.json"
@@ -165,6 +177,7 @@ def run_match(settings: Settings, tender: str, *, use_ontology: bool, out: str |
     _report_extraction(report.extraction_quality)
     _report_single_firm(report.single_firm)
     _out(f"Tender {report.bid_number}: {len(report.items)} items, ontology={use_ontology}")
+    _out(f"Decided by: {report.decided_by}")
     for item in report.items:
         _out(f"  item {item.item.item_no} {item.item.title} -> {item.product_type}")
         for m in item.manufacturers:
@@ -305,9 +318,10 @@ def build_parser() -> argparse.ArgumentParser:
     index.add_argument("--category", default=None)
     index.add_argument("--reprocess", action="store_true", help="re-parse stored catalogues")
     sub.add_parser("index-status", help="chunks, vectors and spec facts per catalogue")
-    match = sub.add_parser("match-tender", help="rules-only match of one tender -> JSON report")
+    match = sub.add_parser("match-tender", help="match one tender -> JSON report")
     match.add_argument("--tender", required=True, help="tender folder, e.g. GEM_2026_B_8119613")
     match.add_argument("--no-ontology", action="store_true", help="run without any ontology")
+    match.add_argument("--judge", action="store_true", help="LLM judge for free-text lines")
     match.add_argument("--out", default=None, help="report path (default: REPORT_DIR)")
     parse = sub.add_parser("parse-tender", help="print a tender's requirements, no matching")
     parse.add_argument("--tender", required=True, help="tender folder, e.g. GEM_2026_B_8119613")
@@ -339,7 +353,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "embed":
         return 1 if run_embed(settings, args.source, args.manufacturer) else 0
     if args.command == "match-tender":
-        return run_match(settings, args.tender, use_ontology=not args.no_ontology, out=args.out)
+        return run_match(
+            settings,
+            args.tender,
+            use_ontology=not args.no_ontology,
+            out=args.out,
+            judge=args.judge,
+        )
     if args.command == "parse-tender":
         return run_parse_tender(settings, args.tender)
     if args.command == "gold-diff":

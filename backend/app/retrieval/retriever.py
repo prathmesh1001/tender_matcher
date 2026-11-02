@@ -92,7 +92,10 @@ class Retriever:
             ExternalServiceError: If the embedder or reranker fails.
         """
         chunks = self.chunks.list_for_product(
-            request.manufacturer, request.category, request.product_type
+            request.manufacturer,
+            request.category,
+            request.product_type,
+            sha256=request.document_sha256,
         )
         if not chunks:
             return RetrievalResult(outcome=RetrievalOutcome.NO_PRODUCT_DOCUMENTS)
@@ -150,6 +153,19 @@ class Retriever:
                 model, vector, hashes, self.params.candidates, self.params.hnsw_ef_search
             )
         return self.embeddings.distances_to(model, vector, hashes)
+
+    def evidence_hits(self, result: RetrievalResult) -> tuple[RetrievalHit, ...]:
+        """The hits of a result that count as evidence, best first.
+
+        Args:
+            result: A retrieval result.
+
+        Returns:
+            Accepted hits only; none unless the outcome is EVIDENCE.
+        """
+        if result.outcome is not RetrievalOutcome.EVIDENCE:
+            return ()
+        return tuple(h for h in result.hits if self._accepted(h.rerank_score, h.code_matches))
 
     def _accepted(self, score: float, code_matches: tuple[str, ...]) -> bool:
         """A hit counts as evidence by score or by an exact requirement code."""

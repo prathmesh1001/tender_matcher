@@ -14,7 +14,7 @@ category has one and is never required.
 3. `missing_capability` only when a field states the same attribute with a comparable value
    that fails. A label without a usable value, or values that cannot be compared, give
    `unsupported` + needs_review. Free text and unlabelled statements are unsupported too
-   (they need the LLM judge, not enabled).
+   (they need the LLM judge).
 """
 
 import math
@@ -451,10 +451,22 @@ def routed(requirement: Requirement) -> Comparison | None:
 def _not_checkable(requirement: Requirement) -> str | None:
     """Why rules cannot check this requirement at all, or None."""
     if requirement.label is None:
-        return "statement without a label: needs the LLM judge (not enabled)"
+        return "statement without a label: needs the LLM judge"
     if requirement.kind is ValueKind.TEXT:
-        return "free text: needs the LLM judge (not enabled)"
+        return "free text: needs the LLM judge"
     return None
+
+
+def needs_judge(requirement: Requirement) -> bool:
+    """True if catalogues may decide this requirement but rules cannot read it.
+
+    Args:
+        requirement: An atomic requirement.
+
+    Returns:
+        Whether it goes to the LLM judge.
+    """
+    return routed(requirement) is None and _not_checkable(requirement) is not None
 
 
 def compare(

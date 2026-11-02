@@ -1,9 +1,10 @@
-"""Use case: match one tender folder against the registered catalogues (rules only).
+"""Use case: match one tender folder against the registered catalogues.
 
 In-memory path, no database: tender files listed in `tender.yaml` are processed, their
 schedule tables give line items and atomic requirements, and catalogue chunks come from a
 `ChunkSource` (`InMemoryChunkSource` with the sha256 cache for now). The ontology is used
-when an item's category has one, unless the run is told not to use any.
+when an item's category has one, unless the run is told not to use any. Rules decide first; an
+optional judge then handles what they cannot read.
 """
 
 import logging
@@ -35,6 +36,7 @@ from app.matching.engine import (
     item_for_review,
     match_item,
 )
+from app.matching.llm_judge import ItemJudge
 from app.matching.scorer import rank, score_explanation
 from app.ontology.loader import load_ontologies
 from app.ontology.schema import Ontology
@@ -101,6 +103,7 @@ class MatchService:
         selection: SelectionOptions,
         ontologies: Sequence[Ontology],
         tender_root: Path,
+        judge: ItemJudge | None = None,
     ) -> None:
         self._source = source
         self._tender_options = tender_options
@@ -108,6 +111,7 @@ class MatchService:
         self._selection = selection
         self._ontologies = list(ontologies)
         self._tender_root = tender_root
+        self._judge = judge
 
     def parse_tender(
         self, tender: str, *, use_ontology: bool = True, unfetched: Sequence[str] = ()
@@ -214,8 +218,13 @@ class MatchService:
                 for entry in parsed.items
             ]
             logger.info("tender matched", extra={"items": len(reports), "files": len(parsed.files)})
+            quality = parsed.extraction_quality
+            decided_by = "rules"
+            # Items that cannot be trusted are not worth paying to judge.
+            if self._judge is not None and quality.status is not ExtractionStatus.UNRELIABLE:
+                judged = self._judge.judge_items(parsed.items, reports, self._source)
+                reports, decided_by = judged.reports, judged.decided_by
         general = [general_result(r) for r in parsed.general]
-        quality = parsed.extraction_quality
         if quality.status is ExtractionStatus.UNRELIABLE:
             note = "extraction unreliable: " + ", ".join(r.code.value for r in quality.reasons)
             reports = [item_for_review(r, note, self._selection) for r in reports]
@@ -228,6 +237,7 @@ class MatchService:
             tender_files=parsed.files,
             generated_at=datetime.now(UTC),
             ontology_used=use_ontology,
+            decided_by=decided_by,
             items=reports,
             ranking=self._ranking(reports),
             score_explanation=score_explanation(
@@ -259,12 +269,15 @@ class MatchService:
         )
 
 
-def build_match_service(settings: Settings, store: FileStore | None = None) -> MatchService:
+def build_match_service(
+    settings: Settings, store: FileStore | None = None, judge: ItemJudge | None = None
+) -> MatchService:
     """Wire the in-memory match service from settings.
 
     Args:
         settings: Application settings.
         store: File store (built from settings if omitted).
+        judge: LLM judge for what rules leave open; None for rules only.
 
     Returns:
         A ready service.
@@ -290,4 +303,5 @@ def build_match_service(settings: Settings, store: FileStore | None = None) -> M
         selection=SelectionOptions.from_settings(settings),
         ontologies=ontologies,
         tender_root=settings.TENDER_DATA_DIR,
+        judge=judge,
     )
