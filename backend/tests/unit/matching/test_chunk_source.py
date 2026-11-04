@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from pydantic import HttpUrl
 
+from app.core.config import Settings
 from app.core.exceptions import NotFoundError
 from app.ingestion.processing import ProcessedDocument, ProcessedPage
 from app.matching.chunk_source import (
@@ -15,6 +16,8 @@ from app.matching.chunk_source import (
     declared_types_named,
     evidence_chunks,
     fingerprint,
+    processing_fingerprint,
+    processing_settings,
 )
 from app.schemas.chunking import ChunkDraft
 from app.schemas.enums import ChunkType, DocType
@@ -151,3 +154,44 @@ def test_fingerprint_changes_with_file_content(tmp_path: Path) -> None:
     code.write_text("A = 2", encoding="utf-8")
     assert fingerprint([code], "{}") != before
     assert fingerprint([code], '{"X": 1}') != fingerprint([code], "{}")
+
+
+BACKEND = Path(__file__).resolve().parents[3]
+
+
+def _settings(**overrides: object) -> Settings:
+    return Settings(
+        _env_file=None,
+        DATABASE_URL="postgresql+psycopg://u:p@localhost/db",  # type: ignore[arg-type]
+        ONTOLOGY_DIR=BACKEND / "ontology",
+        SECTION_CATEGORIES_FILE=BACKEND / "config" / "section_categories.yaml",
+        **overrides,  # type: ignore[arg-type]
+    )
+
+
+def test_processing_settings_are_the_ones_processing_reads() -> None:
+    read = processing_settings(_settings())
+    assert {"TABLE_HEADER_MAX_WORDS", "OCR_ENABLED", "SECTION_CATEGORIES_FILE"} <= set(read)
+    assert not {"TENDER_UPLOAD_MAX_MB", "LLM_MODEL", "LLM_JUDGE_MAX_CALLS"} & set(read)
+
+
+def test_unrelated_settings_keep_the_cache_and_processing_settings_reset_it() -> None:
+    base = processing_fingerprint(_settings(), BACKEND)
+    assert processing_fingerprint(_settings(TENDER_UPLOAD_MAX_MB=99), BACKEND) == base
+    assert processing_fingerprint(_settings(LLM_JUDGE_MAX_CALLS=7), BACKEND) == base
+    assert processing_fingerprint(_settings(TABLE_HEADER_MAX_WORDS=3), BACKEND) != base
+
+
+def test_warm_loads_every_document_once() -> None:
+    calls: list[str] = []
+
+    def process(source: RegisteredSource) -> ProcessedDocument:
+        calls.append(source.sha256)
+        return PROCESSED
+
+    source = InMemoryChunkSource(
+        [_source(SHA_A, ["butterfly_valve"]), _source(SHA_B, ["gate_valve"])], process
+    )
+    assert source.warm() == 2
+    source.chunks_for_product("Acme", "valves_pumps", "gate_valve", use_tags=True)
+    assert calls == [SHA_A, SHA_B]

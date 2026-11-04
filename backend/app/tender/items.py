@@ -28,10 +28,11 @@ from typing import Final
 from app.ontology.schema import Ontology
 from app.retrieval.text_normalizer import fold_text
 from app.schemas.chunking import ChunkDraft
-from app.schemas.enums import ChunkType, Operator
+from app.schemas.enums import ChunkType, Operator, RequirementType
 from app.schemas.requirements import LineItem, Requirement, ValueKind
 from app.tender.general import english_part, general_requirements, row_text
 from app.tender.line_items import header_key
+from app.tender.name_segments import NameRules, segment_by_name
 from app.tender.pipeline import (
     ItemRequirements,
     RequirementOptions,
@@ -40,7 +41,13 @@ from app.tender.pipeline import (
     tender_requirements,
     with_title_size,
 )
-from app.tender.segments import Segment, SegmentRules, item_clause, segment_file
+from app.tender.segments import (
+    FileSegments,
+    Segment,
+    SegmentRules,
+    item_clause,
+    segment_file,
+)
 from app.tender.splitter import leaves
 
 ITEM_LABEL: Final = "ITEM"
@@ -56,6 +63,10 @@ class ItemSource(StrEnum):
     SPEC_SCHEDULE = "spec_schedule"
     ITEM_CATEGORY = "item_category"
     NONE = "none"
+
+
+# Flag on a requirement whose value a scan lost ("%" for 1/2" or 3/4").
+_UNREADABLE_FLAG: Final = "value not readable in the scan: check the document"
 
 
 @dataclass(frozen=True, slots=True)
@@ -285,6 +296,7 @@ def _segment_requirements(
     options, ontologies, rules = context
     item_no = entry.item.item_no
     by_page: dict[int, list[str]] = {}
+    unreadable = {line.text for line in segment.lines if line.unreadable}
     for line in segment.lines:
         text = item_clause(line.text, item_no, rules)
         if text is not None:
@@ -301,10 +313,37 @@ def _segment_requirements(
             }
         )
         found.extend(
-            r.model_copy(update={"item_no": item_no})
+            (
+                _unreadable(r)
+                if r.raw_text in unreadable
+                else r.model_copy(update={"item_no": item_no})
+            )
             for r in item_entry(part, options, ontologies).requirements
         )
-    return found
+    return [r.model_copy(update={"item_no": item_no}) for r in found]
+
+
+def _unreadable(requirement: Requirement) -> Requirement:
+    """A value the scan lost: kept for review, never compared (its number would be a guess)."""
+    return requirement.model_copy(
+        update={
+            "req_type": RequirementType.VAGUE,
+            "flags": [*requirement.flags, _UNREADABLE_FLAG],
+        }
+    )
+
+
+def _file_segments(
+    file: TenderFile,
+    titles: Mapping[str, str],
+    rules: SegmentRules,
+    name_rules: NameRules | None,
+) -> FileSegments:
+    """Cut a spec file at item numbers; if it prints none, at blocks headed by item names."""
+    found = segment_file(file.chunks, titles.keys(), rules)
+    if found.segments or name_rules is None:
+        return found
+    return segment_by_name(file.chunks, titles, name_rules)
 
 
 def _attach_segments(
@@ -324,10 +363,12 @@ def _attach_segments(
     if len(by_number) != len(entries):
         return list(entries), {}
     rules = SegmentRules.from_rules(options.classifier.rules)
+    name_rules = NameRules.from_rules(options.classifier.rules)
+    titles = {number: e.item.title for number, e in by_number.items()}
     added: dict[str, list[Requirement]] = {}
     used: dict[str, set[int]] = {}
     for file in (f for f in files if f.role in options.spec_roles):
-        found = segment_file(file.chunks, by_number.keys(), rules)
+        found = _file_segments(file, titles, rules, name_rules)
         used[file.name] = found.used_chunks
         for index, segment in enumerate(found.segments, start=1):
             for number in segment.item_nos:

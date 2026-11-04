@@ -119,6 +119,10 @@ class Settings(BaseSettings):
         default=Path(".cache/chunks"),
         description="Processed catalogue files for in-memory matching, one JSON per sha256.",
     )
+    CATALOGUE_WARM_ON_STARTUP: bool = Field(
+        default=True,
+        description="The API reads every catalogue into the cache when it starts, not in a run.",
+    )
 
     PRODUCT_PAGE_MIN_TAGGED: int = Field(
         default=2,
@@ -224,6 +228,11 @@ class Settings(BaseSettings):
         default=2,
         ge=1,
         description="Values this short with no code ('WAFER') are options; longer ones are text.",
+    )
+    PRODUCT_TYPE_LABEL_WORDS: list[str] = Field(
+        default_factory=lambda: ["type", "product"],
+        description="Label words asking what the item is ('Valve Type'); such a line whose value "
+        "is just the product's name is met by the catalogue chosen for that product.",
     )
     COMPARATOR_GENERIC_LABEL_WORDS: list[str] = Field(
         default_factory=lambda: [
@@ -361,6 +370,13 @@ class Settings(BaseSettings):
         ge=0,
         description="An item with at most this many atomic requirements is nearly empty.",
     )
+    EXTRACTION_TITLE_ONLY_SHARE: float = Field(
+        default=0.5,
+        gt=0,
+        le=1,
+        description="Tender is unreliable if at least this share of items is nearly empty (their "
+        "title only) although specification files are attached: the spec missed the items.",
+    )
     EXTRACTION_MIN_SPEC_OUTSIDE_ITEMS: int = Field(
         default=10,
         ge=1,
@@ -418,7 +434,17 @@ class Settings(BaseSettings):
         description="API runs send free-text requirements to the LLM judge (the CLI: --judge).",
     )
     LLM_JUDGE_MAX_CALLS: int = Field(
-        default=200, ge=1, description="Most LLM judge calls for one tender, to protect the quota."
+        default=35,
+        ge=1,
+        description="Most LLM judge calls for one tender; caps its cost (about Rs 0.10 a call).",
+    )
+    LLM_JUDGE_MAX_PASSAGES: int = Field(
+        default=3, ge=1, description="Best catalogue passages sent to the judge per requirement."
+    )
+    LLM_JUDGE_THINKING_LEVEL: str | None = Field(
+        default="low",
+        description="Gemini thinkingLevel of judge calls ('low' adds no hidden thinking tokens); "
+        "empty uses the model default.",
     )
     LLM_JUDGE_LOW_SCORE_HITS: int = Field(
         default=3,
@@ -502,7 +528,17 @@ class Settings(BaseSettings):
     )
 
     TENDER_UPLOAD_MAX_MB: int = Field(
-        default=50, ge=1, description="Largest bid.pdf the API accepts."
+        default=50, ge=1, description="Largest upload (bid.pdf or tender ZIP) the API accepts."
+    )
+    TENDER_ZIP_RULES_FILE: Path = Field(
+        default=Path("config/tender_zip_files.yaml"),
+        description="File-name patterns giving roles to the files of an uploaded tender ZIP.",
+    )
+    TENDER_ZIP_MAX_FILES: int = Field(
+        default=100, ge=1, description="Most files an uploaded tender ZIP may hold."
+    )
+    TENDER_ZIP_MAX_UNPACKED_MB: int = Field(
+        default=300, ge=1, description="Largest total unpacked size of an uploaded tender ZIP."
     )
     RUNS_LIST_LIMIT: int = Field(default=100, ge=1, description="Most runs `GET /runs` returns.")
     RUN_ERROR_MAX_CHARS: int = Field(

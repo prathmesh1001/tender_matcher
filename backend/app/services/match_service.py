@@ -164,7 +164,7 @@ class MatchService:
             ],
             general=found.general,
             item_source=found.source,
-            extraction_quality=self._quality(found, low_ocr, unfetched),
+            extraction_quality=self._quality(found, low_ocr, unfetched, files),
         )
 
     def _item_facts(self, entry: ItemRequirements, low_ocr: set[tuple[str, int]]) -> ItemFacts:
@@ -183,15 +183,28 @@ class MatchService:
         found: TenderRequirements,
         low_ocr: set[tuple[str, int]],
         unfetched: Sequence[str],
+        files: Sequence[TenderFile] = (),
     ) -> ExtractionQuality:
         """Judge the extraction; titles are read with every ontology, however the run is set."""
+        spec_roles = self._requirement_options.spec_roles
         return extraction_quality(
             [self._item_facts(entry, low_ocr) for entry in found.items],
             found.source is ItemSource.ITEM_CATEGORY,
             self._requirement_options.quality,
             unfetched,
             spec_outside=sum(r.evidence is EvidenceSource.CATALOGUE for r in found.general),
+            spec_files=[f.name for f in files if f.role in spec_roles],
         )
+
+    def warm_catalogues(self) -> int:
+        """Read every registered catalogue into the cache now, so runs do not wait for it.
+
+        Returns:
+            How many catalogues are loaded.
+        """
+        loaded = self._source.warm()
+        logger.info("catalogues warm", extra={"documents": loaded})
+        return loaded
 
     def match_tender(
         self,

@@ -104,6 +104,7 @@ class RunService:
         matcher: Callable[[], Matcher],
         fetch_links: Callable[[str], list[str]],
         manufacturers: Callable[[], ManufacturerService],
+        warm_up: Callable[[], int] | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._settings = settings
@@ -111,6 +112,20 @@ class RunService:
         self._matcher = matcher
         self._fetch_links = fetch_links
         self._manufacturers = manufacturers
+        self._warm_up = warm_up
+
+    def warm_catalogues(self) -> bool:
+        """Queue reading every catalogue into the cache; runs queued after it find it ready.
+
+        It goes through the run queue, so it never processes catalogues alongside a run.
+
+        Returns:
+            Whether a warm-up was queued (False when it is turned off).
+        """
+        if self._warm_up is None:
+            return False
+        self._queue.enqueue(_warm, self._warm_up)
+        return True
 
     def start(self, request: StartRunRequest) -> RunResponse:
         """Queue a run of a stored tender.
@@ -215,6 +230,14 @@ class RunService:
             return len(lost)
 
 
+def _warm(warm_up: Callable[[], int]) -> None:
+    """Queue job: warm the catalogue cache; a failure is logged, the next run processes."""
+    try:
+        warm_up()
+    except (AppError, OSError) as exc:
+        logger.warning("catalogue warm-up failed", extra={"error": str(exc)})
+
+
 def build_run_service(
     settings: Settings, session_factory: sessionmaker[Session], queue: JobQueue
 ) -> RunService:
@@ -251,4 +274,5 @@ def build_run_service(
         matcher,
         fetch_links,
         lambda: build_manufacturer_service(settings),
+        (lambda: matcher().warm_catalogues()) if settings.CATALOGUE_WARM_ON_STARTUP else None,
     )

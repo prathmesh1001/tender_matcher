@@ -90,6 +90,12 @@ product_types:
 
 # Words a label may have after a synonym and still name that attribute ("Body Materials", "Size
 # Range", "Ends Parameter"). Any other word means the label names something else ("Stem Length").
+# Products of this category with no product type above (no catalogues are registered for them).
+# A title naming one as a phrase is that product, never a type sharing its words in another
+# order: "PVC foot valve Ball type" is a foot valve, not a ball valve (8157758 item 21).
+other_products: [foot valve, strainer, y strainer, pressure reducing valve, safety valve,
+  relief valve, needle valve, solenoid valve, air release valve, float valve]
+
 label_generic_words: [valve, moc, material, parameter, component, part, sl, "no", number, type,
                       spec, specification, description, detail, range, dim, dimension, scope,
                       iso, asme, of, to, and, for, at, the, max, maximum, min, minimum,

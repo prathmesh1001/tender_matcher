@@ -32,6 +32,15 @@ class RequirementRules(BaseModel):
     item_clause_split_pattern: str
     segment_end_pattern: str
     segment_cut_pattern: str
+    item_title_suffix_pattern: str = ""
+    name_heading_follow_pattern: str = ""
+    name_heading_max_lead_words: int = Field(default=0, ge=0)
+    set_line_pattern: str = ""
+    set_size_pattern: str = ""
+    set_unreadable_pattern: str = ""
+    name_ocr_confusions: dict[str, str] = Field(default_factory=dict)
+    set_size_label: str = "Size"
+    set_item_label: str = "Set contents"
 
 
 class ValueKind(StrEnum):

@@ -24,13 +24,14 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Fail runs a restart lost; on shutdown stop the queue and release DB connections."""
+    """Fail lost runs and warm the catalogue cache; on shutdown stop the queue and the DB."""
     try:
         lost = app.state.run_service.fail_interrupted()
         if lost:
             logger.warning("marked interrupted runs failed", extra={"runs": lost})
     except SQLAlchemyError as exc:  # the API still starts without a DB; requests then report it
         logger.warning("could not check for interrupted runs", extra={"error": str(exc)})
+    app.state.run_service.warm_catalogues()
     yield
     app.state.job_queue.shutdown()
     app.state.engine.dispose()

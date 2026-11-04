@@ -1,0 +1,20 @@
+# Roles of the files inside an uploaded tender ZIP (bid.pdf + its attachments in one archive).
+#
+# The bid document is not named here: it is the PDF with a GeM bid number on page 1.
+# Every other file gets the role of the first rule whose pattern matches its file name
+# (lower-cased, folders removed); unmatched files get `default_role`. Roles are the same as
+# for linked files (config/tender_links.yaml), so extraction reads both the same way:
+#   boq_items  the item list (a spreadsheet)      atc  additional terms (never gives items)
+#   boq_spec / buyer_spec / attachment  specifications that can give items
+
+default_role: attachment
+
+rules:
+  - role: atc
+    pattern: '(^|[^a-z])atc([^a-z]|$)|additional.?terms'
+  - role: boq_items
+    pattern: 'boq.*\.(csv|xlsx)$'
+  - role: boq_spec
+    pattern: 'boq'
+  - role: buyer_spec
+    pattern: 'spec|technical'

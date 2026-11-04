@@ -155,16 +155,18 @@ class DbEvidenceFinder:
     vocabulary: QueryVocabulary
     params: RetrievalParams
     low_score_hits: int = 0
+    max_passages: int | None = None
 
     def find(self, request: RetrievalRequest) -> FoundEvidence:
-        """Search one catalogue; hits that count as evidence, else the best few below it.
+        """Search one catalogue; the best hits that count as evidence, else the best few below it.
 
         Args:
             request: The requirement and the catalogue to search.
 
         Returns:
-            The outcome and the passages, best first: the accepted ones, or, when the product's
-            passages all score below the threshold, the best `low_score_hits` marked low_score.
+            The outcome and the passages, best first: the best `max_passages` accepted ones, or,
+            when the product's passages all score below the threshold, the best `low_score_hits`
+            marked low_score.
 
         Raises:
             ExternalServiceError: If the embedder or reranker fails.
@@ -180,7 +182,7 @@ class DbEvidenceFinder:
                 params=self.params,
             )
             result = retriever.retrieve(request)
-            hits = retriever.evidence_hits(result)
+            hits = retriever.evidence_hits(result)[: self.max_passages]
             low = not hits and result.outcome is RetrievalOutcome.BELOW_THRESHOLD
             if low:
                 hits = result.hits[: self.low_score_hits]
@@ -353,7 +355,7 @@ def build_judge_service(settings: Settings, session_factory: sessionmaker[Sessio
         min_length=settings.QUERY_TYPO_MIN_LENGTH,
     )
     return JudgeService(
-        build_llm_client(settings),
+        build_llm_client(settings, settings.LLM_JUDGE_THINKING_LEVEL),
         DbEvidenceFinder(
             session_factory,
             build_embedder(settings),
@@ -361,6 +363,7 @@ def build_judge_service(settings: Settings, session_factory: sessionmaker[Sessio
             vocabulary,
             RetrievalParams.from_settings(settings),
             settings.LLM_JUDGE_LOW_SCORE_HITS,
+            settings.LLM_JUDGE_MAX_PASSAGES,
         ),
         JudgeOptions(
             comparator=ComparatorOptions.from_settings(settings),

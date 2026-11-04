@@ -63,5 +63,24 @@ segment_end_pattern: '^\s*(?:annexure\b|(?:[ivx]+\.\s*)?delivery\s+period\b)'
 # Form text cut from a line, with everything after it on that line.
 segment_cut_pattern: '\bnull\b|agreed for the above|name of authori[sz]ed signatory|fact or no\b|factor description|vendor response'
 
+# Annexures whose blocks are headed by the item's name, not its number (8157758 Annexure A:
+# "SS ball valve set - 1 set shall consists of the following ..."; scans lose the Sl. No).
+# The item's name is its title without this ending ("SS ball valve set as per Annexure A").
+item_title_suffix_pattern: '\s+(?:set\s+)?(?:as\s+per|according\s+to|refer)\s+annexure\b.*$|\s+set$'
+# A block heading: the name, then "set" or a dash/colon (not the name inside a sentence).
+name_heading_follow_pattern: '^\s*(?:sets?\b|[-:])'
+# Scanned lines may start with a stray Sl. No or OCR noise before the name ("11 SS ball valve set").
+name_heading_max_lead_words: 2
+# One line of a set: what it holds and how many ("1" - 10 nos"); the count is not a requirement.
+set_line_pattern: '^(?P<value>.+?)\s*[-:]\s*(?P<count>\d+)\s*(?:nos?|no\.|pcs|pieces|numbers)\b\.?\s*$'
+# A set line holding a pipe size: inches, mm, DN or NB.
+set_size_pattern: '^(?:\d+(?:[\s-]+\d+/\d+)?|\d+/\d+)\s*(?:"|\x27\x27|inch(?:es)?\b|mm\b)|^(?:dn|nb)\s*\d+|^\d+\s*nb\b'
+# A scan that lost a size: OCR reads 1/2" or 3/4" as "%", or keeps no digit (never guessed, sent to review).
+set_unreadable_pattern: '%|^[^0-9]*$'
+# Letters OCR confuses, read alike only when matching an item name to a heading (CLAUDE.md A7: "Gl" is "GI").
+name_ocr_confusions: {l: i, '|': i}
+set_size_label: Size
+set_item_label: Set contents
+
 # Words ending in "." that do not end a sentence when prose is split into requirements.
 sentence_abbreviations: [m/s, "no", nos, gr, ltd, pvt, dt, sl, sr, rs, inr, govt, dept, viz, etc, e.g, i.e, f.o.r]

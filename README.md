@@ -78,10 +78,14 @@ to change:
 | `GEMINI_API_KEY` | none | Needed by the judge and `extract-specs` |
 | `LLM_MODEL` | `gemini-3.8-flash` | Model id at the provider |
 | `LLM_JUDGE_ENABLED` | `false` | API runs send free-text lines to the LLM judge (CLI: `match-tender --judge`) |
-| `LLM_JUDGE_MAX_CALLS` | `200` | Most judge calls per tender; further lines stay `unsupported` |
+| `LLM_JUDGE_MAX_CALLS` | `35` | Most judge calls per tender; further lines stay `unsupported`. Caps the cost (about Rs 0.10 a call, so under Rs 5 a tender) |
+| `LLM_JUDGE_MAX_PASSAGES` | `3` | Best catalogue passages sent to the judge per requirement |
+| `LLM_JUDGE_THINKING_LEVEL` | `low` | Gemini thinking level of judge calls; `low` adds no billed thinking tokens (empty: model default) |
 | `LLM_JUDGE_LOW_SCORE_HITS` | `3` | When the right product's passages all score below `RERANK_MIN_SCORE`, this many go to the judge (0 turns it off) |
 | `RANKING_MIN_COVERAGE_PCT` | `50` | Below this, a manufacturer is listed last as low coverage |
-| `TENDER_UPLOAD_MAX_MB` | `50` | Largest `bid.pdf` the API accepts |
+| `TENDER_UPLOAD_MAX_MB` | `50` | Largest upload the API accepts: `bid.pdf`, or a ZIP of it with its BOQ/spec/ATC files |
+| `TENDER_ZIP_RULES_FILE` | `config/tender_zip_files.yaml` | File-name patterns giving each file in an uploaded ZIP its role |
+| `TENDER_ZIP_MAX_FILES` / `TENDER_ZIP_MAX_UNPACKED_MB` | `100` / `300` | Limits on an uploaded ZIP |
 
 Judge answers are cached in the `judge_answers` table, keyed by a hash of the prompt version,
 model and full prompt (requirement text and passage chunk ids). A rerun gives the same answers and

@@ -25,7 +25,7 @@ const BOTH: Manufacturer = {
 
 async function fillForm() {
   const user = userEvent.setup();
-  await user.upload(screen.getByLabelText("Tender PDF"), pdf());
+  await user.upload(screen.getByLabelText("Tender PDF or ZIP"), pdf());
   await user.selectOptions(await screen.findByLabelText("Product category"), "valves_pumps");
   await user.click(screen.getByLabelText(/Acme Valves/));
   return user;
@@ -104,10 +104,10 @@ describe("UploadForm", () => {
     renderWithProviders(<AppRoutes />);
     const user = userEvent.setup({ applyAccept: false });
     await user.upload(
-      screen.getByLabelText("Tender PDF"),
+      screen.getByLabelText("Tender PDF or ZIP"),
       new File(["x"], "boq.xlsx", { type: "application/vnd.ms-excel" }),
     );
-    expect(screen.getByRole("alert")).toHaveTextContent("Only .pdf files can be uploaded.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Only .pdf, .zip files can be uploaded.");
     await waitFor(() => {
       expect(screen.getByText("No file chosen")).toBeInTheDocument();
     });

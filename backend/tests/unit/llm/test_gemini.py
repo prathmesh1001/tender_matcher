@@ -10,7 +10,7 @@ from pydantic import BaseModel, SecretStr
 from app.core.config import Settings
 from app.core.exceptions import ExternalServiceError, InvalidInputError
 from app.llm.factory import build_llm_client
-from app.llm.providers.gemini import GeminiClient, gemini_schema
+from app.llm.providers.gemini import GeminiClient, gemini_schema, token_usage
 
 KEY = "secret-test-key"
 
@@ -28,7 +28,11 @@ def _ok(text: str = '{"items": [{"name": "a"}]}') -> httpx.Response:
     return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": text}]}}]})
 
 
-def _client(handler: Callable[[httpx.Request], httpx.Response], retries: int = 2) -> GeminiClient:
+def _client(
+    handler: Callable[[httpx.Request], httpx.Response],
+    retries: int = 2,
+    thinking_level: str | None = None,
+) -> GeminiClient:
     return GeminiClient(
         http=httpx.Client(transport=httpx.MockTransport(handler)),
         model="test-model",
@@ -38,8 +42,21 @@ def _client(handler: Callable[[httpx.Request], httpx.Response], retries: int = 2
         max_output_tokens=100,
         max_retries=retries,
         retry_backoff_seconds=1.0,
+        thinking_level=thinking_level,
         sleep=lambda _: None,
     )
+
+
+def _sent_config(thinking_level: str | None) -> dict[str, object]:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return _ok()
+
+    _client(handler, thinking_level=thinking_level).generate_json("p", _Answer)
+    config: dict[str, object] = json.loads(seen[0].content)["generationConfig"]
+    return config
 
 
 def test_request_shape_and_validated_answer() -> None:
@@ -60,6 +77,22 @@ def test_request_shape_and_validated_answer() -> None:
     config = body["generationConfig"]
     assert config["responseMimeType"] == "application/json"
     assert (config["temperature"], config["maxOutputTokens"]) == (0.0, 100)
+
+
+def test_thinking_level_is_sent_only_when_set() -> None:
+    assert _sent_config("low")["thinkingConfig"] == {"thinkingLevel": "low"}
+    assert "thinkingConfig" not in _sent_config(None)
+    assert "thinkingConfig" not in _sent_config("")
+
+
+def test_token_usage_reads_billed_counts_and_defaults_to_zero() -> None:
+    usage = {"promptTokenCount": 691, "candidatesTokenCount": 57, "thoughtsTokenCount": 246}
+    assert token_usage({"usageMetadata": usage}) == {
+        "input_tokens": 691,
+        "output_tokens": 57,
+        "thinking_tokens": 246,
+    }
+    assert token_usage({}) == {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0}
 
 
 def test_schema_inlines_references_and_marks_nullable() -> None:
@@ -159,3 +192,13 @@ def test_factory_uses_the_configured_model(settings: Settings) -> None:
         update={"GEMINI_API_KEY": SecretStr(KEY), "LLM_MODEL": "other-model"}
     )
     assert build_llm_client(configured).model_name == "other-model"
+
+
+def test_factory_passes_the_callers_thinking_level(settings: Settings) -> None:
+    configured = settings.model_copy(update={"GEMINI_API_KEY": SecretStr(KEY)})
+    client = build_llm_client(configured, "low")
+    assert isinstance(client, GeminiClient)
+    assert client.thinking_level == "low"
+    default = build_llm_client(configured)
+    assert isinstance(default, GeminiClient)
+    assert default.thinking_level is None

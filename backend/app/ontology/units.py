@@ -5,6 +5,7 @@ comparator never compares "10 kg/cm²" with "10 bar" (CLAUDE.md B5). PN and Clas
 designation systems and are mapped only through the EN 1759-1 table, never via bar (B6).
 """
 
+import re
 from dataclasses import dataclass
 from fractions import Fraction
 from typing import Final
@@ -15,6 +16,31 @@ from app.core.exceptions import UnitConversionError
 from app.ontology.schema import Attribute, Ontology
 
 _REGISTRY: Final = pint.UnitRegistry()
+# Fraction characters as written fractions; NFKC would turn one and a half into "11/2" (11 halves).
+_VULGAR: Final = {
+    "\u00bc": "1/4",
+    "\u00bd": "1/2",
+    "\u00be": "3/4",
+    "\u215b": "1/8",
+    "\u215c": "3/8",
+    "\u215d": "5/8",
+    "\u215e": "7/8",
+}
+_VULGAR_CHAR: Final = re.compile("[" + "".join(_VULGAR) + "]")
+_FRACTION_SLASH: Final = "\u2044"
+
+
+def spell_fractions(text: str) -> str:
+    """Write fraction characters out: "1½" -> "1 1/2", "¾" -> "3/4" (read before NFKC folding).
+
+    Args:
+        text: A value as printed.
+
+    Returns:
+        The text with each fraction character as "n/d" after a space, and fraction slashes as "/".
+    """
+    spelled = _VULGAR_CHAR.sub(lambda m: " " + _VULGAR[m.group(0)], text)
+    return spelled.replace(_FRACTION_SLASH, "/").strip() if spelled != text else spelled
 
 
 @dataclass(frozen=True, slots=True)

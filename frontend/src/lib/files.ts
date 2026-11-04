@@ -13,10 +13,10 @@ export function formatBytes(bytes: number): string {
 /**
  * Why a file cannot be uploaded as a tender, or null if it can.
  *
- * Checks the extension as well as the MIME type: Windows often reports "" for PDFs.
+ * Checks the extension as well as the MIME type: Windows often reports "" for PDFs and ZIPs.
  */
 export function validateTenderFile(file: File): string | null {
-  const extensions = Object.values(ACCEPTED_TENDER_TYPES);
+  const extensions = [...new Set(Object.values(ACCEPTED_TENDER_TYPES))];
   const name = file.name.toLowerCase();
   const typeOk = file.type === "" || file.type in ACCEPTED_TENDER_TYPES;
   if (!typeOk || !extensions.some((ext) => name.endsWith(ext))) {

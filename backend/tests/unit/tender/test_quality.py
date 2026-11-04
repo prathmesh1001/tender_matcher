@@ -147,7 +147,10 @@ def test_every_reason_is_reported() -> None:
     ]
     quality = extraction_quality(items, True, RULES, unfetched=["a.pdf"], spec_outside=100)
     # Nearly empty items and an oversized item exclude each other.
-    expected = set(ExtractionIssueCode) - {ExtractionIssueCode.SPEC_OUTSIDE_ITEMS}
+    expected = set(ExtractionIssueCode) - {
+        ExtractionIssueCode.SPEC_OUTSIDE_ITEMS,
+        ExtractionIssueCode.TITLE_ONLY_ITEMS,
+    }
     assert {r.code for r in quality.reasons} == expected
 
 
@@ -192,3 +195,40 @@ def test_one_item_with_real_requirements_clears_the_check() -> None:
 
 def test_no_items_is_not_this_problem() -> None:
     assert _spec_codes([], 100) == set()
+
+
+# ---------------------------------------------------------------- title-only items (8157758)
+
+SPEC = ["boq_spec.pdf"]
+
+
+def _title_only(items: list[ItemFacts], spec_files: list[str]) -> set[ExtractionIssueCode]:
+    found = extraction_quality(items, False, RULES, spec_files=spec_files)
+    return {r.code for r in found.reasons}
+
+
+def test_items_with_only_their_title_and_a_spec_attached_mark_the_tender() -> None:
+    items = [_item(f"Valve set {n} as per Annexure A", n=1) for n in range(4)]
+    assert ExtractionIssueCode.TITLE_ONLY_ITEMS in _title_only(items, SPEC)
+
+
+def test_title_only_reason_names_counts_files_and_items() -> None:
+    items = [_item("SS ball valve set as per Annexure A", n=1), _item(n=1)]
+    [reason] = extraction_quality(items, False, RULES, spec_files=SPEC).reasons
+    assert reason.reason.startswith("2 of 2 items hold at most 2 requirements")
+    assert '"boq_spec.pdf"' in reason.reason
+    assert '"SS ball valve set as per Annexure A"' in reason.reason
+
+
+def test_no_spec_file_means_title_only_items_are_not_this_problem() -> None:
+    assert _title_only([_item(n=1), _item(n=1)], []) == set()
+
+
+def test_title_only_share_is_inclusive() -> None:
+    share = RULES.title_only_share
+    total = 4
+    empty = int(share * total)
+    items = [_item(n=1)] * empty + [_item(n=10)] * (total - empty)
+    assert ExtractionIssueCode.TITLE_ONLY_ITEMS in _title_only(items, SPEC)
+    fewer = [_item(n=1)] * (empty - 1) + [_item(n=10)] * (total - empty + 1)
+    assert _title_only(fewer, SPEC) == set()

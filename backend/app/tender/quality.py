@@ -4,7 +4,8 @@ A wrong schedule gives confident-looking results about the wrong things, and no 
 notice that. So the extraction itself is judged, by what it looks like and never by which
 tender it is: titles that name no product and read as fragments or sentences, an item holding
 far more requirements than one product has, items left nearly empty while the specification's
-lines sit among the general requirements, a bid's Item Category row merging several products
+lines sit among the general requirements, items left with only their title although
+specification files are attached, a bid's Item Category row merging several products
 into one item, requirements read from low-confidence OCR, linked files that could not be fetched
 (the specification may be in one). Any of these marks the tender unreliable; that sends every
 result to review and changes no status.
@@ -37,6 +38,7 @@ class QualityRules:
     max_item_requirements: int
     nearly_empty_item: int
     min_spec_outside_items: int
+    title_only_share: float
     ocr_min_confidence: float
     low_ocr_share: float
 
@@ -52,6 +54,7 @@ class QualityRules:
             max_item_requirements=settings.EXTRACTION_MAX_ITEM_REQUIREMENTS,
             nearly_empty_item=settings.EXTRACTION_NEARLY_EMPTY_ITEM,
             min_spec_outside_items=settings.EXTRACTION_MIN_SPEC_OUTSIDE_ITEMS,
+            title_only_share=settings.EXTRACTION_TITLE_ONLY_SHARE,
             ocr_min_confidence=settings.EXTRACTION_OCR_MIN_CONFIDENCE,
             low_ocr_share=settings.EXTRACTION_LOW_OCR_SHARE,
         )
@@ -158,6 +161,23 @@ def _spec_outside_issue(
     )
 
 
+def _title_only_issue(
+    items: Sequence[ItemFacts], spec_files: Sequence[str], rules: QualityRules
+) -> ExtractionIssue | None:
+    """Most items hold only their title although specification files are attached."""
+    if not items or not spec_files:
+        return None
+    empty = [i for i in items if i.requirements <= rules.nearly_empty_item]
+    if len(empty) / len(items) < rules.title_only_share:
+        return None
+    return ExtractionIssue(
+        code=ExtractionIssueCode.TITLE_ONLY_ITEMS,
+        reason=f"{len(empty)} of {len(items)} items hold at most {rules.nearly_empty_item} "
+        f"requirements although specification files are attached ({_examples(spec_files)}): "
+        f"their text did not reach the items, e.g. {_examples([i.title for i in empty])}",
+    )
+
+
 def _ocr_issue(items: Sequence[ItemFacts], rules: QualityRules) -> ExtractionIssue | None:
     """Enough item requirements were read from low-confidence OCR."""
     total = sum(i.requirements for i in items)
@@ -221,6 +241,7 @@ def extraction_quality(
     rules: QualityRules,
     unfetched: Sequence[str] = (),
     spec_outside: int = 0,
+    spec_files: Sequence[str] = (),
 ) -> ExtractionQuality:
     """Judge one tender's extraction.
 
@@ -230,6 +251,7 @@ def extraction_quality(
         rules: Thresholds.
         unfetched: Linked files that could not be fetched or read.
         spec_outside: General requirements that catalogues could check (evidence: catalogue).
+        spec_files: Specification files read for the tender (spec, BOQ and annexure roles).
 
     Returns:
         `unreliable` with every reason found, else `ok` with none.
@@ -238,6 +260,7 @@ def extraction_quality(
         _title_issue(items, rules),
         _size_issue(items, rules),
         _spec_outside_issue(items, spec_outside, rules),
+        _title_only_issue(items, spec_files, rules),
         _merged_issue(items, from_item_category, rules),
         _ocr_issue(items, rules),
         _fetch_issue(unfetched),

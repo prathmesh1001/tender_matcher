@@ -89,11 +89,22 @@ def _named(title_words: list[str], product: ProductType) -> bool:
     return False
 
 
+def _names_other_product(title_words: list[str], ontology: Ontology) -> bool:
+    """True if the title names, as a phrase, a product the ontology has no type for."""
+    for phrase in ontology.other_products:
+        other = words(phrase)
+        if any(title_words[i : i + len(other)] == other for i in range(len(title_words))):
+            return True
+    return False
+
+
 def product_types_named(title: str, ontology: Ontology) -> list[str]:
     """Product types a title names: as a phrase, else with its words in any order.
 
     "CENTRIFUGAL HORIZONTAL PUMP" names `centrifugal_pump`. The exact phrase goes first, so
-    a title naming a phrase is not also read as every type sharing its words.
+    a title naming a phrase is not also read as every type sharing its words. A title naming
+    another product as a phrase ("PVC foot valve Ball type") names that product, so its words
+    in another order name no type (a foot valve is no ball valve).
 
     Args:
         title: The item title.
@@ -106,6 +117,8 @@ def product_types_named(title: str, ontology: Ontology) -> list[str]:
     exact = [p.name for p in ontology.product_types if _named(title_words, p)]
     if exact:
         return exact
+    if _names_other_product(title_words, ontology):
+        return []
     in_title = set(stems(title))
     return [
         p.name

@@ -8,11 +8,12 @@ from app.llm.base import LLMClient
 from app.llm.providers.gemini import GeminiClient
 
 
-def build_llm_client(settings: Settings) -> LLMClient:
+def build_llm_client(settings: Settings, thinking_level: str | None = None) -> LLMClient:
     """Build the LLM client from settings.
 
     Args:
         settings: Application settings.
+        thinking_level: Provider thinking level for this caller; None keeps the model default.
 
     Returns:
         A ready client.
@@ -33,4 +34,5 @@ def build_llm_client(settings: Settings) -> LLMClient:
                 max_output_tokens=settings.LLM_MAX_OUTPUT_TOKENS,
                 max_retries=settings.LLM_MAX_RETRIES,
                 retry_backoff_seconds=settings.LLM_RETRY_BACKOFF_SECONDS,
+                thinking_level=thinking_level,
             )

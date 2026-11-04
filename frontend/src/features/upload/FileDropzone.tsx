@@ -12,7 +12,7 @@ interface FileDropzoneProps {
   disabled?: boolean;
 }
 
-/** Drag-and-drop area plus a "Browse files" button for one tender PDF. */
+/** Drag-and-drop area plus a "Browse files" button for one tender PDF or ZIP. */
 export function FileDropzone({ file, onChange, disabled = false }: FileDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
@@ -73,16 +73,19 @@ export function FileDropzone({ file, onChange, disabled = false }: FileDropzoneP
         <span className="flex size-14 items-center justify-center rounded-full bg-white text-2xl text-brand-600 shadow-card">
           <UploadIcon />
         </span>
-        <p className="font-medium">Drag and drop the tender PDF here</p>
-        <p className="text-sm text-ink-600">GeM bid document (bid.pdf), up to {MAX_UPLOAD_MB} MB</p>
+        <p className="font-medium">Drag and drop the tender PDF or ZIP here</p>
+        <p className="text-sm text-ink-600">
+          GeM bid document (bid.pdf), or a ZIP of it with its BOQ, spec and ATC files, up to{" "}
+          {MAX_UPLOAD_MB} MB
+        </p>
         <label htmlFor={inputId} className="sr-only">
-          Tender PDF
+          Tender PDF or ZIP
         </label>
         <input
           ref={inputRef}
           id={inputId}
           type="file"
-          accept={Object.values(ACCEPTED_TENDER_TYPES).join(",")}
+          accept={[...new Set(Object.values(ACCEPTED_TENDER_TYPES))].join(",")}
           className="sr-only"
           disabled={disabled}
           onChange={(e) => {

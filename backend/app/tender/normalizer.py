@@ -14,7 +14,7 @@ from functools import lru_cache
 from typing import Final
 
 from app.ontology.schema import Attribute, Ontology
-from app.ontology.units import convert, units_compatible
+from app.ontology.units import convert, spell_fractions, units_compatible
 from app.retrieval.text_normalizer import fold_text, stem_token
 from app.schemas.enums import Operator
 from app.schemas.requirements import ValueKind
@@ -148,7 +148,7 @@ def title_size(title: str) -> str | None:
     """The one size an item title states, as printed; None for none or several (never guessed)."""
     found = {
         " ".join((m.group("size") or m.group("mm")).split())
-        for m in _TITLE_SIZE.finditer(fold_text(title))
+        for m in _TITLE_SIZE.finditer(fold_text(spell_fractions(title)))
     }
     return next(iter(found)) if len(found) == 1 else None
 
@@ -315,7 +315,7 @@ def parse_value(
     Returns:
         The parsed value: numeric (number, unit, operator), code, or text.
     """
-    stripped = value.strip().rstrip(".")
+    stripped = spell_fractions(value.strip().rstrip("."))
     # "PN 16 OR HIGHER": the direction words set the operator, the rest is the number.
     bare = _AT_MOST_VALUE.sub("", _AT_LEAST_VALUE.sub("", fold_text(stripped))).strip()
     size = size_form(bare)

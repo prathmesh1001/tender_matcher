@@ -100,6 +100,7 @@ class ExtractionIssueCode(StrEnum):
     LOW_CONFIDENCE_OCR = "low_confidence_ocr"
     FILES_NOT_FETCHED = "files_not_fetched"
     SPEC_OUTSIDE_ITEMS = "spec_outside_items"
+    TITLE_ONLY_ITEMS = "title_only_items"
 
 
 class RunStatus(StrEnum):

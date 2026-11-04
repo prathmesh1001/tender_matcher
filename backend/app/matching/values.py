@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Final
 
+from app.ontology.units import spell_fractions
 from app.retrieval.text_normalizer import SearchVocabulary, fold_text, search_tokens, stem_token
 
 _NUM: Final = r"-?\d+(?:\.\d+)?"
@@ -91,7 +92,8 @@ def quantities(text: str, prefixes: Sequence[str]) -> list[Quantity]:
     Returns:
         The quantities. A range's unit is the unit printed with either end.
     """
-    folded = _INCH_FRACTION.sub(_decimal_inches, _THOUSANDS.sub("", fold_text(text)))
+    spelled = fold_text(spell_fractions(text))
+    folded = _INCH_FRACTION.sub(_decimal_inches, _THOUSANDS.sub("", spelled))
     found, rest = _prefixed(folded, tuple(p.lower() for p in prefixes))
     open_end = -1  # end of the last "up to" value: its bracketed equivalent is open too
     for m in _NUMBER_VALUE.finditer(rest):

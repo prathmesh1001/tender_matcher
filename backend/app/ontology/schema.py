@@ -112,6 +112,11 @@ class Ontology(BaseModel):
         default_factory=list,
         description="Words that may follow a synonym in a label without changing what it names.",
     )
+    other_products: list[str] = Field(
+        default_factory=list,
+        description="Products of the category with no product type here (no catalogues): a title "
+        "naming one is not read as a type sharing its words ('foot valve, ball type').",
+    )
     material_names: list[str] = Field(
         default_factory=list,
         description='Words that start a material value: they end a merged key ("Shaft Bronze").',

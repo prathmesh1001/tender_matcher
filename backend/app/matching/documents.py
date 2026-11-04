@@ -29,7 +29,8 @@ from app.matching.comparator import (
 from app.matching.evidence_verifier import PageTexts, verify_comparison
 from app.matching.fields import located_fields, option_fields
 from app.matching.headings import ProductGroups, group_by_product
-from app.retrieval.text_normalizer import normalize_for_search
+from app.matching.product_identity import names_only_product, product_identity
+from app.retrieval.text_normalizer import normalize_for_search, stem_token
 from app.schemas.enums import DecisionSource, MatchStatus, ReviewFlag
 from app.schemas.matching import Comparison, DocumentResult, ManufacturerItemResult, SubTypeFit
 from app.schemas.requirements import Requirement, ValueKind
@@ -51,6 +52,7 @@ class SelectionOptions:
     quote_threshold: float
     min_coverage_pct: float
     overview_min_headings: int = 3
+    product_label_words: frozenset[str] = frozenset()
 
     @classmethod
     def from_settings(cls, settings: Settings) -> SelectionOptions:
@@ -61,6 +63,7 @@ class SelectionOptions:
             quote_threshold=settings.QUOTE_MATCH_THRESHOLD,
             min_coverage_pct=settings.RANKING_MIN_COVERAGE_PCT,
             overview_min_headings=settings.CATALOGUE_OVERVIEW_MIN_HEADINGS,
+            product_label_words=frozenset(stem_token(w) for w in settings.PRODUCT_TYPE_LABEL_WORDS),
         )
 
 
@@ -252,6 +255,47 @@ def _by_heading(
     return _from_another_product(result, chosen) if result.status in decides else result
 
 
+def _reading_order(
+    chunks: Sequence[CatalogueChunk],
+    groups: ProductGroups | None,
+    chosen: str | None,
+    product_type: str | None,
+) -> list[CatalogueChunk]:
+    """The chosen product's chunks, then those under any heading of the type, then the rest.
+
+    A contents page lists every product, so chunks under the product's own headings come first.
+    """
+    own: list[CatalogueChunk] = []
+    if groups is not None:
+        headings = [chosen] if chosen is not None else []
+        headings += [h for h in groups.headings_of(product_type or "") if h != chosen]
+        own = [c for h in headings for c in groups.by_heading[h]]
+    seen = {id(c) for c in own}
+    rest = [c for c in chunks if id(c) not in seen]
+    return [*own, *sorted(rest, key=lambda c: (c.chunk.page_number, c.chunk.position))]
+
+
+def _identified(
+    requirements: Sequence[Requirement],
+    raw: Sequence[Comparison],
+    chunks: Sequence[CatalogueChunk],
+    product_type: str | None,
+    ctx: MatchContext,
+    options: SelectionOptions,
+) -> list[Comparison]:
+    """Undecided lines that only name the product, met by the catalogue line naming it."""
+    if not product_type or not options.product_label_words:
+        return list(raw)
+    found: list[Comparison] = []
+    for requirement, comparison in zip(requirements, raw, strict=True):
+        if comparison.status is MatchStatus.UNSUPPORTED and names_only_product(
+            requirement, product_type, ctx, options.product_label_words
+        ):
+            comparison = product_identity(requirement, chunks, product_type, ctx) or comparison
+        found.append(comparison)
+    return found
+
+
 def evaluate_document(
     requirements: Sequence[Requirement],
     document: CatalogueDocument,
@@ -283,6 +327,8 @@ def evaluate_document(
     else:
         fields = located_fields(chunks, options.comparator.fields)
         raw = [compare(r, fields, ctx, options.comparator) for r in requirements]
+    ordered = _reading_order(chunks, groups, chosen, product_type)
+    raw = _identified(requirements, raw, ordered, product_type, ctx, options)
     offers = option_fields(chunks, options.comparator.fields)
     softened = [
         offered_as_option(r, c, offers, ctx, options.comparator)

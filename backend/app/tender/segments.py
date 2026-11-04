@@ -57,6 +57,7 @@ class SegmentLine:
 
     text: str
     page_number: int
+    unreadable: bool = False  # the scan lost the value (name_segments); never guessed
 
 
 @dataclass(slots=True)

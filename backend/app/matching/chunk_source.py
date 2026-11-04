@@ -19,10 +19,11 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Final, Protocol
+from typing import Any, Final, Protocol, cast
 
 from app.core.config import Settings
 from app.core.exceptions import NotFoundError
+from app.ingestion.ocr import build_ocr_engine
 from app.ingestion.processing import (
     ProcessedDocument,
     ProcessedPage,
@@ -31,8 +32,10 @@ from app.ingestion.processing import (
     set_product_family,
     tag_products,
 )
-from app.ingestion.product_tagger import Declared
+from app.ingestion.product_tagger import Declared, ProductMatcher
 from app.ingestion.registry import verify_source_file
+from app.ontology.loader import load_ontologies
+from app.retrieval.text_normalizer import SearchVocabulary
 from app.schemas.chunking import ChunkDraft
 from app.schemas.enums import DocType
 from app.schemas.sources import RegisteredSource
@@ -115,6 +118,10 @@ class ChunkSource(Protocol):
 
     def page_ocr(self, sha256: str, page_number: int) -> bool:
         """True if a page's text came from OCR."""
+        ...
+
+    def warm(self) -> int:
+        """Process every registered document now, so runs only read the cache."""
         ...
 
 
@@ -246,6 +253,41 @@ _FINGERPRINT_GLOBS: Final = (
 )
 
 
+class _ReadRecorder:
+    """Settings stand-in that records which settings are read."""
+
+    def __init__(self, settings: Settings) -> None:
+        self._settings = settings
+        self.read: set[str] = set()
+
+    def __getattr__(self, name: str) -> object:
+        self.read.add(name)
+        return getattr(self._settings, name)
+
+
+def processing_settings(settings: Settings) -> dict[str, Any]:
+    """The settings catalogue processing reads, found by building its options once.
+
+    Only these decide a processed file, so changing any other setting (upload limits, the LLM,
+    report paths) keeps the cache. Recording the reads keeps the list complete without a hand-
+    kept copy that could go stale.
+
+    Args:
+        settings: Application settings.
+
+    Returns:
+        Setting name -> value (JSON-ready), for every setting processing reads.
+    """
+    recorder = _ReadRecorder(settings)
+    as_settings = cast(Settings, recorder)
+    ontologies = load_ontologies(settings.ONTOLOGY_DIR)
+    vocabulary = SearchVocabulary.from_ontologies(ontologies)
+    matcher = ProductMatcher.from_ontologies(ontologies, vocabulary)
+    ProcessingOptions.from_settings(as_settings, vocabulary, matcher, build_ocr_engine(as_settings))
+    dumped = settings.model_dump(mode="json")
+    return {name: dumped[name] for name in sorted(recorder.read) if name in dumped}
+
+
 def processing_fingerprint(settings: Settings, backend_dir: Path) -> str:
     """Fingerprint of everything that decides a processed file: code, ontology, settings.
 
@@ -258,7 +300,7 @@ def processing_fingerprint(settings: Settings, backend_dir: Path) -> str:
     """
     files = [p for g in _FINGERPRINT_GLOBS for p in backend_dir.glob(g)]
     files += [*sorted(settings.ONTOLOGY_DIR.glob("*.yaml")), settings.SECTION_CATEGORIES_FILE]
-    return fingerprint(files, settings.model_dump_json())
+    return fingerprint(files, json.dumps(processing_settings(settings), sort_keys=True))
 
 
 def catalogue_processor(store: FileStore, options: ProcessingOptions) -> Processor:
@@ -378,6 +420,16 @@ class InMemoryChunkSource:
     def doc_type(self, sha256: str) -> DocType | None:
         """A document's type, or None if it is not registered."""
         return next((s.doc_type for s in self.sources if s.sha256 == sha256), None)
+
+    def warm(self) -> int:
+        """Load every registered document (disk cache, else process and cache it).
+
+        Returns:
+            How many documents are loaded.
+        """
+        for source in self.sources:
+            self._load(source)
+        return len(self._loaded)
 
     def page_ocr(self, sha256: str, page_number: int) -> bool:
         """True if a page's text came from OCR; False for an unknown document or page."""

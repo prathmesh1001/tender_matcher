@@ -6,6 +6,7 @@ everything else (routes, services, queue, database) is real.
 
 import hashlib
 import uuid
+import zipfile
 from collections.abc import Callable, Iterator, Sequence
 from datetime import UTC, datetime
 from functools import cache
@@ -14,6 +15,7 @@ from pathlib import Path
 
 import pymupdf
 import pytest
+import yaml
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
@@ -297,6 +299,77 @@ def test_a_file_on_disk_is_never_overwritten_even_without_its_row(
     body = client.post("/api/v1/tenders", files={"file": ("bid.pdf", PDF)}).json()
     assert body["revision"] == 2
     assert orphan.read_bytes() == b"%PDF an older copy"
+
+
+def _zip(files: dict[str, bytes]) -> bytes:
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, content in files.items():
+            archive.writestr(name, content)
+    return buffer.getvalue()
+
+
+def test_zip_upload_stores_bid_and_attachments_with_roles(
+    client: TestClient, tmp_path: Path
+) -> None:
+    spec = _pdf(bid_number=None, extra="Technical specification")
+    archive = _zip({"docs/GeM-Bidding.pdf": PDF, "docs/Tech Spec.pdf": spec, "docs/a.jpg": b"x"})
+    response = client.post("/api/v1/tenders", files={"file": ("tender.zip", archive)})
+    assert response.status_code == 201
+    body = response.json()
+    assert (body["bid_number"], body["attachments"]) == (BID, ["buyer_spec.pdf"])
+    assert body["skipped"] == ["docs/a.jpg: file type not read"]
+    folder = tmp_path / "tenders" / "GEM_2099_B_1234567"
+    assert (folder / "bid.pdf").read_bytes() == PDF
+    assert (folder / "buyer_spec.pdf").read_bytes() == spec
+    manifest = yaml.safe_load((folder / "tender.yaml").read_text(encoding="utf-8"))
+    entry = next(f for f in manifest["files"] if f["file"] == "buyer_spec.pdf")
+    assert (entry["role"], entry["original_name"]) == ("buyer_spec", "docs/Tech Spec.pdf")
+
+
+def test_zip_with_the_known_bid_adds_only_new_attachments(client: TestClient) -> None:
+    first = client.post("/api/v1/tenders", files={"file": ("bid.pdf", PDF)}).json()
+    archive = _zip({"bid.pdf": PDF, "ATC.pdf": _pdf(bid_number=None, extra="ATC")})
+    second = client.post("/api/v1/tenders", files={"file": ("t.zip", archive)}).json()
+    third = client.post("/api/v1/tenders", files={"file": ("t.zip", archive)}).json()
+    assert second["tender_id"] == first["tender_id"] == third["tender_id"]
+    assert (second["attachments"], third["attachments"]) == (["atc.pdf"], [])
+
+
+def test_zip_without_a_bid_pdf_is_refused(client: TestClient) -> None:
+    archive = _zip({"spec.pdf": _pdf(bid_number=None)})
+    response = client.post("/api/v1/tenders", files={"file": ("t.zip", archive)})
+    assert response.status_code == 422
+    assert "No PDF in the ZIP" in response.json()["error"]["message"]
+
+
+def test_a_file_that_is_neither_pdf_nor_zip_is_refused(client: TestClient) -> None:
+    response = client.post("/api/v1/tenders", files={"file": ("t.txt", b"hello")})
+    assert response.status_code == 422
+    assert "neither a PDF nor a ZIP" in response.json()["error"]["message"]
+
+
+def test_catalogue_warm_up_goes_through_the_run_queue(app: FastAPI) -> None:
+    warmed: list[int] = []
+
+    def warm_up() -> int:
+        warmed.append(1)
+        return 7
+
+    def service(warm_up: Callable[[], int] | None) -> RunService:
+        return RunService(
+            app.state.session_factory,
+            make_test_settings(),
+            _Inline(),
+            cache(lambda: _Matcher(_report())),
+            lambda _: [],
+            lambda: ManufacturerService([]),
+            warm_up,
+        )
+
+    assert service(warm_up).warm_catalogues() is True
+    assert warmed == [1]
+    assert service(None).warm_catalogues() is False
 
 
 def test_excel_downloads_for_a_finished_run_only(app: FastAPI, client: TestClient) -> None:

@@ -83,6 +83,23 @@ def response_text(body: Mapping[str, Any]) -> str:
     return text
 
 
+def token_usage(body: Mapping[str, Any]) -> dict[str, int]:
+    """Billed token counts of a `generateContent` response (0 where the API omits one).
+
+    Args:
+        body: The decoded response.
+
+    Returns:
+        Input, answer and thinking tokens; thinking tokens are billed as output.
+    """
+    usage = body.get("usageMetadata") or {}
+    return {
+        "input_tokens": int(usage.get("promptTokenCount") or 0),
+        "output_tokens": int(usage.get("candidatesTokenCount") or 0),
+        "thinking_tokens": int(usage.get("thoughtsTokenCount") or 0),
+    }
+
+
 @dataclass(slots=True)
 class GeminiClient:
     """`LLMClient` over the Gemini REST API; the HTTP client is injected."""
@@ -95,6 +112,7 @@ class GeminiClient:
     max_output_tokens: int
     max_retries: int
     retry_backoff_seconds: float
+    thinking_level: str | None = None
     sleep: Callable[[float], None] = time.sleep
 
     @property
@@ -116,16 +134,21 @@ class GeminiClient:
             ExternalServiceError: If the call fails after retries, the prompt is blocked, or
                 the answer does not satisfy the schema.
         """
+        config: dict[str, Any] = {
+            "temperature": self.temperature,
+            "maxOutputTokens": self.max_output_tokens,
+            "responseMimeType": "application/json",
+            "responseSchema": gemini_schema(schema),
+        }
+        if self.thinking_level:
+            config["thinkingConfig"] = {"thinkingLevel": self.thinking_level}
         payload = {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": self.temperature,
-                "maxOutputTokens": self.max_output_tokens,
-                "responseMimeType": "application/json",
-                "responseSchema": gemini_schema(schema),
-            },
+            "generationConfig": config,
         }
-        text = response_text(self._post(payload))
+        body = self._post(payload)
+        logger.info("gemini usage", extra=token_usage(body))
+        text = response_text(body)
         try:
             return schema.model_validate_json(text)
         except ValidationError as exc:

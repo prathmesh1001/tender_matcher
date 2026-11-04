@@ -547,6 +547,23 @@ def test_an_exact_phrase_goes_before_any_order(ontology: Ontology) -> None:
     assert product_types_named("GLOBE VALVE FOR GATE HOUSE", ontology) == ["globe_valve"]
 
 
+@pytest.mark.parametrize(
+    ("title", "product"),
+    [
+        ("PVC foot valve Ball type set as per Annexure A", None),  # a foot valve (8157758)
+        ("SS Y strainer set as per Annexure A", None),
+        ("Check valve with Y strainer", "check_valve"),  # the phrase still names the type
+        ("Valve, Ball type, SS", "ball_valve"),  # no other product named: any order holds
+    ],
+)
+def test_a_title_naming_another_product_is_not_a_type_sharing_its_words(
+    title: str, product: str | None, ontology: Ontology
+) -> None:
+    assert product_type_for(title, ontology) == product
+    declared = sorted(p.name for p in ontology.product_types)
+    assert item_product_type(title, declared, MatchContext.for_ontology(ontology)) == product
+
+
 def test_engine_finds_the_type_in_any_order(ontology: Ontology) -> None:
     ctx = MatchContext.for_ontology(ontology)
     declared = ["centrifugal_pump", "submersible_pump"]
