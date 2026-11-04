@@ -10,6 +10,7 @@ from app.ingestion.chunker import table_row_text
 from app.matching.chunk_source import CatalogueChunk, CatalogueDocument
 from app.matching.comparator import ComparatorOptions, MatchContext, compare
 from app.matching.fields import FieldOptions, chunk_fields, is_dimension_table, located_fields
+from app.matching.values import quantities
 from app.ontology.loader import load_ontologies
 from app.ontology.schema import Ontology
 from app.schemas.chunking import ChunkDraft
@@ -181,6 +182,34 @@ def test_unlabelled_line_counts_when_label_leads(valves: Ontology, with_ontology
     lines = _prose("Butterfly valves for water\nSize range 80 mm to 2500 mm")
     result = _compare("SIZE : 250 MM", [lines], _ontology(valves, with_ontology))
     assert result.status is FULL
+
+
+@pytest.mark.parametrize(
+    ("line", "status"),
+    [
+        ('SIZE : 3"', FULL),  # inside: was "missing" when "thru" read as a list of 2" and 12"
+        ('SIZE : 2"', FULL),
+        ('SIZE : 12"', FULL),
+        ('SIZE : 1"', MISSING),
+        ('SIZE : 14"', MISSING),
+    ],
+)
+def test_thru_is_a_range(valves: Ontology, line: str, status: MatchStatus) -> None:
+    mueller = _prose("Sizes: 2” thru 12” / DN 50 thru DN 300\n2.2 Working pressure")
+    assert _compare(line, [mueller], valves).status is status
+
+
+@pytest.mark.parametrize(
+    ("text", "low", "high", "unit"),
+    [
+        ("50 thru 300 mm", 50.0, 300.0, "mm"),  # "thru" is never the unit of 50
+        ("2 through 8 inch", 2.0, 8.0, "inch"),
+        ("DN 50 thru DN 300", 50.0, 300.0, "dn"),
+    ],
+)
+def test_thru_and_through_join_a_range(text: str, low: float, high: float, unit: str) -> None:
+    [found] = quantities(text, ("pn", "class", "dn"))
+    assert (found.low, found.high, found.unit) == (low, high, unit)
 
 
 def test_inch_size_against_dn_range(valves: Ontology) -> None:

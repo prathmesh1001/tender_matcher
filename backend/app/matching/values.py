@@ -18,8 +18,9 @@ from app.retrieval.text_normalizer import SearchVocabulary, fold_text, search_to
 
 _NUM: Final = r"-?\d+(?:\.\d+)?"
 # A unit right after a number: '"', or a word starting with a letter or "°" ("mm", "m3/hr").
-_UNIT: Final = r"""(?:"|''|(?!to\b|and\b|or\b)[a-z°][a-z0-9°/²³]*)"""
-_RANGE_SEP: Final = r"\s*(?:to|-|~)\s*"
+_UNIT: Final = r"""(?:"|''|(?!to\b|thru\b|through\b|and\b|or\b)[a-z°][a-z0-9°/²³]*)"""
+# "50 to 600", "2" thru 12"" (Mueller), "50 - 600": one range, never a list of two values.
+_RANGE_SEP: Final = r"\s*(?:to|thru|through|-|~)\s*"
 _NUMBER_VALUE: Final = re.compile(
     rf"(?<![\w.])(?P<a>{_NUM})\s*(?P<ua>{_UNIT})?(?:{_RANGE_SEP}(?P<b>{_NUM})\s*(?P<ub>{_UNIT})?)?"
 )

@@ -23,7 +23,7 @@ _NUMBER: Final = r"[+-]?\d+(?:\.\d+)?"
 # "250 MM", "650 M3/HR", "CLASS #150", "PN 16", "50 to 600 mm": the whole value is a number.
 _NUMERIC_VALUE: Final = re.compile(
     rf"^(?P<designation>class|pn)?\s*#?\s*(?P<num>{_NUMBER})"
-    rf"(?:\s*(?:to|-)\s*(?P<num2>{_NUMBER}))?\s*(?P<unit>[^\s\d][^\s]*)?$",
+    rf"(?:\s*(?:to|thru|through|-)\s*(?P<num2>{_NUMBER}))?\s*(?P<unit>[^\s\d][^\s]*)?$",
     re.IGNORECASE,
 )
 # A code: letters and digits in one token ("A216", "CF8M", "17-4PH"), or a standard body
