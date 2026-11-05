@@ -2,7 +2,7 @@
 
 import uuid
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class TenderUploadResponse(BaseModel):
@@ -16,9 +16,3 @@ class TenderUploadResponse(BaseModel):
     bid_number: str
     revision: int
     created: bool
-    attachments: list[str] = Field(
-        default_factory=list, description="Files stored from an uploaded ZIP besides bid.pdf."
-    )
-    skipped: list[str] = Field(
-        default_factory=list, description="Files in an uploaded ZIP that were not stored, and why."
-    )

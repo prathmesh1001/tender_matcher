@@ -528,17 +528,7 @@ class Settings(BaseSettings):
     )
 
     TENDER_UPLOAD_MAX_MB: int = Field(
-        default=50, ge=1, description="Largest upload (bid.pdf or tender ZIP) the API accepts."
-    )
-    TENDER_ZIP_RULES_FILE: Path = Field(
-        default=Path("config/tender_zip_files.yaml"),
-        description="File-name patterns giving roles to the files of an uploaded tender ZIP.",
-    )
-    TENDER_ZIP_MAX_FILES: int = Field(
-        default=100, ge=1, description="Most files an uploaded tender ZIP may hold."
-    )
-    TENDER_ZIP_MAX_UNPACKED_MB: int = Field(
-        default=300, ge=1, description="Largest total unpacked size of an uploaded tender ZIP."
+        default=50, ge=1, description="Largest bid.pdf the API accepts."
     )
     RUNS_LIST_LIMIT: int = Field(default=100, ge=1, description="Most runs `GET /runs` returns.")
     RUN_ERROR_MAX_CHARS: int = Field(

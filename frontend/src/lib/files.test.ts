@@ -15,14 +15,6 @@ describe("validateTenderFile", () => {
   });
 
   it.each([
-    ["tender.zip", "application/zip"],
-    ["tender.zip", "application/x-zip-compressed"],
-    ["TENDER.ZIP", ""],
-  ])("accepts the tender ZIP %s (%s)", (name, type) => {
-    expect(validateTenderFile(file(name, type))).toBeNull();
-  });
-
-  it.each([
     ["spec.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
     ["boq.xlsx", ""],
     ["fake.pdf", "image/png"],

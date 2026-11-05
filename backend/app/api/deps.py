@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import Settings, get_settings
 from app.db.repositories import DocumentRepository
 from app.db.session import session_scope
-from app.ingestion.processing import SUPPORTED_SUFFIXES
 from app.services.document_service import DocumentService
 from app.services.health_service import HealthService
 from app.services.manufacturer_service import (
@@ -24,7 +23,6 @@ from app.services.report_service import ReportService, build_report_service
 from app.services.run_service import RunService
 from app.services.tender_service import TenderService
 from app.storage.file_store import build_file_store
-from app.tender.zip_upload import ZipLimits, load_zip_rules
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
@@ -91,12 +89,6 @@ def get_tender_service(request: Request, settings: SettingsDep) -> TenderService
         build_file_store(settings),
         settings.TENDER_DATA_DIR,
         settings.TENDER_UPLOAD_MAX_MB,
-        load_zip_rules(settings.TENDER_ZIP_RULES_FILE),
-        ZipLimits(
-            max_files=settings.TENDER_ZIP_MAX_FILES,
-            max_unpacked_mb=settings.TENDER_ZIP_MAX_UNPACKED_MB,
-            readable_suffixes=SUPPORTED_SUFFIXES,
-        ),
     )
 
 

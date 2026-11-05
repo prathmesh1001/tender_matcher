@@ -96,21 +96,3 @@ class FetchedFile(BaseModel):
     content: bytes
     content_type: str | None
     fetched_at: datetime
-
-
-class ZipFileRule(BaseModel):
-    """One file-name pattern inside an uploaded tender ZIP and the role it gives."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    role: str = Field(pattern=r"^[a-z0-9_]+$")
-    pattern: str = Field(min_length=1)
-
-
-class ZipFileRules(BaseModel):
-    """Top-level shape of the ZIP file rules (`config/tender_zip_files.yaml`)."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    default_role: str = Field(pattern=r"^[a-z0-9_]+$")
-    rules: list[ZipFileRule] = Field(default_factory=list)

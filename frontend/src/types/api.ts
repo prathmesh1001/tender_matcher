@@ -30,10 +30,6 @@ export interface TenderUploadResponse {
   bid_number: string;
   revision: number;
   created: boolean;
-  /** Files stored from an uploaded ZIP besides bid.pdf. */
-  attachments: string[];
-  /** Files in an uploaded ZIP that were not stored, and why. */
-  skipped: string[];
 }
 
 /** Request body of POST /runs (Step 12). */
