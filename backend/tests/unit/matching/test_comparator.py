@@ -1,6 +1,7 @@
 """Rule comparator. Catalogue rows and tender lines are synthetic, shaped like the real ones."""
 
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -619,3 +620,66 @@ def test_other_temperatures_are_read(value: str, valves: Ontology) -> None:
 def test_the_glued_zero_rule_is_for_temperatures_only(valves: Ontology) -> None:
     result = _compare("SIZE : 100 MM", [_prose("Size: 50 to 200C")], valves)
     assert "misread" not in result.reason
+
+
+# ---------------------------------------------------------------- standards named by code
+
+@pytest.mark.parametrize(
+    ("line", "text"),
+    [
+        ("Product Standard : EN 593", "Butterfly valves that conform to EN 593, sizes 50 to 600"),
+        ("Testing Standard : API 598", "Each valve is shell and seat tested to API 598."),
+        ("Design Standard : BS EN 593", "ISO 5208 / EN 593"),  # no label on the line
+    ],
+)
+def test_a_standard_code_names_its_attribute(valves: Ontology, line: str, text: str) -> None:
+    result = _compare(line, [_prose(text)], valves)
+    assert result.status is FULL
+    assert [e.quote for e in result.evidence] == [text]
+
+
+def test_another_standard_never_makes_a_standard_missing(valves: Ontology) -> None:
+    result = _compare("Testing Standard : API 598", [_prose("Tested to ISO 5208.")], valves)
+    assert result.status is UNSUPPORTED
+
+
+def test_a_labelled_field_decides_before_a_standard_code(valves: Ontology) -> None:
+    labelled = _row(["Item", "Standard"], ["Design", "API 609"], "Technical data")
+    result = _compare("Design Standard : EN 593", [labelled, _prose("Also EN 593 flanges")], valves)
+    assert result.status is MISSING
+
+
+def test_a_standard_code_needs_the_ontology(valves: Ontology) -> None:
+    result = _compare("Testing Standard : API 598", [_prose("Tested to API 598.")], None)
+    assert result.status is UNSUPPORTED
+
+
+def test_a_standard_code_on_another_products_line_is_not_evidence(valves: Ontology) -> None:
+    several = replace(DOC, product_types=("butterfly_valve", "gate_valve"))
+    chunk = ChunkDraft(
+        page_number=2,
+        position=0,
+        chunk_type=ChunkType.PROSE,
+        raw_text="Gate valves are tested to API 598.",
+        token_count=1,
+    )
+    untagged = CatalogueChunk(several, chunk)
+    gate = CatalogueChunk(several, chunk.model_copy(update={"product_type": "gate_valve"}))
+    own = CatalogueChunk(several, chunk.model_copy(update={"product_type": "butterfly_valve"}))
+    requirement = _req("Testing Standard : API 598", valves).model_copy(
+        update={"product_type": "butterfly_valve"}
+    )
+    ctx = MatchContext.for_ontology(valves)
+
+    def status(chunks: list[CatalogueChunk]) -> MatchStatus:
+        return compare(requirement, located_fields(chunks, OPTIONS.fields), ctx, OPTIONS).status
+
+    assert status([untagged, gate]) is UNSUPPORTED
+    assert status([own]) is FULL
+
+
+def test_a_standard_code_in_the_label_cell_lifts_a_near_miss(valves: Ontology) -> None:
+    # L&T ball valves p6: "Scope: Design* ISO 17292/ | Standard: API 6D".
+    row = _row(["Scope", "Standard"], ["Design* ISO 17292/", "API 6D"], "Standards & Materials")
+    result = _compare("Product Standard : BS EN ISO 17292", [row], valves)
+    assert result.status is FULL

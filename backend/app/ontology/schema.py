@@ -56,6 +56,11 @@ class Attribute(BaseModel):
     critical: bool = Field(
         default=False, description="Identifies the product: decides which catalogue is chosen."
     )
+    codes: list[str] = Field(
+        default_factory=list,
+        description="Standards that can only be this attribute ('API 598'): printed in the "
+        "item's own product text, they state it without a label.",
+    )
 
 
 class CodeRule(BaseModel):

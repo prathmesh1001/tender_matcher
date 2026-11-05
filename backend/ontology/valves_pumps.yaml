@@ -197,10 +197,17 @@ attributes:
     critical: true
     dimension: none
     synonyms: [design standard, design code, manufacturing standard, design, design mfg std,
-               governing specification]
+               governing specification, product standard]
+    # A standard that can only be this attribute: printed anywhere in the item's own product
+    # text ("conforms to API 594"), it states the attribute without a label.
+    codes: [API 594, API 600, API 602, API 603, API 608, API 609, API 6D, BS 1414, BS 1868,
+            BS 1873, BS 5150, BS 5152, BS 5153, BS 5154, BS 5155, BS 5351, BS 5352, ISO 10434,
+            ISO 14313, ISO 15761, ISO 17292, EN 593, EN 1171, EN 1984, EN 12334, IS 778,
+            IS 780, IS 5312, IS 13095, IS 14846, ASME B16.34, AWWA C504]
   - name: test_standard
     dimension: none
     synonyms: [testing standard, test standard, inspection and testing]
+    codes: [API 598, ISO 5208, BS 6755, EN 12266]
   - name: face_to_face_standard
     dimension: none
     synonyms: [face to face, face-to-face, f to f]

@@ -15,6 +15,12 @@ category has one and is never required.
    that fails. A label without a usable value, or values that cannot be compared, give
    `unsupported` + needs_review. Free text and unlabelled statements are unsupported too
    (they need the LLM judge).
+4. A standard the ontology lists under an attribute (`codes`: API 598 can only be a test
+   standard) names that attribute itself, so a line of the item's own product printing it
+   ("conforms to API 594") is a full match without a label, when no labelled field decides.
+   Against a labelled field that decides, only a field of the attribute printing the code in
+   its own label counts ("Design* ISO 17292/ | API 6D": either standard). Another standard
+   printed there never makes one missing.
 """
 
 import math
@@ -513,7 +519,59 @@ def compare(
             outcome = judge_code(requirement, value, ctx, options)
         judged.append(_evidence(located, value, outcome))
     result = _decide(requirement, judged, basis, options)
+    if result.status is not MatchStatus.FULL_MATCH:
+        in_label = result.status is not MatchStatus.UNSUPPORTED
+        result = _by_standard_code(requirement, fields, ctx, options, in_label) or result
     return result.model_copy(update={"needs_review": True}) if requirement.flags else result
+
+
+def _own_product(located: LocatedField, requirement: Requirement) -> bool:
+    """True if a field is about the requirement's product: tagged with it, or a one-product file."""
+    chunk, document = located.source.chunk, located.source.document
+    if requirement.product_type is not None and chunk.product_type == requirement.product_type:
+        return True
+    return len(document.product_types) == 1
+
+
+def _by_standard_code(
+    requirement: Requirement,
+    fields: Sequence[LocatedField],
+    ctx: MatchContext,
+    options: ComparatorOptions,
+    in_label: bool = False,
+) -> Comparison | None:
+    """Full match from the product's own lines printing the standard (rule 4), or None.
+
+    With `in_label`, only fields naming the attribute and printing the code in their label.
+    """
+    attribute = ctx.attribute(requirement)
+    if attribute is None or not attribute.codes or requirement.kind is not ValueKind.CODE:
+        return None
+    noise, vocabulary = options.code_noise_words, ctx.vocabulary
+    known = {t for c in attribute.codes for t in code_tokens(c, noise, vocabulary) if is_code(t)}
+    wanted = [
+        codes
+        for o in (requirement.alternatives or [requirement.value_text])
+        if (codes := code_tokens(o, noise, vocabulary) & known)
+    ]
+    if not wanted:
+        return None
+    outcome = _Outcome(MatchStatus.FULL_MATCH, f"{attribute.name} named by its standard code")
+    judged: list[Evidence] = []
+    for located in fields:
+        if not _own_product(located, requirement):
+            continue
+        field = located.field
+        if in_label and not label_names(requirement, field.label, ctx, options, field.key):
+            continue
+        text = field.label if in_label else f"{field.label} {field.value}"
+        have = code_tokens(text, noise, vocabulary)
+        found = [w for w in wanted if w <= have]
+        if found and (len(found) == len(wanted) or requirement.any_alternative):
+            judged.append(_evidence(located, field.value, outcome))
+    if not judged:
+        return None
+    return _decide(requirement, judged, LabelBasis.ATTRIBUTE, options)
 
 
 def offered_as_option(
