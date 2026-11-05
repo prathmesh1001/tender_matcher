@@ -683,3 +683,11 @@ def test_a_standard_code_in_the_label_cell_lifts_a_near_miss(valves: Ontology) -
     row = _row(["Scope", "Standard"], ["Design* ISO 17292/", "API 6D"], "Standards & Materials")
     result = _compare("Product Standard : BS EN ISO 17292", [row], valves)
     assert result.status is FULL
+
+
+def test_a_key_listing_parts_names_each_of_them(valves: Ontology) -> None:
+    # L&T ball valves p6: one material row for "Body/ 1 Connector/ Insert".
+    header = ["No. Part", "Material specification Single-piece"]
+    row = _row(header, ["Body/ 1 Connector/ Insert", "ASTM A216 Gr. WCB"], "Standards & Materials")
+    assert _compare("Body : ASTM A216 Grade WCB or equivelent,", [row], valves).status is FULL
+    assert _compare("Disc : ASTM A216 Grade WCB", [row], valves).status is UNSUPPORTED

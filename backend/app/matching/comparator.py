@@ -145,13 +145,17 @@ def label_names(
 
     A table cell's label is its row key plus a column header, and the header can be a model or
     a heading ("Head" + "Etanorm", "End Connection" + "Standard"). So if the whole label names
-    nothing, the row key alone decides; "Disc Nut" + "Material" still names no disc.
+    nothing, the row key alone decides; "Disc Nut" + "Material" still names no disc. A key
+    listing parts ("Body/ 1 Connector/ Insert": one material for all) names each of them.
     """
     if ctx.ontology is not None and requirement.attribute is not None:
         shape = _shape(requirement)
         found = resolve_attribute(label, shape, ctx.ontology)
         if found is None and key:
             found = resolve_attribute(key, shape, ctx.ontology)
+        if found is None and "/" in key:
+            parts = (resolve_attribute(p, shape, ctx.ontology) for p in key.split("/"))
+            return requirement.attribute in parts
         return found == requirement.attribute
     keys = key_words(requirement.label or "", options)
     return bool(keys) and keys <= frozenset(stems(label))
