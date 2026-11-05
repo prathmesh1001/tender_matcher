@@ -387,3 +387,63 @@ def test_a_clear_winner_is_no_tie(valves: Ontology) -> None:
     )
     assert result.chosen == good.sha256
     assert result.tied_documents == []
+
+
+def _tagged(doc: CatalogueDocument, text: str, product_type: str | None) -> CatalogueChunk:
+    chunk = ChunkDraft(
+        page_number=1,
+        position=0,
+        chunk_type=ChunkType.PROSE,
+        raw_text=text,
+        token_count=1,
+        product_type=product_type,
+    )
+    return CatalogueChunk(doc, chunk)
+
+
+def _size_result(valves: Ontology, chunks: list[CatalogueChunk]) -> tuple[MatchStatus, bool]:
+    result = evaluate_item(
+        ItemQuery("Acme", "10", TITLE, "butterfly_valve"),
+        _requirements(valves)[:1],  # SIZE : 250 MM
+        chunks,
+        MatchContext.for_ontology(valves),
+        OPTIONS,
+        _Pages(chunks),
+    )
+    found = result.documents[0].comparisons[0]
+    return found.status, found.needs_review
+
+
+SEVERAL = ("butterfly_valve", "gate_valve")
+
+
+def test_untagged_full_match_of_a_several_product_document_is_capped(valves: Ontology) -> None:
+    # Velan's cover page "gate, globe, and check ... NPS 2 - 64" is about every product.
+    doc = _doc("brochure", (), SEVERAL)
+    chunks = [_tagged(doc, "Size range: 50 mm to 600 mm", None)]
+    assert _size_result(valves, chunks) == (MatchStatus.PARTIAL_MATCH, True)
+
+
+def test_tagged_full_match_stays_full(valves: Ontology) -> None:
+    doc = _doc("brochure", (), SEVERAL)
+    chunks = [
+        _tagged(doc, "Size range: 50 mm to 600 mm", None),
+        _tagged(doc, "Size range: 80 mm to 300 mm", "butterfly_valve"),
+    ]
+    assert _size_result(valves, chunks) == (MatchStatus.FULL_MATCH, False)
+
+
+def test_a_tagged_failure_never_replaces_an_untagged_match(valves: Ontology) -> None:
+    # Velan "Sizes NPS 2-6 ... may have": only caps, never turns a match into a failure.
+    doc = _doc("brochure", (), SEVERAL)
+    chunks = [
+        _tagged(doc, "Size range: 50 mm to 600 mm", None),
+        _tagged(doc, "Size range: 50 mm to 100 mm", "butterfly_valve"),
+    ]
+    assert _size_result(valves, chunks) == (MatchStatus.PARTIAL_MATCH, True)
+
+
+def test_untagged_line_of_a_one_product_document_still_decides(valves: Ontology) -> None:
+    doc = _doc("datasheet", ())
+    chunks = [_tagged(doc, "Size range: 50 mm to 600 mm", None)]
+    assert _size_result(valves, chunks) == (MatchStatus.FULL_MATCH, False)

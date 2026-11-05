@@ -255,6 +255,31 @@ def _by_heading(
     return _from_another_product(result, chosen) if result.status in decides else result
 
 
+def _untagged_capped(
+    requirements: Sequence[Requirement],
+    raw: Sequence[Comparison],
+    chunks: Sequence[CatalogueChunk],
+    product_type: str,
+    ctx: MatchContext,
+    options: SelectionOptions,
+) -> list[Comparison]:
+    """In a document about several products, a full match needs a chunk tagged with the item's.
+
+    An untagged chunk there may be about any of them (a cover page "gate, globe, and check NPS 2
+    - 64", a gate assembly step), so a full match only untagged chunks give is capped at partial.
+    Nothing else changes: chunks are not reordered, so no new failure can appear.
+    """
+    own = [c for c in chunks if c.chunk.product_type == product_type]
+    tagged = located_fields(own, options.comparator.fields)
+    out: list[Comparison] = []
+    for requirement, result in zip(requirements, raw, strict=True):
+        if result.status is MatchStatus.FULL_MATCH:
+            alone = compare(requirement, tagged, ctx, options.comparator)
+            result = result if alone.status is MatchStatus.FULL_MATCH else _capped(result)
+        out.append(result)
+    return out
+
+
 def _reading_order(
     chunks: Sequence[CatalogueChunk],
     groups: ProductGroups | None,
@@ -327,6 +352,8 @@ def evaluate_document(
     else:
         fields = located_fields(chunks, options.comparator.fields)
         raw = [compare(r, fields, ctx, options.comparator) for r in requirements]
+        if product_type and len(document.product_types) > 1:
+            raw = _untagged_capped(requirements, raw, chunks, product_type, ctx, options)
     ordered = _reading_order(chunks, groups, chosen, product_type)
     raw = _identified(requirements, raw, ordered, product_type, ctx, options)
     offers = option_fields(chunks, options.comparator.fields)
