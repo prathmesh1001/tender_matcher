@@ -50,6 +50,7 @@ class ComparatorOptions:
     fields: FieldOptions
     generic_label_words: frozenset[str]
     code_noise_words: frozenset[str]
+    condition_words: frozenset[str]
     designation_prefixes: tuple[str, ...]
     rel_tolerance: float
     max_evidence: int
@@ -64,6 +65,7 @@ class ComparatorOptions:
                 stem_token(w) for w in settings.COMPARATOR_GENERIC_LABEL_WORDS
             ),
             code_noise_words=frozenset(stem_token(w) for w in settings.COMPARATOR_CODE_NOISE_WORDS),
+            condition_words=frozenset(fold_text(w) for w in settings.COMPARATOR_CONDITION_WORDS),
             designation_prefixes=tuple(settings.COMPARATOR_DESIGNATION_PREFIXES),
             rel_tolerance=settings.COMPARATOR_REL_TOLERANCE,
             max_evidence=settings.COMPARATOR_MAX_EVIDENCE,
@@ -158,10 +160,14 @@ def _inline_value(
     is the digit-free start of the line. A code needs a labelled field: in a sentence
     ("Ends shall be ...") the words after a label are not its value. A label ending in a
     designation keeps it with the number ("ASME Class 150 to 1500" -> "class 150 to 1500").
+    A line opening with a condition word ("For sizes 6 inch and above, ...") states when
+    something else applies, never the attribute's value.
     """
     if requirement.kind is not ValueKind.NUMERIC:
         return None
     tokens = line.split()  # verbatim: the value is cited as printed
+    if not tokens or fold_text(tokens[0]).strip(" ,:") in options.condition_words:
+        return None
     for end in range(1, min(len(tokens), options.fields.label_max_words) + 1):
         prefix = " ".join(tokens[:end])
         if any(ch.isdigit() for ch in prefix):

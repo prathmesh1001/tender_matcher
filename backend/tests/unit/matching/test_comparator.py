@@ -184,6 +184,25 @@ def test_unlabelled_line_counts_when_label_leads(valves: Ontology, with_ontology
     assert result.status is FULL
 
 
+@BOTH
+@pytest.mark.parametrize(
+    "condition",
+    [
+        'For sizes 6" and above, lifting eyebolt option',  # L&T note: was a false full match
+        "If size 300 mm or more, gear operator is supplied",
+        "When size exceeds 600 mm, consult factory",
+        "where size 150 mm, bypass is optional",
+    ],
+)
+def test_condition_line_never_decides(
+    valves: Ontology, with_ontology: bool, condition: str
+) -> None:
+    lines = _prose(f"Butterfly valves for water\n{condition}")
+    result = _compare('SIZE : 8"', [lines], _ontology(valves, with_ontology))
+    assert result.status is UNSUPPORTED
+    assert result.evidence == []
+
+
 @pytest.mark.parametrize(
     ("line", "status"),
     [

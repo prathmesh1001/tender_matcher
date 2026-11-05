@@ -278,6 +278,11 @@ class Settings(BaseSettings):
         ],
         description="Words ignored when comparing codes ('ASTM A216 Gr. WCB' -> a216, wcb).",
     )
+    COMPARATOR_CONDITION_WORDS: list[str] = Field(
+        default_factory=lambda: ["for", "if", "when", "where"],
+        description="An unlabelled catalogue line starting with one of these states a condition "
+        "('For sizes 6\" and above, lifting eyebolt'), not a value: it never decides (JSON list).",
+    )
     COMPARATOR_DESIGNATION_PREFIXES: list[str] = Field(
         default_factory=lambda: ["pn", "class", "dn", "nb"],
         description="Designations written before their number ('PN 16', 'DN 50') (JSON list).",
