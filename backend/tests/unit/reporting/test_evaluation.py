@@ -44,9 +44,7 @@ def _row(
         result = verdict(gold, found)
         cited = pages or []
         agrees = (
-            bool(set(cited) & set(gold_pages))
-            if gold_pages and result is Verdict.AGREE
-            else None
+            bool(set(cited) & set(gold_pages)) if gold_pages and result is Verdict.AGREE else None
         )
         cell = RunCell(
             status=found,
@@ -70,9 +68,7 @@ def _diff(rows: list[RowDiff]) -> GoldDiff:
         tender="T",
         source="synthetic",
         runs=["rules"],
-        evaluations=[
-            EvaluationDiff(evaluation=evaluation, rows=rows, unlabelled=[], scores={})
-        ],
+        evaluations=[EvaluationDiff(evaluation=evaluation, rows=rows, unlabelled=[], scores={})],
         products=[],
         items_without_gold=[],
         rankings={},
@@ -108,9 +104,7 @@ def test_precision_and_recall_per_status() -> None:
     assert (full.labelled, full.predicted, full.correct) == (4, 3, 2)
     assert full.precision == 2 / 3
     assert full.recall == 0.5
-    assert (
-        by_status[U].precision == 0.5
-    )  # one of two unsupported rows was labelled unsupported
+    assert by_status[U].precision == 0.5  # one of two unsupported rows was labelled unsupported
     assert by_status[M].precision is None  # never predicted: nothing to divide by
 
 

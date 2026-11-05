@@ -254,9 +254,11 @@ def build_run_service(
     matcher = cache(
         lambda: build_match_service(
             settings,
-            judge=build_judge_service(settings, session_factory)
-            if settings.LLM_JUDGE_ENABLED
-            else None,
+            judge=(
+                build_judge_service(settings, session_factory)
+                if settings.LLM_JUDGE_ENABLED
+                else None
+            ),
         )
     )
     ingestion = cache(lambda: build_ingestion_service(settings))

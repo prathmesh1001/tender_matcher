@@ -122,15 +122,10 @@ def _confusion(
 ) -> dict[str, dict[str, int]]:
     """Label status -> run status -> rows."""
     counts = Counter((gold.value, found.value) for gold, found in pairs)
-    return {
-        g.value: {f.value: counts[(g.value, f.value)] for f in STATUSES}
-        for g in STATUSES
-    }
+    return {g.value: {f.value: counts[(g.value, f.value)] for f in STATUSES} for g in STATUSES}
 
 
-def _confidence_errors(
-    cells: Sequence[tuple[MatchStatus, RunCell]], full: bool
-) -> Ratio:
+def _confidence_errors(cells: Sequence[tuple[MatchStatus, RunCell]], full: bool) -> Ratio:
     """Wrong decisions among those at full confidence, or among those below it."""
     decided = [
         (gold, cell)
@@ -164,14 +159,10 @@ def run_metrics(diffs: Sequence[GoldDiff], run: str) -> RunMetrics:
         other_catalogue=len(cells) - len(comparable),
         confusion=_confusion(pairs),
         per_status=_status_metrics(pairs),
-        decided_accuracy=Ratio(
-            count=sum(g is s for g, s in decided), total=len(decided)
-        ),
+        decided_accuracy=Ratio(count=sum(g is s for g, s in decided), total=len(decided)),
         coverage=Ratio(count=len(decided), total=len(comparable)),
         stronger=sum(c.verdict is Verdict.STRONGER for _, c in comparable),
-        citation_accuracy=Ratio(
-            count=sum(bool(c.page_agrees) for c in cited), total=len(cited)
-        ),
+        citation_accuracy=Ratio(count=sum(bool(c.page_agrees) for c in cited), total=len(cited)),
         wrong_at_full_confidence=_confidence_errors(comparable, full=True),
         wrong_below_full_confidence=_confidence_errors(comparable, full=False),
     )
@@ -237,9 +228,7 @@ def _run_lines(m: RunMetrics) -> list[str]:
         "|---|" + "---|" * len(STATUSES),
     ]
     for gold, row in m.confusion.items():
-        lines.append(
-            f"| {gold} | " + " | ".join(str(row[s.value]) for s in STATUSES) + " |"
-        )
+        lines.append(f"| {gold} | " + " | ".join(str(row[s.value]) for s in STATUSES) + " |")
     lines += [
         "",
         f"Wrong decisions at full confidence: {_pct(m.wrong_at_full_confidence)}. "
