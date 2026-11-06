@@ -18,7 +18,12 @@ from sqlalchemy.orm import Session
 
 from app.core.logging import log_context
 from app.db.models import Chunk, Document, DocumentSection, Page
-from app.db.repositories import ChunkRepository, DocumentRepository, SectionRepository
+from app.db.repositories import (
+    ChunkRepository,
+    DocumentRepository,
+    SectionRepository,
+    SpecFactRepository,
+)
 from app.ingestion.processing import (
     ProcessedDocument,
     ProcessingOptions,
@@ -274,7 +279,8 @@ def ingest_manufacturer_source(
 def retag_document(session: Session, document: Document, options: ProcessingOptions) -> int:
     """Re-run product tagging on a stored document's chunks (no re-parsing).
 
-    Catalogue chunks also get their product family (the document title) refreshed.
+    Catalogue chunks also get their product family (the document title) refreshed, and the
+    document's spec facts take the new product type of their chunk.
 
     Args:
         session: Open DB session.
@@ -311,4 +317,5 @@ def retag_document(session: Session, document: Document, options: ProcessingOpti
             chunk.product_type, chunk.product_sub_type, chunk.product_family = new
             changed += 1
     session.flush()
+    SpecFactRepository(session).sync_products_from_chunks(document.id)
     return changed

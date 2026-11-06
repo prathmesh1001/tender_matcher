@@ -54,6 +54,7 @@ class _Source:
     chunks: list[SourceChunk]
     pages: dict[int, str]
     ocr_pages: frozenset[int]
+    chunk_products: dict[uuid.UUID, tuple[str | None, str | None]]
 
 
 @dataclass(slots=True)
@@ -119,6 +120,7 @@ class SpecExtractionService:
                 ],
                 pages={p.page_number: p.text for p in document.pages},
                 ocr_pages=frozenset(p.page_number for p in document.pages if p.ocr),
+                chunk_products={c.id: (c.product_type, c.product_sub_type) for c in chunks},
             )
 
     def _extract_one(self, document_id: uuid.UUID) -> SpecOutcome:
@@ -150,17 +152,26 @@ class SpecExtractionService:
 
 
 def _rows(source: _Source, facts: Sequence[SpecFactDraft]) -> list[SpecFact]:
-    """ORM rows for one document's verified facts."""
-    return [
-        SpecFact(
-            document_id=source.document_id,
-            manufacturer=source.manufacturer,
-            category=source.category,
-            ocr=fact.page_number in source.ocr_pages,
-            **fact.model_dump(exclude={"ocr"}),
+    """ORM rows for one document's verified facts, tagged with their chunk's product."""
+    rows = []
+    for fact in facts:
+        product_type, sub_type = (
+            source.chunk_products.get(fact.chunk_id, (None, None))
+            if fact.chunk_id is not None
+            else (None, None)
         )
-        for fact in facts
-    ]
+        rows.append(
+            SpecFact(
+                document_id=source.document_id,
+                manufacturer=source.manufacturer,
+                category=source.category,
+                product_type=product_type,
+                product_sub_type=sub_type,
+                ocr=fact.page_number in source.ocr_pages,
+                **fact.model_dump(exclude={"ocr"}),
+            )
+        )
+    return rows
 
 
 def build_spec_service(settings: Settings) -> SpecExtractionService:

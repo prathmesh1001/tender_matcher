@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError
-from app.db.models import Chunk, Page
+from app.db.models import Chunk, Document, Page, SpecFact
 from app.db.repositories import ChunkRepository, DocumentRepository, SpecFactRepository
 from tests.integration.factories import make_chunk, make_document, make_spec_fact
 
@@ -118,3 +118,69 @@ def test_spec_facts_lookup_keeps_conflicting_facts(
         facts.find(manufacturer="Nobody", category="valves_pumps", attribute="max_pressure") == []
     )
     assert len(facts.list_for_document(doc.id)) == 3
+
+
+def _tagged_fact(
+    db_session: Session, doc: Document, product_type: str | None, value: str
+) -> SpecFact:
+    page = doc.pages[0]
+    chunk = make_chunk(doc, page, position=len(doc.chunks), text=value)
+    chunk.product_type = product_type
+    db_session.add(chunk)
+    db_session.flush()
+    fact = make_spec_fact(doc, attribute="nominal_size", value_text=value)
+    fact.chunk_id, fact.product_type = chunk.id, product_type
+    return fact
+
+
+def test_spec_facts_product_filter_keeps_only_that_product(
+    db_session: Session, docs: DocumentRepository
+) -> None:
+    facts = SpecFactRepository(db_session)
+    valves = make_document()
+    valves.product_types = ["gate_valve", "globe_valve"]
+    pumps = make_document()
+    pumps.product_types = ["centrifugal_pump"]
+    docs.add(valves)
+    docs.add(pumps)
+    facts.add_all(
+        [
+            _tagged_fact(db_session, valves, "gate_valve", "gate 50"),
+            _tagged_fact(db_session, valves, "globe_valve", "globe 80"),
+            _tagged_fact(db_session, valves, None, "general 100"),
+            _tagged_fact(db_session, pumps, None, "pump 65"),
+        ]
+    )
+
+    def values(product_type: str | None) -> set[str]:
+        found = facts.find(
+            manufacturer="AcmePumps",
+            category="valves_pumps",
+            attribute="nominal_size",
+            product_type=product_type,
+        )
+        return {f.value_text for f in found}
+
+    assert values("gate_valve") == {"gate 50", "general 100"}
+    assert values("globe_valve") == {"globe 80", "general 100"}
+    assert values("centrifugal_pump") == {"pump 65"}
+    assert values("butterfly_valve") == set()
+    assert len(values(None)) == 4
+
+
+def test_spec_facts_follow_their_chunk_after_retagging(
+    db_session: Session, docs: DocumentRepository
+) -> None:
+    facts = SpecFactRepository(db_session)
+    doc = make_document()
+    docs.add(doc)
+    fact = _tagged_fact(db_session, doc, None, "size 50")
+    facts.add_all([fact])
+    [chunk] = doc.chunks
+    chunk.product_type, chunk.product_sub_type = "gate_valve", "knife_gate"
+    db_session.flush()
+
+    assert facts.sync_products_from_chunks(doc.id) == 1
+    assert facts.sync_products_from_chunks(doc.id) == 0
+    [row] = facts.list_for_document(doc.id)
+    assert (row.product_type, row.product_sub_type) == ("gate_valve", "knife_gate")

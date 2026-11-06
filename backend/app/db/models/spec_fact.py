@@ -11,11 +11,15 @@ from app.db.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 class SpecFact(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """One verified attribute/value claim, e.g. `body_material = SS316`, with its source quote.
 
-    Only facts whose `quote` was verified on `page_number` are stored.
+    Only facts whose `quote` was verified on `page_number` are stored. `product_type` and
+    `product_sub_type` are copied from the fact's chunk (NULL = general, like the chunk), so a
+    lookup can be limited to one product without joining chunks.
     """
 
     __tablename__ = "spec_facts"
-    __table_args__ = (Index("ix_spec_facts_lookup", "manufacturer", "category", "attribute"),)
+    __table_args__ = (
+        Index("ix_spec_facts_lookup", "manufacturer", "category", "product_type", "attribute"),
+    )
 
     document_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("documents.id", ondelete="CASCADE"), index=True
@@ -24,6 +28,10 @@ class SpecFact(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     page_number: Mapped[int]
     manufacturer: Mapped[str] = mapped_column(String(128))
     category: Mapped[str] = mapped_column(String(64))
+    product_type: Mapped[str | None] = mapped_column(
+        String(64), comment="Ontology product type of the chunk; NULL = general."
+    )
+    product_sub_type: Mapped[str | None] = mapped_column(String(64))
     product_family: Mapped[str | None] = mapped_column(Text)
     model: Mapped[str | None] = mapped_column(Text)
     attribute: Mapped[str] = mapped_column(String(128), comment="Canonical ontology attribute.")

@@ -124,3 +124,16 @@ def test_manufacturer_filter(
     llm = _LLM([GOOD])
     assert _service(factory, settings, llm).extract(manufacturer="Nobody").succeeded == []
     assert llm.calls == 0
+
+
+def test_facts_take_the_product_type_of_their_chunk(
+    factory: sessionmaker[Session], settings: Settings, document: Document
+) -> None:
+    with factory() as session:
+        [chunk] = session.get_one(Document, document.id).chunks
+        chunk.product_type, chunk.product_sub_type = "gate_valve", "wedge_gate"
+        session.commit()
+    _service(factory, settings, _LLM([GOOD])).extract()
+    with factory() as session:
+        [row] = SpecFactRepository(session).list_for_document(document.id)
+        assert (row.product_type, row.product_sub_type) == ("gate_valve", "wedge_gate")
