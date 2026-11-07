@@ -33,14 +33,17 @@ from app.schemas.requirements import LineItem, Requirement, ValueKind
 from app.tender.general import english_part, general_requirements, row_text
 from app.tender.line_items import header_key
 from app.tender.name_segments import NameRules, segment_by_name
+from app.tender.normalizer import title_size
 from app.tender.pipeline import (
     ItemRequirements,
     RequirementOptions,
     item_entry,
+    ontology_for,
     tender_general_requirements,
     tender_requirements,
     with_title_size,
 )
+from app.tender.quality import TITLE_PART_SEPARATOR, title_merges_products
 from app.tender.segments import (
     FileSegments,
     Segment,
@@ -52,6 +55,7 @@ from app.tender.splitter import leaves
 
 ITEM_LABEL: Final = "ITEM"
 _CATEGORY_ITEM_NO: Final = "1"
+_TRAILING_NUMBER: Final = re.compile(r"(\d+)$")
 _NOT_A_FILE_NAME_CHAR: Final = re.compile(r"[^A-Za-z0-9]+")
 _DEVANAGARI: Final = re.compile("[ऀ-ॿ]")
 
@@ -159,8 +163,71 @@ def _schedules(
         if file.role in roles:
             entries = tender_requirements(file.chunks, file.name, options, ontologies)
             if entries:
-                found[file.name] = entries
+                found[file.name] = fold_datasheets(entries, options, ontologies)
     return found
+
+
+def _number_runs(entries: Sequence[ItemRequirements]) -> list[list[ItemRequirements]]:
+    """Entries split where the item numbering starts again ("1, 2, 3" then "1, 2, ... 31")."""
+    runs: list[list[ItemRequirements]] = []
+    last = None
+    for entry in entries:
+        found = _TRAILING_NUMBER.search(entry.item.item_no)
+        number = int(found.group(1)) if found else None
+        if not runs or number is None or last is None or number <= last:
+            runs.append([])
+        runs[-1].append(entry)
+        last = number
+    return runs
+
+
+def _is_datasheet_row(entry: ItemRequirements, label_max_words: int) -> bool:
+    """A numbered row that is a label and its value ("Size" | "1'', 25mm"), not a product."""
+    title = entry.item.title.strip()
+    lines = [ln.strip() for ln in entry.item.description_lines if ln.strip()]
+    return bool(lines) and lines[0] == title and len(title.split()) <= label_max_words
+
+
+def _datasheet_line(entry: ItemRequirements) -> str:
+    """A datasheet row as one "label : value" line."""
+    lines = [ln.strip() for ln in entry.item.description_lines if ln.strip()]
+    return f"{entry.item.title.strip()} : {' '.join(lines[1:])}"
+
+
+def fold_datasheets(
+    entries: Sequence[ItemRequirements],
+    options: RequirementOptions,
+    ontologies: Sequence[Ontology],
+) -> list[ItemRequirements]:
+    """Each item's datasheet folded into that item (8063368).
+
+    A spec file can list its items ("1 Supply of pneumatic control valve ...", "2 ...") and then
+    one numbered datasheet per item ("1 Size | 1''", "2 Fluid service | Steam", ...). Read as a
+    schedule, every datasheet row becomes an item. When every numbering run after the first
+    holds only label rows and there are as many such runs as items in the first, run i is
+    item i's datasheet. Anything else is left as it was (and the extraction check flags it).
+
+    Args:
+        entries: One file's line items in document order.
+        options: Label length, splitting thresholds and classifier.
+        ontologies: Loaded ontologies.
+
+    Returns:
+        The items, with their datasheet rows as requirements.
+    """
+    runs = _number_runs(entries)
+    products, sheets = runs[0], runs[1:]
+    limit = options.split.label_max_words
+    if len(sheets) != len(products) or not all(
+        _is_datasheet_row(e, limit) for sheet in sheets for e in sheet
+    ):
+        return list(entries)
+    out: list[ItemRequirements] = []
+    for product, sheet in zip(products, sheets, strict=True):
+        lines = [*product.item.description_lines, *(_datasheet_line(e) for e in sheet)]
+        item = product.item.model_copy(update={"description_lines": lines})
+        out.append(item_entry(item, options, ontologies))
+    return out
 
 
 def _better_spec(
@@ -502,6 +569,50 @@ def parse_tender_files(
         return TenderRequirements([], _general(files, set(), set(), options), ItemSource.NONE)
     entry, used = category
     general = _general(files, used, set(), options)
-    sized_entry = with_title_size(_once(entry), options, ontologies)
-    found = TenderRequirements([_with_title(sized_entry)], general, ItemSource.ITEM_CATEGORY)
+    parts = split_category(entry, options, ontologies)
+    sized = [_with_title(with_title_size(_once(e), options, ontologies)) for e in parts]
+    found = TenderRequirements(sized, general, ItemSource.ITEM_CATEGORY)
     return _with_spec_rows(found, options, ontologies)
+
+
+def _sized(requirement: Requirement, ontology: Ontology | None) -> bool:
+    """True if a requirement states a nominal pipe size."""
+    if ontology is None or requirement.attribute is None:
+        return False
+    attribute = ontology.attribute(requirement.attribute)
+    return attribute is not None and attribute.nominal_pipe_size
+
+
+def split_category(
+    entry: ItemRequirements, options: RequirementOptions, ontologies: Sequence[Ontology]
+) -> list[ItemRequirements]:
+    """One item per product the Item Category row lists ("Globe Valve 40 NB, Globe Valve 50 NB").
+
+    Each part is its own item (D5), read from its own title. The specification found for the
+    row is shared by all of them, except a size: a part whose title states one keeps only that,
+    so the 50 NB line never lands on the 40 NB item. A title of one product is left whole.
+
+    Args:
+        entry: The item made from the whole Item Category row, with the specification found.
+        options: Splitting thresholds, classifier and the merged-title rule.
+        ontologies: Loaded ontologies.
+
+    Returns:
+        The items, in the row's order.
+    """
+    title = entry.item.title
+    if not title_merges_products(title, options.quality.merged_title_lead_words):
+        return [entry]
+    parts = [p.strip() for p in title.split(TITLE_PART_SEPARATOR) if p.strip()]
+    out: list[ItemRequirements] = []
+    for number, part in enumerate(parts, start=1):
+        item = entry.item.model_copy(update={"title": part})
+        base = item_entry(item, options, ontologies)
+        ontology = ontology_for(part, ontologies)
+        own_size = title_size(part) is not None
+        shared = [r for r in entry.requirements if not (own_size and _sized(r, ontology))]
+        whole = ItemRequirements(
+            item, base.category, [*base.requirements, *shared], base.product_type
+        )
+        out.append(_renumbered(whole, str(number)))
+    return out

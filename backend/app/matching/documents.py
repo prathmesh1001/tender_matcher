@@ -267,7 +267,8 @@ def _untagged_capped(
 
     An untagged chunk there may be about any of them (a cover page "gate, globe, and check NPS 2
     - 64", a gate assembly step), so a full match only untagged chunks give is capped at partial.
-    Nothing else changes: chunks are not reordered, so no new failure can appear.
+    Nothing else changes: chunks are not reordered, so no new failure can appear. A full match
+    the tagged chunks give is cited from them, not from a cover page saying the same.
     """
     own = [c for c in chunks if c.chunk.product_type == product_type]
     tagged = located_fields(own, options.comparator.fields)
@@ -275,7 +276,7 @@ def _untagged_capped(
     for requirement, result in zip(requirements, raw, strict=True):
         if result.status is MatchStatus.FULL_MATCH:
             alone = compare(requirement, tagged, ctx, options.comparator)
-            result = result if alone.status is MatchStatus.FULL_MATCH else _capped(result)
+            result = alone if alone.status is MatchStatus.FULL_MATCH else _capped(result)
         out.append(result)
     return out
 

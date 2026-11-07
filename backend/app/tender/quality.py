@@ -23,7 +23,7 @@ from app.tender.normalizer import words
 
 _EXAMPLES: Final = 3
 _EXAMPLE_CHARS: Final = 40
-_TITLE_PART_SEPARATOR: Final = ","
+TITLE_PART_SEPARATOR: Final = ","
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,7 +201,7 @@ def title_merges_products(title: str, lead_words: int) -> bool:
     Returns:
         Whether at least two parts share them; commas inside one product's description do not.
     """
-    leads = [tuple(words(part)[:lead_words]) for part in title.split(_TITLE_PART_SEPARATOR)]
+    leads = [tuple(words(part)[:lead_words]) for part in title.split(TITLE_PART_SEPARATOR)]
     full = [lead for lead in leads if len(lead) == lead_words]
     return len(set(full)) < len(full)
 

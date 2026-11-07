@@ -6,6 +6,7 @@ import pytest
 
 from app.core.config import Settings
 from app.core.exceptions import DocumentParseError
+from app.ingestion.glyph_repair import RepairOptions
 from app.ingestion.ocr import OcrLine, OcrResult
 from app.ingestion.pdf_parser import (
     ParserOptions,
@@ -147,5 +148,8 @@ def test_options_come_from_settings(settings: Settings) -> None:
         update={"OCR_MIN_TEXT_CHARS": 7, "OCR_MIN_IMAGE_COVERAGE": 0.8, "OCR_DPI": 200}
     )
     assert ParserOptions.from_settings(custom) == ParserOptions(
-        ocr_min_text_chars=7, ocr_min_image_coverage=0.8, ocr_dpi=200
+        ocr_min_text_chars=7,
+        ocr_min_image_coverage=0.8,
+        ocr_dpi=200,
+        glyphs=RepairOptions.from_settings(custom),
     )

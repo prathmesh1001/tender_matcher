@@ -13,6 +13,7 @@ import pymupdf
 
 from app.core.config import Settings
 from app.core.exceptions import DocumentParseError
+from app.ingestion.glyph_repair import RepairOptions, page_repair, repair_text
 from app.ingestion.ocr import OcrEngine, OcrResult
 from app.schemas.parsing import BBox, ParsedDocument, ParsedPage, TextBlock, count_text_chars
 
@@ -29,6 +30,7 @@ class ParserOptions:
     ocr_min_text_chars: int
     ocr_min_image_coverage: float
     ocr_dpi: int
+    glyphs: RepairOptions | None = None  # repair shifted fonts; None = off
 
     @classmethod
     def from_settings(cls, settings: Settings) -> ParserOptions:
@@ -37,6 +39,7 @@ class ParserOptions:
             ocr_min_text_chars=settings.OCR_MIN_TEXT_CHARS,
             ocr_min_image_coverage=settings.OCR_MIN_IMAGE_COVERAGE,
             ocr_dpi=settings.OCR_DPI,
+            glyphs=RepairOptions.from_settings(settings),
         )
 
 
@@ -66,20 +69,23 @@ def open_pdf(path: Path) -> pymupdf.Document:
     return doc
 
 
-def extract_text_blocks(page: pymupdf.Page) -> list[TextBlock]:
+def extract_text_blocks(page: pymupdf.Page, glyphs: RepairOptions | None = None) -> list[TextBlock]:
     """Return the page's native text blocks in reading order (top-to-bottom, left-to-right).
 
     Args:
         page: A PyMuPDF page.
+        glyphs: Shifted-font repair options (`glyph_repair`); None = text as extracted.
 
     Returns:
         Non-empty text blocks with their boxes in PDF points.
     """
+    repair = page_repair(page, glyphs) if glyphs is not None else None
     blocks: list[TextBlock] = []
     for x0, y0, x1, y1, text, _num, block_type in page.get_text("blocks", sort=True):
         if block_type != _TEXT_BLOCK_TYPE or not str(text).strip():
             continue
-        blocks.append(TextBlock(text=str(text).strip(), bbox=BBox(x0=x0, y0=y0, x1=x1, y1=y1)))
+        clean = repair_text(str(text), repair) if repair and repair.active else str(text)
+        blocks.append(TextBlock(text=clean.strip(), bbox=BBox(x0=x0, y0=y0, x1=x1, y1=y1)))
     return blocks
 
 
@@ -191,7 +197,7 @@ def parse_page(page: pymupdf.Page, options: ParserOptions, engine: OcrEngine | N
     Returns:
         The parsed page.
     """
-    blocks = extract_text_blocks(page)
+    blocks = extract_text_blocks(page, options.glyphs)
     scanned = is_scanned(
         blocks,
         image_coverage(page),

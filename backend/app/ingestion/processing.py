@@ -17,6 +17,7 @@ from app.core.exceptions import DocumentParseError
 from app.ingestion.boilerplate import BoilerplateOptions, remove_boilerplate
 from app.ingestion.chunker import ChunkerOptions, chunk_document
 from app.ingestion.docx_reader import docx_page, read_docx_items
+from app.ingestion.glyph_repair import RepairOptions
 from app.ingestion.layout import LayoutOptions
 from app.ingestion.ocr import OcrEngine
 from app.ingestion.pdf_parser import ParserOptions, open_pdf, parse_pdf
@@ -84,6 +85,7 @@ class ProcessingOptions:
                 units=vocabulary.unit_spellings,
                 max_label_words=settings.TABLE_HEADER_MAX_WORDS,
                 paragraph_gap=settings.TABLE_PARAGRAPH_GAP_FACTOR,
+                glyphs=RepairOptions.from_settings(settings),
             ),
             layout=LayoutOptions.from_settings(settings),
             vocabulary=vocabulary,

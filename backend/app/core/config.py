@@ -630,6 +630,21 @@ class Settings(BaseSettings):
         description="A sparse page is OCR'd only if images cover at least this page fraction.",
     )
     OCR_DPI: int = Field(default=300, ge=72, le=600, description="Render resolution for OCR.")
+    SHIFTED_TEXT_MIN_CONTROL_CHARS: int = Field(
+        default=5,
+        ge=1,
+        description="A page with this many control characters prints a shifted font "
+        "('9QTMKPI VGORGTCVWTG' = 'Working temperature'): its text is decoded.",
+    )
+    SHIFTED_WORD_MIN_LETTERS: int = Field(
+        default=4, ge=1, description="Shortest one-word token decoded without a control character."
+    )
+    SHIFTED_WORD_MIN_VOWEL_SHARE: float = Field(
+        default=0.3,
+        ge=0,
+        le=1,
+        description="Such a token is decoded only if this share of its decoded letters are vowels.",
+    )
     OCR_LANGUAGE: str = Field(
         default="eng+hin",
         pattern=r"^[a-z_]+(\+[a-z_]+)*$",

@@ -225,3 +225,85 @@ def test_implicit_label(part: str, expected: tuple[str, str] | None, ontology: O
 
 def test_implicit_label_needs_an_ontology() -> None:
     assert implicit_label("BODY A351CF8", None, SPLIT) is None
+
+
+def test_a_category_listing_several_sizes_is_one_item_each(
+    options: RequirementOptions, ontology: Ontology
+) -> None:
+    # 8175587: "Globe Valve 40 NB with Companion Flanges and Fasteners , Globe Valve 50 NB ..."
+    title = "Globe Valve 40 NB with Companion Flanges , Globe Valve 50 NB with Companion Flanges"
+    row = _row(["Column 1", "Column 2"], ["Item Category", title])
+    spec = _prose("BODY MOC : ASTM A216 WCB\nSIZE : 40 NB", 3)
+    files = [
+        TenderFile("bid.pdf", "bid_document", [row]),
+        TenderFile("buyer_spec.pdf", "buyer_spec", [spec]),
+    ]
+    found = parse_tender_files(files, options, [ontology])
+    first, second = found.items
+    assert [e.item.item_no for e in found.items] == ["1", "2"]
+    assert second.item.title == "Globe Valve 50 NB with Companion Flanges"
+    assert first.product_type == second.product_type == "globe_valve"
+    for entry, size in ((first, "40"), (second, "50")):
+        values = [r.value_text for r in entry.requirements]
+        assert "ASTM A216 WCB" in values  # the shared specification
+        sizes = [r for r in entry.requirements if r.attribute == "nominal_size"]
+        assert [s.value_num for s in sizes] == [float(size)]  # only its own title's size
+        assert all(r.item_no == entry.item.item_no for r in entry.requirements)
+    ids = [r.id for e in found.items for r in e.requirements]
+    assert len(ids) == len(set(ids))
+
+
+DATASHEET = ["Sl No", "Description"]
+
+
+def _numbered(number: str, lines: list[str], page: int = 1) -> ChunkDraft:
+    chunk = _row(DATASHEET, [number, " ".join(lines)], page)
+    return chunk.model_copy(update={"meta": {**chunk.meta, "cell_lines": [[number], lines]}})
+
+
+def test_each_items_datasheet_is_folded_into_it(
+    options: RequirementOptions, ontology: Ontology
+) -> None:
+    # 8063368: items 1-2, then one numbered datasheet per item, numbering starting again.
+    rows = [
+        _numbered("1", ["Supply of gate valve of", "size 50 mm for steam line"]),
+        _numbered("2", ["Supply of gate valve of", "size 80 mm for water line"]),
+        _numbered("1", ["Size", "", "50 mm"], 2),
+        _numbered("2", ["Body material", "", "ASTM A216 WCB"], 2),
+        _numbered("1", ["Size", "", "80 mm"], 3),
+        _numbered("2", ["Body material", "", "ASTM A351 CF8M"], 3),
+    ]
+    found = parse_tender_files([TenderFile("spec.pdf", "buyer_spec", rows)], options, [ontology])
+    first, second = found.items
+    assert first.item.title == "Supply of gate valve of size 50 mm for steam line"  # wrapped
+    assert "ASTM A216 WCB" in [r.value_text for r in leaves(first.requirements)]
+    assert "ASTM A351 CF8M" in [r.value_text for r in leaves(second.requirements)]
+    assert "ASTM A216 WCB" not in [r.value_text for r in leaves(second.requirements)]
+
+
+def test_a_line_starting_in_capitals_is_not_part_of_the_title(
+    options: RequirementOptions, ontology: Ontology
+) -> None:
+    # 7956201: the second line is the next statement, not a wrap of the title.
+    rows = [_numbered("1", ["Globe valve as per BS-1873", "Size: 6 inch # 300 Class"])]
+    found = parse_tender_files([TenderFile("spec.pdf", "buyer_spec", rows)], options, [ontology])
+    assert found.items[0].item.title == "Globe valve as per BS-1873"
+
+
+def test_numbering_runs_that_are_not_datasheets_stay_items(
+    options: RequirementOptions, ontology: Ontology
+) -> None:
+    rows = [
+        _numbered("1", ["Gate valve 50 mm"]),
+        _numbered("2", ["Gate valve 80 mm"]),
+        _numbered("1", ["Globe valve 25 mm flanged, class 150"], 2),  # a product, not a label
+    ]
+    found = parse_tender_files([TenderFile("spec.pdf", "buyer_spec", rows)], options, [ontology])
+    assert len(found.items) == 3
+
+
+def test_a_control_valve_is_no_globe_valve(options: RequirementOptions, ontology: Ontology) -> None:
+    title = "Supply of Pneumatic (ATO) globe type two way control valve of size 1'' for steam"
+    row = _row(["Column 1", "Column 2"], ["Item Category", title])
+    found = parse_tender_files([TenderFile("bid.pdf", "bid_document", [row])], options, [ontology])
+    assert found.items[0].product_type is None

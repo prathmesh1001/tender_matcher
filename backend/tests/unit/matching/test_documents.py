@@ -433,6 +433,24 @@ def test_tagged_full_match_stays_full(valves: Ontology) -> None:
     assert _size_result(valves, chunks) == (MatchStatus.FULL_MATCH, False)
 
 
+def test_a_tagged_full_match_is_cited_from_the_tagged_line(valves: Ontology) -> None:
+    doc = _doc("brochure", (), SEVERAL)
+    chunks = [
+        _tagged(doc, "Size range: 50 mm to 600 mm", None),
+        _tagged(doc, "Size range: 80 mm to 300 mm", "butterfly_valve"),
+    ]
+    result = evaluate_item(
+        ItemQuery("Acme", "10", TITLE, "butterfly_valve"),
+        _requirements(valves)[:1],
+        chunks,
+        MatchContext.for_ontology(valves),
+        OPTIONS,
+        _Pages(chunks),
+    )
+    quotes = [e.quote for e in result.documents[0].comparisons[0].evidence]
+    assert quotes == ["Size range: 80 mm to 300 mm"]
+
+
 def test_a_tagged_failure_never_replaces_an_untagged_match(valves: Ontology) -> None:
     # Velan "Sizes NPS 2-6 ... may have": only caps, never turns a match into a failure.
     doc = _doc("brochure", (), SEVERAL)

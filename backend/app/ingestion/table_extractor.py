@@ -38,6 +38,7 @@ from typing import Final
 
 import pymupdf
 
+from app.ingestion.glyph_repair import RepairOptions, page_repair, repair_word
 from app.ingestion.layout import (
     LayoutOptions,
     Rule,
@@ -211,9 +212,13 @@ class PageWords:
     words: tuple[Word, ...]
 
     @classmethod
-    def of(cls, page: pymupdf.Page) -> PageWords:
-        """Read the page's words once, without overprinted duplicates."""
-        return cls(words=drop_overprints(tuple(w[:8]) for w in page.get_text("words")))
+    def of(cls, page: pymupdf.Page, glyphs: RepairOptions | None = None) -> PageWords:
+        """Read the page's words once, without overprinted duplicates, shifted fonts repaired."""
+        words = [tuple(w[:8]) for w in page.get_text("words")]
+        repair = page_repair(page, glyphs) if glyphs is not None else None
+        if repair is not None and repair.active:
+            words = [(*w[:4], repair_word(str(w[4]), w[:4], repair), *w[5:]) for w in words]
+        return cls(words=drop_overprints(words))
 
     def lines(self, box: BBox) -> list[tuple[float, str]]:
         """`(y0, text)` of each text line whose words are centred inside `box`, top to bottom."""
@@ -671,7 +676,11 @@ def rule_grid_table(
 
 
 def rule_grid_tables(
-    page: pymupdf.Page, key_value_pairs: bool, layout: LayoutOptions, paragraph_gap: float = 0.0
+    page: pymupdf.Page,
+    key_value_pairs: bool,
+    layout: LayoutOptions,
+    paragraph_gap: float = 0.0,
+    glyphs: RepairOptions | None = None,
 ) -> list[ExtractedTable]:
     """Tables rebuilt from drawn rules, for pages where PyMuPDF finds none (failure case T1).
 
@@ -680,6 +689,7 @@ def rule_grid_tables(
         key_value_pairs: Read two-column grids as label/value pairs (tender files).
         layout: Rule-grid thresholds.
         paragraph_gap: Paragraph-break gap for `cell_lines`; 0 = no breaks.
+        glyphs: Shifted-font repair options; None = words as extracted.
 
     Returns:
         The tables, top to bottom.
@@ -687,7 +697,7 @@ def rule_grid_tables(
     grids = page_grids(drawn_rules(page, layout.rule_max_thickness), layout)
     if not grids:
         return []
-    words = PageWords.of(page)
+    words = PageWords.of(page, glyphs)
     tables: list[ExtractedTable] = []
     for grid in grids:
         key_value = key_value_pairs and len(grid.xs) - 1 == KEY_VALUE_COLUMNS
@@ -730,9 +740,9 @@ def extract_page_tables(
     tables: list[ExtractedTable] = []
     found = page.find_tables().tables
     if not found and layout is not None:
-        grids = rule_grid_tables(page, key_value_pairs, layout, repair.paragraph_gap)
+        grids = rule_grid_tables(page, key_value_pairs, layout, repair.paragraph_gap, repair.glyphs)
         return [_repaired(t, repair) for t in grids]
-    words = PageWords.of(page) if found else PageWords(words=())
+    words = PageWords.of(page, repair.glyphs) if found else PageWords(words=())
     for table in found:
         grid_rows = _grid_rows(words, table, split_stacked)
         boxes = [row.box for row in grid_rows]

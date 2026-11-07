@@ -23,6 +23,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from app.ingestion.glyph_repair import RepairOptions
 from app.retrieval.text_normalizer import fold_text
 from app.schemas.chunking import TableRow
 from app.schemas.parsing import BBox
@@ -237,6 +238,7 @@ class TableCleanupOptions:
     units: frozenset[str] = frozenset()  # folded unit spellings; empty = no split-value join
     max_label_words: int = 0  # longest column label in words; 0 = no caption detection
     paragraph_gap: float = 0.0  # line gap (x median pitch) marking a paragraph; 0 = none
+    glyphs: RepairOptions | None = None  # repair shifted fonts in cell words; None = off
 
 
 def _word_count(text: str) -> int:

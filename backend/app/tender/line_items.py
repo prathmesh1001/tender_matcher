@@ -110,9 +110,24 @@ def _description_lines(chunk: ChunkDraft, columns: ItemColumns) -> list[str]:
 
 
 def _title_from(lines: Sequence[str], fallback: str) -> str:
-    """A title when the table has no title column: the first line up to its first comma."""
-    first = next((ln for ln in lines if ln.strip()), "")
-    return first.split(",", 1)[0].strip() or fallback
+    """A title when the table has no title column: the first line, wraps joined, up to a comma.
+
+    A cell wraps its text over lines, so a following line that starts in lower case continues
+    the title ("Supply of Pneumatic (ATO) globe type two" + "way control valve of size 1'' ...").
+    A line starting otherwise is the next statement ("Globe valve as per BS-1873" then
+    "Size: 6 inch ..."), and an empty line ends the paragraph.
+    """
+    paragraph: list[str] = []
+    for line in lines:
+        text = line.strip()
+        if not text:
+            if paragraph:
+                break
+            continue
+        if paragraph and not text[0].islower():
+            break
+        paragraph.append(text)
+    return " ".join(paragraph).split(",", 1)[0].strip() or fallback
 
 
 def is_schedule_row(chunk: ChunkDraft, options: ItemColumnOptions) -> bool:
