@@ -37,6 +37,11 @@ measured. It changes only the judge, so the rules numbers are those of step 3; t
 calls the judge is measured once, at step 9. From step 4 on, `run_eval.py --judge` judges only
 the item x manufacturer pairs a gold file labels (`--judge-all` judges every one).
 
+Step 5, judge guardrail (a full or missing verdict on a numeric or code requirement must be
+what the comparator reads from the judge's own quote, else unsupported + needs_review): built
+and unit-tested, NOT measured; it changes no prompt, so it costs no new calls. Measured at
+step 9 with step 4.
+
 The sections below are still the step 0 output.
 
 | Run | Labelled | Other catalogue | Coverage | Decided accuracy | Stronger | Citations |

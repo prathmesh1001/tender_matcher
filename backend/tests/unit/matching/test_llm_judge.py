@@ -138,3 +138,55 @@ def test_names_attribute_needs_the_labels_key_words() -> None:
     requirement = _requirement(label="Actuation")
     assert names_attribute(requirement, "Actuation by gear", MatchContext(), _options())
     assert not names_attribute(requirement, "Gear box", MatchContext(), _options())
+
+
+def _body(quote: str, status: JudgeStatus) -> Comparison:
+    requirement = _requirement(
+        label="Body",
+        kind=ValueKind.CODE,
+        operator=Operator.EQ,
+        value_text="ASTM A216 WCB",
+        raw_text="Body : ASTM A216 WCB",
+    )
+    return _judged(requirement, _verdict(status=status, quote=quote))
+
+
+def test_guardrail_keeps_a_code_verdict_the_rules_read_from_its_quote() -> None:
+    assert _body("Body: ASTM A216 Gr. WCB", JudgeStatus.FULL_MATCH).status is (
+        MatchStatus.FULL_MATCH
+    )
+
+
+def test_guardrail_drops_a_full_code_verdict_the_quote_contradicts() -> None:
+    result = _body("Body: ASTM A351 Gr. CF8M", JudgeStatus.FULL_MATCH)
+    assert result.status is MatchStatus.UNSUPPORTED
+    assert result.needs_review
+    assert result.decided_by is DecisionSource.NONE
+    assert "rules on its quote say: missing_capability" in result.reason
+
+
+def test_guardrail_drops_a_missing_verdict_the_quote_satisfies() -> None:
+    result = _body("Body: ASTM A216 Gr. WCB", JudgeStatus.MISSING_CAPABILITY)
+    assert result.status is MatchStatus.UNSUPPORTED
+
+
+def test_guardrail_drops_a_numeric_verdict_without_a_comparable_value() -> None:
+    requirement = _requirement(
+        label="Pressure",
+        kind=ValueKind.NUMERIC,
+        operator=Operator.GTE,
+        value_text="16 bar",
+        value_num=16.0,
+        unit="bar",
+        raw_text="Pressure : 16 bar",
+    )
+    verdict = _verdict(status=JudgeStatus.FULL_MATCH, quote="Pressure: suitable for high pressure")
+    assert _judged(requirement, verdict).status is MatchStatus.UNSUPPORTED
+
+
+def test_guardrail_leaves_partial_and_free_text_verdicts_alone() -> None:
+    assert _body("Body: ASTM A351 Gr. CF8M", JudgeStatus.PARTIAL_MATCH).status is (
+        MatchStatus.PARTIAL_MATCH
+    )
+    full_text = _judged(_requirement(), _verdict(status=JudgeStatus.FULL_MATCH))
+    assert full_text.status is MatchStatus.FULL_MATCH

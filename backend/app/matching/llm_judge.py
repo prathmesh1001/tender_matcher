@@ -1,8 +1,12 @@
-"""LLM judge for requirements rules cannot read: free text and statements without a label.
+"""LLM judge for requirements the rules leave unsupported.
+
+It sees free text, unlabelled lines and lines no catalogue field names, never those routing
+decides (`comparator.needs_judge`).
 
 The model sees only passages retrieved from the catalogue already chosen for the item, and may
 cite only those. Nothing it says is trusted: the page and document come from the passage it cites,
-the quote must name the attribute (like for like), and the caller verifies the quote on the page.
+the quote must name the attribute (like for like), a full or missing verdict on a number or code
+must be what the comparator reads from that quote, and the caller verifies the quote on the page.
 Anything that fails stays `unsupported` + needs_review. Every LLM decision goes to review.
 """
 
@@ -12,13 +16,19 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final, Protocol
 
-from app.matching.comparator import ComparatorOptions, MatchContext, key_words
+from app.matching.comparator import (
+    ComparatorOptions,
+    MatchContext,
+    judge_code,
+    judge_numeric,
+    key_words,
+)
 from app.matching.engine import ItemInput
 from app.matching.evidence_verifier import PageTexts
 from app.schemas.enums import DecisionSource, MatchStatus, ReviewFlag
 from app.schemas.matching import Comparison, Evidence, JudgeStatus, JudgeVerdict, LabelBasis
 from app.schemas.report import ItemReport
-from app.schemas.requirements import Requirement
+from app.schemas.requirements import Requirement, ValueKind
 from app.tender.normalizer import stems
 
 # Raise when the prompt's wording changes, so cached answers to the old wording are not reused.
@@ -144,6 +154,44 @@ def names_attribute(
     return not wanted or any(keys <= found for keys in wanted)
 
 
+_GUARDED: Final = frozenset({MatchStatus.FULL_MATCH, MatchStatus.MISSING_CAPABILITY})
+
+
+def rules_disagree(
+    requirement: Requirement,
+    status: MatchStatus,
+    quote: str,
+    ctx: MatchContext,
+    options: ComparatorOptions,
+) -> str | None:
+    """Why the comparator does not back the judge's verdict on its own quote, or None.
+
+    A full or missing verdict on a numeric or code requirement must be what the rules read from
+    the cited value (units and direction for numbers, every token for codes): the model never
+    decides a number or a code alone. Partial verdicts and free-text lines are not checked.
+
+    Args:
+        requirement: The requirement judged.
+        status: The judge's status.
+        quote: The judge's quote.
+        ctx: The item's ontology context.
+        options: Comparator settings.
+
+    Returns:
+        The disagreement, or None when the rules agree or the verdict is not checked.
+    """
+    if status not in _GUARDED or requirement.kind not in (ValueKind.NUMERIC, ValueKind.CODE):
+        return None
+    if requirement.kind is ValueKind.NUMERIC:
+        outcome = judge_numeric(requirement, quote, False, ctx, options)
+    else:
+        outcome = judge_code(requirement, quote, ctx, options)
+    if outcome.status is status:
+        return None
+    rules = outcome.status.value if outcome.status is not None else outcome.reason
+    return f"LLM judge said {status.value}, rules on its quote say: {rules}"
+
+
 def undecided(requirement: Requirement, reason: str) -> Comparison:
     """`unsupported` + needs_review, saying why the judge decided nothing.
 
@@ -182,7 +230,9 @@ def judged_comparison(
 
     Returns:
         A decision citing the passage's real document and page, or `unsupported` if the model
-        found nothing, cited a passage it was not given, or quoted nothing on the attribute.
+        found nothing, cited a passage it was not given, quoted nothing on the attribute, or
+        gave a full or missing verdict on a number or code that the rules do not read from its
+        quote (`rules_disagree`).
     """
     if verdict.status is JudgeStatus.UNSUPPORTED:
         return undecided(requirement, f"LLM judge found no evidence: {verdict.reasoning}")
@@ -194,6 +244,9 @@ def judged_comparison(
     if not names_attribute(requirement, verdict.quote, ctx, options):
         return undecided(requirement, f"LLM quote does not name the attribute ({verdict.status})")
     status = MatchStatus(verdict.status.value)
+    disagreement = rules_disagree(requirement, status, verdict.quote, ctx, options)
+    if disagreement is not None:
+        return undecided(requirement, disagreement)
     reason = f"LLM judge: {verdict.capability}. {verdict.reasoning}"
     return Comparison(
         requirement_id=requirement.id,
