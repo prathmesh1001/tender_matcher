@@ -58,14 +58,14 @@ def _judged(requirement: Requirement, verdict: JudgeVerdict) -> Comparison:
     return judged_comparison(requirement, verdict, [PASSAGE], MatchContext(), _options())
 
 
-def test_free_text_and_unlabelled_lines_need_the_judge() -> None:
+def test_every_line_catalogues_may_decide_can_go_to_the_judge() -> None:
     assert needs_judge(_requirement())
     assert needs_judge(_requirement(label=None))
+    assert needs_judge(_requirement(kind=ValueKind.CODE))
+    assert needs_judge(_requirement(kind=ValueKind.NUMERIC))
 
 
-def test_lines_rules_or_routing_decide_do_not_need_the_judge() -> None:
-    assert not needs_judge(_requirement(kind=ValueKind.CODE))
-    assert not needs_judge(_requirement(kind=ValueKind.NUMERIC))
+def test_lines_routing_decides_never_go_to_the_judge() -> None:
     assert not needs_judge(_requirement(req_type=RequirementType.VAGUE))
     assert not needs_judge(_requirement(evidence=EvidenceSource.VENDOR_DOCUMENTS))
     assert not needs_judge(_requirement(evidence=EvidenceSource.NONE))

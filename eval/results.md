@@ -29,8 +29,15 @@ full_match precision 94% (34/36). Changed row: 7956201 "Testing Standard : API 5
 Step 3, product type lines met by the product heading (rules only): coverage 53% -> 54%
 (53/99), decided accuracy 77% (40/52) -> 77% (41/53), stronger 3 -> 3, citations 65% -> 66%
 (27/41), full_match precision 94% -> 95% (35/37). Changed row: 8119613 "TYPE : TRIPLE OFFSET
-METAL SEATED BUTTERFLY VALVE" now agrees (p3, p9). The sections below are still the step 0
-output.
+METAL SEATED BUTTERFLY VALVE" now agrees (p3, p9).
+
+Step 4, judge reach (every requirement the rules leave unsupported for a catalogue reason, 5
+passages, attribute synonyms in the dense and rerank query): built and unit-tested, NOT
+measured. It changes only the judge, so the rules numbers are those of step 3; to save Gemini
+calls the judge is measured once, at step 9. From step 4 on, `run_eval.py --judge` judges only
+the item x manufacturer pairs a gold file labels (`--judge-all` judges every one).
+
+The sections below are still the step 0 output.
 
 | Run | Labelled | Other catalogue | Coverage | Decided accuracy | Stronger | Citations |
 |---|---|---|---|---|---|---|

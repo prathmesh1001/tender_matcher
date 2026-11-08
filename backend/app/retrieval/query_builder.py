@@ -7,7 +7,9 @@
    is logged. Words the catalogues use ("water") are never "corrected" ("wafer").
 3. Expand abbreviations (A5): "nrv" adds "check valve".
 4. Expand synonyms: a product type, sub-type or attribute named in the query (or the
-   requirement's canonical attribute) adds the other words the ontology lists for it.
+   requirement's canonical attribute) adds the other words the ontology lists for it. An
+   attribute's synonyms are also added, as written, to the dense and rerank text: a short
+   line ("Gasket : Graphite") otherwise scores low against a row labelled "Body-Bonnet Joint".
 5. Expand equivalents: a material named in any form ("CI", "cast iron") adds its grade codes
    ("A126", "IS210"), also to the dense and rerank text, since catalogues often give only those.
 6. Stem. The requirement's own tokens come first; expansion tokens are added once each.
@@ -39,6 +41,7 @@ class SynonymGroup:
 
     name: str
     phrases: tuple[_Phrase, ...]
+    written: tuple[str, ...] = ()  # the phrases as the ontology writes them
 
     @property
     def terms(self) -> tuple[str, ...]:
@@ -113,8 +116,13 @@ class QueryVocabulary:
 
 def _group(name: str, phrases: Iterable[str], search: SearchVocabulary) -> SynonymGroup:
     """Stem every phrase of a group, dropping phrases that normalize to nothing."""
+    phrases = list(phrases)
     stemmed = (tuple(stem_token(t) for t in search_tokens(p, search)) for p in phrases)
-    return SynonymGroup(name=name, phrases=tuple(dict.fromkeys(p for p in stemmed if p)))
+    return SynonymGroup(
+        name=name,
+        phrases=tuple(dict.fromkeys(p for p in stemmed if p)),
+        written=tuple(dict.fromkeys(p.strip() for p in phrases if p.strip())),
+    )
 
 
 def _product_groups(ontologies: Sequence[Ontology], search: SearchVocabulary) -> list[SynonymGroup]:
@@ -253,6 +261,18 @@ def _synonym_terms(
     return [t for group in named for t in group.terms]
 
 
+def _attribute_phrases(
+    text: str, stems: Sequence[str], vocabulary: QueryVocabulary, attribute: str | None
+) -> list[str]:
+    """Synonyms (as written) of the attributes named in the query or given, not in the text."""
+    named = [g for g in vocabulary.attributes.values() if _named(g, stems)]
+    given = vocabulary.attributes.get(attribute) if attribute else None
+    if given is not None and given not in named:
+        named.append(given)
+    lowered = text.lower()
+    return [p for g in named for p in g.written if p.lower() not in lowered]
+
+
 def build_query(
     text: str,
     vocabulary: QueryVocabulary,
@@ -284,8 +304,11 @@ def build_query(
     )
     expansion += equivalent_stems
     extra = tuple(dict.fromkeys(t for t in expansion if t not in terms))
+    synonyms = _attribute_phrases(text, [*terms, *expansion], vocabulary, attribute)
     dense_extra = list(
-        dict.fromkeys([c.corrected for c in corrections] + abbreviations + equivalent_terms)
+        dict.fromkeys(
+            [c.corrected for c in corrections] + abbreviations + equivalent_terms + synonyms
+        )
     )
     dense_text = " ".join([embedding_text(text), *dense_extra]).strip()
     return SearchQuery(

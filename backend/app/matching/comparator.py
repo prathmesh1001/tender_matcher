@@ -486,15 +486,19 @@ def _not_checkable(requirement: Requirement) -> str | None:
 
 
 def needs_judge(requirement: Requirement) -> bool:
-    """True if catalogues may decide this requirement but rules cannot read it.
+    """True if catalogues may decide this requirement, so the judge may try what rules left open.
+
+    Every requirement the rules leave unsupported goes, whatever the catalogue reason (no field
+    names it, free text, a quote that failed to verify). Vendor documents, vague lines, named
+    makes and buyer details never go (`routed`).
 
     Args:
         requirement: An atomic requirement.
 
     Returns:
-        Whether it goes to the LLM judge.
+        Whether it goes to the LLM judge when the rules leave it unsupported.
     """
-    return routed(requirement) is None and _not_checkable(requirement) is not None
+    return routed(requirement) is None
 
 
 def compare(

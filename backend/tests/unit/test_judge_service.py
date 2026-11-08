@@ -123,9 +123,12 @@ def _chosen() -> CandidateSummary:
 
 
 def _inputs(
-    requirements: Sequence[Requirement], chosen: bool = True, category: str = "valves"
+    requirements: Sequence[Requirement],
+    chosen: bool = True,
+    category: str = "valves",
+    status: MatchStatus = MatchStatus.UNSUPPORTED,
 ) -> tuple[list[ItemInput], list[ItemReport]]:
-    results = [_open(r) for r in requirements]
+    results = [_open(r, status) for r in requirements]
     report = ItemReport(
         item=LineItem(
             item_no="10", title="Gate valve", description_lines=[], document="b.pdf", page_number=1
@@ -258,10 +261,17 @@ def test_a_repeated_line_is_judged_once_under_each_id() -> None:
 def test_a_rule_result_is_left_alone() -> None:
     llm = _Llm()
     requirement = _requirement(kind=ValueKind.CODE)
-    inputs, reports = _inputs([requirement])
+    inputs, reports = _inputs([requirement], status=MatchStatus.MISSING_CAPABILITY)
     judged = _service(llm, _Finder()).judge_items(inputs, reports, _Pages())
     assert llm.prompts == []
     assert _results(judged) == reports[0].manufacturers[0].results
+
+
+def test_a_code_line_the_rules_left_open_is_judged() -> None:
+    llm = _Llm()
+    inputs, reports = _inputs([_requirement(kind=ValueKind.CODE)])
+    _service(llm, _Finder()).judge_items(inputs, reports, _Pages())
+    assert len(llm.prompts) == 1
 
 
 def test_a_tie_or_missing_catalogue_is_not_judged() -> None:

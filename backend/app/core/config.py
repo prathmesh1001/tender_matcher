@@ -450,7 +450,7 @@ class Settings(BaseSettings):
         description="Most LLM judge calls for one tender; caps its cost (about Rs 0.10 a call).",
     )
     LLM_JUDGE_MAX_PASSAGES: int = Field(
-        default=3, ge=1, description="Best catalogue passages sent to the judge per requirement."
+        default=5, ge=1, description="Best catalogue passages sent to the judge per requirement."
     )
     LLM_JUDGE_THINKING_LEVEL: str | None = Field(
         default="low",

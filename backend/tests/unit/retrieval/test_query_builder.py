@@ -136,3 +136,17 @@ def test_code_terms_include_equivalent_grade_codes(query_vocab: QueryVocabulary)
     codes = build_query("Disc- SGI", query_vocab).code_terms
     assert {"a536", "a395", "en1563"} <= set(codes)
     assert "sgi" not in codes  # a word, not a code
+
+
+def test_attribute_synonyms_are_added_to_the_dense_and_rerank_text(
+    query_vocab: QueryVocabulary,
+) -> None:
+    query = build_query("200 mm", query_vocab, attribute="nominal_size")
+    assert query.dense_text.startswith("200 mm")
+    assert "nominal bore" in query.dense_text
+    assert "nominal bore" in query.rerank_text
+
+
+def test_synonyms_already_in_the_text_are_not_repeated(query_vocab: QueryVocabulary) -> None:
+    query = build_query("Nominal Bore 200 mm", query_vocab, attribute="nominal_size")
+    assert query.dense_text.lower().count("nominal bore") == 1
