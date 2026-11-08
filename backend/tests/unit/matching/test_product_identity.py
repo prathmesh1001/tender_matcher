@@ -191,3 +191,77 @@ def test_table_row_cites_the_printed_cell(valves: Ontology) -> None:
     [comparison] = result.documents[0].comparisons
     assert comparison.status is MatchStatus.FULL_MATCH
     assert comparison.evidence[0].quote == "Gate Valves"
+
+
+def _headed(sections: list[tuple[int, str, str]]) -> tuple[list[CatalogueChunk], _Pages]:
+    """Chunks under printed section headings: (page, heading, text)."""
+    doc = _doc("butterfly_valve")
+    chunks = [
+        CatalogueChunk(
+            doc,
+            ChunkDraft(
+                page_number=page,
+                position=i,
+                chunk_type=ChunkType.PROSE,
+                raw_text=f"{heading}\n{text}",
+                section=heading,
+                token_count=1,
+            ),
+        )
+        for i, (page, heading, text) in enumerate(sections)
+    ]
+    return chunks, _Pages(chunks)
+
+
+def _headed_result(line: str, sections: list[tuple[int, str, str]], valves: Ontology) -> Comparison:
+    chunks, pages = _headed(sections)
+    title = "Butterfly valve"
+    result = evaluate_item(
+        ItemQuery("Acme", "1", title, "butterfly_valve"),
+        [_requirement(line, title, valves)],
+        chunks,
+        MatchContext.for_ontology(valves),
+        OPTIONS,
+        pages,
+    )
+    [comparison] = result.documents[0].comparisons
+    return comparison
+
+
+TRIPLE_OFFSET = [
+    (2, "Introduction", "Our valves serve refineries."),
+    (3, "Triple-offset Butterfly Valves", "Zero leakage in both directions."),
+    (9, "Replaceable Metal-to-Metal Seats", "The seat ring can be replaced in line."),
+]
+
+
+def test_product_line_cites_the_product_heading(valves: Ontology) -> None:
+    found = _headed_result("Valve Type : Butterfly Valve", TRIPLE_OFFSET, valves)
+    assert found.status is MatchStatus.FULL_MATCH
+    [evidence] = found.evidence
+    assert (evidence.quote, evidence.page_number) == ("Triple-offset Butterfly Valves", 3)
+    assert evidence.verified is True
+
+
+def test_sub_type_and_other_words_met_by_headings(valves: Ontology) -> None:
+    found = _headed_result(
+        "TYPE : TRIPLE OFFSET METAL SEATED BUTTERFLY VALVE", TRIPLE_OFFSET, valves
+    )
+    assert found.status is MatchStatus.FULL_MATCH
+    assert [(e.quote, e.page_number) for e in found.evidence] == [
+        ("Triple-offset Butterfly Valves", 3),
+        ("Replaceable Metal-to-Metal Seats", 9),
+    ]
+
+
+def test_other_words_without_a_sub_heading_decide_nothing(valves: Ontology) -> None:
+    found = _headed_result(
+        "TYPE : TRIPLE OFFSET SOFT SEATED BUTTERFLY VALVE", TRIPLE_OFFSET, valves
+    )
+    assert found.status is MatchStatus.UNSUPPORTED
+
+
+def test_a_heading_without_the_sub_type_decides_nothing(valves: Ontology) -> None:
+    sections = [(3, "Butterfly Valves", "Wafer and lug bodies.")]
+    found = _headed_result("TYPE : TRIPLE OFFSET BUTTERFLY VALVE", sections, valves)
+    assert found.status is MatchStatus.UNSUPPORTED

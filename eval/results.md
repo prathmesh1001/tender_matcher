@@ -24,7 +24,13 @@ Step 2, standard codes from an untagged standards table row, flagged code_only (
 the judge needed 70 new calls, measured at step 9): coverage 52% -> 53% (52/99), decided
 accuracy 76% (39/51) -> 77% (40/52), stronger 3 -> 3, citations 64% -> 65% (26/40),
 full_match precision 94% (34/36). Changed row: 7956201 "Testing Standard : API 598" now agrees
-(p4, p5). The sections below are still the step 0 output.
+(p4, p5).
+
+Step 3, product type lines met by the product heading (rules only): coverage 53% -> 54%
+(53/99), decided accuracy 77% (40/52) -> 77% (41/53), stronger 3 -> 3, citations 65% -> 66%
+(27/41), full_match precision 94% -> 95% (35/37). Changed row: 8119613 "TYPE : TRIPLE OFFSET
+METAL SEATED BUTTERFLY VALVE" now agrees (p3, p9). The sections below are still the step 0
+output.
 
 | Run | Labelled | Other catalogue | Coverage | Decided accuracy | Stronger | Citations |
 |---|---|---|---|---|---|---|

@@ -29,7 +29,7 @@ from app.matching.comparator import (
 from app.matching.evidence_verifier import PageTexts, verify_comparison
 from app.matching.fields import located_fields, option_fields
 from app.matching.headings import ProductGroups, group_by_product
-from app.matching.product_identity import names_only_product, product_identity
+from app.matching.product_identity import product_ask, product_identity
 from app.retrieval.text_normalizer import normalize_for_search, stem_token
 from app.schemas.enums import DecisionSource, MatchStatus, ReviewFlag
 from app.schemas.matching import Comparison, DocumentResult, ManufacturerItemResult, SubTypeFit
@@ -314,16 +314,29 @@ def _identified(
     product_type: str | None,
     ctx: MatchContext,
     options: SelectionOptions,
+    groups: ProductGroups | None = None,
+    chosen: str | None = None,
 ) -> list[Comparison]:
-    """Undecided lines that only name the product, met by the catalogue line naming it."""
+    """Undecided product type lines, met by the product heading or a line naming the product."""
     if not product_type or not options.product_label_words:
         return list(raw)
+    headings = [chosen] if chosen is not None else []
+    if groups is not None:
+        headings += [h for h in groups.headings_of(product_type) if h != chosen]
     found: list[Comparison] = []
     for requirement, comparison in zip(requirements, raw, strict=True):
-        if comparison.status is MatchStatus.UNSUPPORTED and names_only_product(
-            requirement, product_type, ctx, options.product_label_words
-        ):
-            comparison = product_identity(requirement, chunks, product_type, ctx) or comparison
+        ask = product_ask(
+            requirement,
+            product_type,
+            ctx,
+            options.product_label_words,
+            options.comparator.generic_label_words,
+        )
+        if comparison.status is MatchStatus.UNSUPPORTED and ask is not None:
+            identity = product_identity(
+                requirement, chunks, product_type, ctx, ask, groups, headings
+            )
+            comparison = identity or comparison
         found.append(comparison)
     return found
 
@@ -362,7 +375,7 @@ def evaluate_document(
         if product_type and len(document.product_types) > 1:
             raw = _untagged_capped(requirements, raw, chunks, product_type, ctx, options)
     ordered = _reading_order(chunks, groups, chosen, product_type)
-    raw = _identified(requirements, raw, ordered, product_type, ctx, options)
+    raw = _identified(requirements, raw, ordered, product_type, ctx, options, groups, chosen)
     offers = option_fields(chunks, options.comparator.fields)
     softened = [
         offered_as_option(r, c, offers, ctx, options.comparator)
