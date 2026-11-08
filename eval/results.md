@@ -18,7 +18,13 @@ Step 1, interleaved table cells cited line by line (rules only; the judge is mea
 step 9, it needed 70 new calls): coverage 49% -> 52% (51/99), decided accuracy 76% (37/49) ->
 76% (39/51), stronger 3 -> 3, citations 65% (24/37) -> 64% (25/39). Changed rows: 7956201
 "Valve Ends : Flanged." and 8017367 item 11 "Body : ASTM A216 Grade WCB" now agree; nothing
-got worse. The sections below are still the step 0 output.
+got worse.
+
+Step 2, standard codes from an untagged standards table row, flagged code_only (rules only;
+the judge needed 70 new calls, measured at step 9): coverage 52% -> 53% (52/99), decided
+accuracy 76% (39/51) -> 77% (40/52), stronger 3 -> 3, citations 64% -> 65% (26/40),
+full_match precision 94% (34/36). Changed row: 7956201 "Testing Standard : API 598" now agrees
+(p4, p5). The sections below are still the step 0 output.
 
 | Run | Labelled | Other catalogue | Coverage | Decided accuracy | Stronger | Citations |
 |---|---|---|---|---|---|---|

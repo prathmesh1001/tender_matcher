@@ -11,6 +11,7 @@ from app.matching.comparator import MatchContext
 from app.matching.documents import (
     ItemQuery,
     SelectionOptions,
+    _capped,
     evaluate_item,
     item_sub_type,
     sub_type_fit,
@@ -19,8 +20,8 @@ from app.matching.engine import manufacturer_report
 from app.ontology.loader import load_ontologies
 from app.ontology.schema import Ontology
 from app.schemas.chunking import ChunkDraft
-from app.schemas.enums import ChunkType, DocType, MatchStatus
-from app.schemas.matching import ManufacturerItemResult, SubTypeFit
+from app.schemas.enums import ChunkType, DecisionSource, DocType, MatchStatus, ReviewFlag
+from app.schemas.matching import Comparison, LabelBasis, ManufacturerItemResult, SubTypeFit
 from app.schemas.requirements import LineItem, Requirement
 from app.tender.splitter import SplitOptions, item_requirements, leaves
 
@@ -465,3 +466,23 @@ def test_untagged_line_of_a_one_product_document_still_decides(valves: Ontology)
     doc = _doc("datasheet", ())
     chunks = [_tagged(doc, "Size range: 50 mm to 600 mm", None)]
     assert _size_result(valves, chunks) == (MatchStatus.FULL_MATCH, False)
+
+
+def _rule_result(flags: list[ReviewFlag]) -> Comparison:
+    return Comparison(
+        requirement_id="1.1",
+        status=MatchStatus.FULL_MATCH,
+        needs_review=False,
+        decided_by=DecisionSource.RULE,
+        basis=LabelBasis.ATTRIBUTE,
+        reason="",
+        flags=flags,
+    )
+
+
+def test_heading_cap_leaves_a_code_only_standard_alone() -> None:
+    kept = _capped(_rule_result([ReviewFlag.CODE_ONLY_HIT]))
+    assert kept.status is MatchStatus.FULL_MATCH
+    capped = _capped(_rule_result([]))
+    assert capped.status is MatchStatus.PARTIAL_MATCH
+    assert ReviewFlag.HEADING_UNCLEAR in capped.flags

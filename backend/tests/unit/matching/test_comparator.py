@@ -15,7 +15,7 @@ from app.matching.values import quantities
 from app.ontology.loader import load_ontologies
 from app.ontology.schema import Ontology
 from app.schemas.chunking import ChunkDraft
-from app.schemas.enums import ChunkType, DocType, MatchStatus
+from app.schemas.enums import ChunkType, DocType, MatchStatus, ReviewFlag
 from app.schemas.matching import Comparison
 from app.schemas.requirements import LineItem, Requirement
 from app.tender.splitter import SplitOptions, item_requirements, leaves
@@ -692,3 +692,51 @@ def test_a_key_listing_parts_names_each_of_them(valves: Ontology) -> None:
     row = _row(header, ["Body/ 1 Connector/ Insert", "ASTM A216 Gr. WCB"], "Standards & Materials")
     assert _compare("Body : ASTM A216 Grade WCB or equivelent,", [row], valves).status is FULL
     assert _compare("Disc : ASTM A216 Grade WCB", [row], valves).status is UNSUPPORTED
+
+
+def _several_product_row(product_type: str | None) -> CatalogueChunk:
+    several = replace(DOC, product_types=("butterfly_valve", "gate_valve"))
+    header = ["Parameter", "Compliance"]
+    cells = ["Valve Inspection & Testing", "API 600, API 598, BS 6755 Part I"]
+    chunk = ChunkDraft(
+        page_number=5,
+        position=0,
+        chunk_type=ChunkType.TABLE_ROW,
+        raw_text=table_row_text(header, cells, "Introduction"),
+        section="Introduction",
+        product_type=product_type,
+        token_count=1,
+        meta={"header": header, "cells": cells},
+    )
+    return CatalogueChunk(several, chunk)
+
+
+def _butterfly(line: str, valves: Ontology) -> Requirement:
+    return _req(line, valves).model_copy(update={"product_type": "butterfly_valve"})
+
+
+def test_an_untagged_standards_row_counts_only_by_its_code(valves: Ontology) -> None:
+    requirement = _butterfly("Testing Standard : API 598", valves)
+    fields = located_fields([_several_product_row(None)], OPTIONS.fields)
+    result = compare(requirement, fields, MatchContext.for_ontology(valves), OPTIONS)
+    assert result.status is FULL
+    assert ReviewFlag.CODE_ONLY_HIT in result.flags
+
+
+def test_a_tagged_row_needs_no_code_only_flag(valves: Ontology) -> None:
+    requirement = _butterfly("Testing Standard : API 598", valves)
+    fields = located_fields([_several_product_row("butterfly_valve")], OPTIONS.fields)
+    result = compare(requirement, fields, MatchContext.for_ontology(valves), OPTIONS)
+    assert result.status is FULL
+    assert ReviewFlag.CODE_ONLY_HIT not in result.flags
+
+
+def test_another_products_row_or_a_missing_code_is_no_evidence(valves: Ontology) -> None:
+    ctx = MatchContext.for_ontology(valves)
+    gate = located_fields([_several_product_row("gate_valve")], OPTIONS.fields)
+    assert compare(_butterfly("Testing Standard : API 598", valves), gate, ctx, OPTIONS).status is (
+        UNSUPPORTED
+    )
+    untagged = located_fields([_several_product_row(None)], OPTIONS.fields)
+    other = compare(_butterfly("Testing Standard : ISO 5208", valves), untagged, ctx, OPTIONS)
+    assert other.status is UNSUPPORTED

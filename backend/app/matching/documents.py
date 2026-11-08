@@ -195,7 +195,13 @@ def _chosen_heading(
 
 
 def _capped(comparison: Comparison) -> Comparison:
-    """Evidence no heading clearly owns can't be full: partial + review."""
+    """Evidence no heading clearly owns can't be full: partial + review.
+
+    A standard found only by its exact code on an untagged line (`code_only_hit`, comparator
+    rule 4) already says no heading owns it and carries its own lower confidence.
+    """
+    if ReviewFlag.CODE_ONLY_HIT in comparison.flags:
+        return comparison
     flags = [*comparison.flags, ReviewFlag.HEADING_UNCLEAR]
     if comparison.status is not MatchStatus.FULL_MATCH:
         return comparison.model_copy(update={"needs_review": True, "flags": flags})

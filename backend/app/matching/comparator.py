@@ -21,6 +21,10 @@ category has one and is never required.
    Against a labelled field that decides, only a field of the attribute printing the code in
    its own label counts ("Design* ISO 17292/ | API 6D": either standard). Another standard
    printed there never makes one missing.
+   Without such a line, an untagged table row of a document declaring the item's product type
+   (a standards table "Valve Inspection & Testing | API 598") counts too, flagged
+   `code_only_hit`: the exact code is the only link to the product, so confidence is lowered.
+   Untagged prose never counts: a sentence names its own subject ("Gate valves are tested").
 """
 
 import math
@@ -35,7 +39,14 @@ from app.matching.values import Quantity, code_tokens, quantities
 from app.ontology.schema import Attribute, Ontology
 from app.ontology.units import canonical_number, class_to_pn
 from app.retrieval.text_normalizer import SearchVocabulary, fold_text, is_code, stem_token
-from app.schemas.enums import DecisionSource, MatchStatus, Operator, RequirementType, ReviewFlag
+from app.schemas.enums import (
+    ChunkType,
+    DecisionSource,
+    MatchStatus,
+    Operator,
+    RequirementType,
+    ReviewFlag,
+)
 from app.schemas.matching import Comparison, Evidence, LabelBasis
 from app.schemas.requirements import Requirement, ValueKind
 from app.schemas.sections import EvidenceSource
@@ -537,6 +548,16 @@ def _own_product(located: LocatedField, requirement: Requirement) -> bool:
     return len(document.product_types) == 1
 
 
+def _untagged_of_type(located: LocatedField, requirement: Requirement) -> bool:
+    """True for an untagged table row of a document declaring the requirement's product type."""
+    chunk, document = located.source.chunk, located.source.document
+    return (
+        chunk.chunk_type is ChunkType.TABLE_ROW
+        and chunk.product_type is None
+        and requirement.product_type in document.product_types
+    )
+
+
 def _by_standard_code(
     requirement: Requirement,
     fields: Sequence[LocatedField],
@@ -561,9 +582,11 @@ def _by_standard_code(
     if not wanted:
         return None
     outcome = _Outcome(MatchStatus.FULL_MATCH, f"{attribute.name} named by its standard code")
-    judged: list[Evidence] = []
+    own: list[Evidence] = []
+    untagged: list[Evidence] = []
     for located in fields:
-        if not _own_product(located, requirement):
+        mine = _own_product(located, requirement)
+        if not mine and not _untagged_of_type(located, requirement):
             continue
         field = located.field
         if in_label and not label_names(requirement, field.label, ctx, options, field.key):
@@ -572,10 +595,14 @@ def _by_standard_code(
         have = code_tokens(text, noise, vocabulary)
         found = [w for w in wanted if w <= have]
         if found and (len(found) == len(wanted) or requirement.any_alternative):
-            judged.append(_evidence(located, field.value, outcome))
-    if not judged:
+            (own if mine else untagged).append(_evidence(located, field.value, outcome))
+    if own:
+        return _decide(requirement, own, LabelBasis.ATTRIBUTE, options)
+    if not untagged:
         return None
-    return _decide(requirement, judged, LabelBasis.ATTRIBUTE, options)
+    result = _decide(requirement, untagged, LabelBasis.ATTRIBUTE, options)
+    flags = [*result.flags, ReviewFlag.CODE_ONLY_HIT]
+    return result.model_copy(update={"flags": flags})
 
 
 def offered_as_option(
