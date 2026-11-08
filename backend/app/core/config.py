@@ -303,6 +303,12 @@ class Settings(BaseSettings):
             "dimension table."
         ),
     )
+    COMPARATOR_LINE_Y_TOLERANCE: float = Field(
+        default=2.0,
+        ge=0,
+        description="A line of an interleaved table cell keeps the row key only if a key line "
+        "is printed within this many points of its height.",
+    )
     COMPARATOR_REL_TOLERANCE: float = Field(
         default=0.001,
         ge=0,

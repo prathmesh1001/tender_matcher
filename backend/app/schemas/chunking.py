@@ -26,6 +26,13 @@ class TableRow(BaseModel):
             '(one "KEY : value" per line in tender specs). Empty otherwise.'
         ),
     )
+    cell_line_ys: list[list[float | None]] = Field(
+        default_factory=list,
+        description=(
+            "Top y of each line in `cell_lines` (None at a paragraph break), so a line can be "
+            "matched to the key line printed at the same height. Empty when unknown."
+        ),
+    )
     spanning_columns: tuple[int, ...] = Field(
         default=(),
         description="Columns holding one value that was printed across them and re-joined.",

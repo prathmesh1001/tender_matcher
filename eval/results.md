@@ -14,6 +14,12 @@ recall plan is compared against these numbers. The table is added by hand:
 | Citation accuracy | 65% (24/37) | 60% (25/42) |
 | Gemini calls | 0 | 106 new, 148 cached before the run |
 
+Step 1, interleaved table cells cited line by line (rules only; the judge is measured again at
+step 9, it needed 70 new calls): coverage 49% -> 52% (51/99), decided accuracy 76% (37/49) ->
+76% (39/51), stronger 3 -> 3, citations 65% (24/37) -> 64% (25/39). Changed rows: 7956201
+"Valve Ends : Flanged." and 8017367 item 11 "Body : ASTM A216 Grade WCB" now agree; nothing
+got worse. The sections below are still the step 0 output.
+
 | Run | Labelled | Other catalogue | Coverage | Decided accuracy | Stronger | Citations |
 |---|---|---|---|---|---|---|
 | rules | 99 | 0 | 49% (49/99) | 76% (37/49) | 3 | 65% (24/37) |

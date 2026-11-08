@@ -18,6 +18,7 @@ from typing import Final
 
 from app.core.config import Settings
 from app.ingestion.boilerplate import in_bottom_band
+from app.ingestion.quote_verifier import verify_quote
 from app.schemas.chunking import ChunkDraft, ExtractedTable, TableRow
 from app.schemas.enums import ChunkType
 from app.schemas.parsing import BBox, ParsedPage, TextBlock
@@ -46,6 +47,8 @@ class ChunkerOptions:
     heading_max_digit_share: float = 1.0
     # Bottom share of the page whose headings end at the page break; 0 = off (DOCX).
     footer_band: float = 0.0
+    # A multi-line cell whose joined text matches its page below this is interleaved.
+    quote_threshold: float = 1.0
 
     @classmethod
     def from_settings(cls, settings: Settings) -> ChunkerOptions:
@@ -58,6 +61,7 @@ class ChunkerOptions:
             heading_min_latin_ratio=settings.CHUNK_HEADING_MIN_LATIN_RATIO,
             heading_max_digit_share=settings.CHUNK_HEADING_MAX_DIGIT_SHARE,
             footer_band=settings.PAGE_MARGIN_BAND_FRACTION,
+            quote_threshold=settings.QUOTE_MATCH_THRESHOLD,
             model_header_keywords=tuple(k.lower() for k in settings.CHUNK_MODEL_HEADER_KEYWORDS),
             variant_header_keywords=tuple(
                 k.lower() for k in settings.CHUNK_VARIANT_HEADER_KEYWORDS
@@ -314,10 +318,55 @@ def _row_chunk(
             **({"stacked_unresolved": True} if row.stacked_unresolved else {}),
             **({"rule_grid": True} if table.from_rules else {}),
             **({"cell_lines": row.cell_lines} if row.cell_lines else {}),
+            **({"cell_line_ys": row.cell_line_ys} if _ys_fit(row) else {}),
             # A value printed across these columns was re-joined (V5); check the row bbox.
             **({"spanning_columns": list(row.spanning_columns)} if row.spanning_columns else {}),
             **extra,
         },
+    )
+
+
+def _ys_fit(row: TableRow) -> bool:
+    """True if `cell_line_ys` gives a height for every line of `cell_lines`."""
+    return bool(row.cell_lines) and [len(c) for c in row.cell_lines] == [
+        len(c) for c in row.cell_line_ys
+    ]
+
+
+def interleaved_cells(chunk: ChunkDraft, page_text: str, threshold: float) -> list[int]:
+    """Cells of a table-row chunk whose lines are not printed one after another on the page.
+
+    A cell spanning several printed columns (an ordering legend read as one row: L&T API 600
+    p17 "End Trim Connection") holds lines the page text interleaves with other columns, so
+    its joined text is no quote. Such a cell is cited line by line (`matching/fields.py`).
+
+    Args:
+        chunk: A table-row chunk (`cell_lines` meta).
+        page_text: Its page's text.
+        threshold: Quote match threshold (`QUOTE_MATCH_THRESHOLD`).
+
+    Returns:
+        Indices of the interleaved cells (only multi-line cells are checked).
+    """
+    lines: list[list[str]] = chunk.meta.get("cell_lines", [])
+    out: list[int] = []
+    for i, cell in enumerate(lines):
+        printed = [line for line in cell if line.strip()]
+        if (
+            len(printed) > 1
+            and not verify_quote([" ".join(printed)], page_text, threshold).verified
+        ):
+            out.append(i)
+    return out
+
+
+def _with_page_checks(chunk: ChunkDraft, page_text: str, options: ChunkerOptions) -> ChunkDraft:
+    """A table-row chunk with `interleaved_cells` meta when any cell is interleaved."""
+    found = interleaved_cells(chunk, page_text, options.quote_threshold)
+    return (
+        chunk.model_copy(update={"meta": {**chunk.meta, "interleaved_cells": found}})
+        if found
+        else chunk
     )
 
 
@@ -588,7 +637,11 @@ def chunk_page(
         if isinstance(item, ExtractedTable):
             ordered.extend(prose.take_chunks())
             ordered.extend(
-                c.model_copy(update={"meta": {**c.meta, "section_page": prose.section_page}})
+                _with_page_checks(
+                    c.model_copy(update={"meta": {**c.meta, "section_page": prose.section_page}}),
+                    page.text,
+                    options,
+                )
                 for c in table_chunks(item, _table_section(item, prose.section), options)
             )
         elif is_heading(

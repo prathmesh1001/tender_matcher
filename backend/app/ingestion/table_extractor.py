@@ -254,13 +254,20 @@ def with_paragraph_breaks(lines: Sequence[tuple[float, str]], gap_factor: float)
     Returns:
         The texts, with "" between paragraphs.
     """
+    return [text for _, text in positioned_lines(lines, gap_factor)]
+
+
+def positioned_lines(
+    lines: Sequence[tuple[float, str]], gap_factor: float
+) -> list[tuple[float | None, str]]:
+    """`with_paragraph_breaks`, keeping each line's top y (None for a break)."""
     gaps = [b[0] - a[0] for a, b in itertools.pairwise(lines)]
     pitch = statistics.median(gaps) if gaps else 0.0
-    out: list[str] = []
-    for i, (_, text) in enumerate(lines):
+    out: list[tuple[float | None, str]] = []
+    for i, (y, text) in enumerate(lines):
         if i and pitch and gaps[i - 1] > gap_factor * pitch:
-            out.append("")
-        out.append(text)
+            out.append((None, ""))
+        out.append((y, text))
     return out
 
 
@@ -280,9 +287,20 @@ def cell_lines(
     Returns:
         Lines per cell ("" marks a paragraph break), or [] if every cell is a single line.
     """
-    lines = [
-        with_paragraph_breaks(words.lines(b), gap_factor) if b is not None else [] for b in boxes
-    ]
+    return [[text for _, text in cell] for cell in _positioned_cells(words, boxes, gap_factor)]
+
+
+def cell_line_ys(
+    words: PageWords, boxes: Sequence[BBox | None], gap_factor: float
+) -> list[list[float | None]]:
+    """Top y of each line `cell_lines` returns (None at a break), [] when it returns []."""
+    return [[y for y, _ in cell] for cell in _positioned_cells(words, boxes, gap_factor)]
+
+
+def _positioned_cells(
+    words: PageWords, boxes: Sequence[BBox | None], gap_factor: float
+) -> list[list[tuple[float | None, str]]]:
+    lines = [positioned_lines(words.lines(b), gap_factor) if b is not None else [] for b in boxes]
     return lines if any(len(cell) > 1 for cell in lines) else []
 
 
@@ -657,7 +675,12 @@ def rule_grid_table(
     else:  # the first band is already data (a numbered row, a clause)
         header = [f"Column {i + 1}" for i in range(width)]
     rows = [
-        TableRow(cells=texts, bbox=box, cell_lines=cell_lines(words, boxes, paragraph_gap))
+        TableRow(
+            cells=texts,
+            bbox=box,
+            cell_lines=cell_lines(words, boxes, paragraph_gap),
+            cell_line_ys=cell_line_ys(words, boxes, paragraph_gap),
+        )
         for boxes, texts, box in bands
     ]
     rows = [r for r in rows if not repeats_header(header, r.cells)]
@@ -753,6 +776,9 @@ def extract_page_tables(
                 bbox=row.box,
                 stacked_unresolved=row.stacked_unresolved,
                 cell_lines=cell_lines(
+                    words, [c.bbox if c else None for c in row.cells], repair.paragraph_gap
+                ),
+                cell_line_ys=cell_line_ys(
                     words, [c.bbox if c else None for c in row.cells], repair.paragraph_gap
                 ),
             )
