@@ -56,6 +56,16 @@ judged from another product's p26 line (now not decided). Still below the step 0
 the judge's own errors are 3 weaker (Operator Gear/HW, Ball & Stem A 182, pump water at ambient
 temperature) and 2 stronger (Flanged Ended, Spring).
 
+Step 6, options lists under the item's own product heading: SKIPPED by the user (2026-11-09), no
+code changed. The only options-list rows in the gold (7956201 item 1, a globe valve: "Body &
+Bonnet MOC : LCB", "Stem/Hinge pin : SS316") cite p9 of the L&T API 600 catalogue, an ordering
+page for the whole catalogue. The heading grouping gives p9 to "48-inch Class 150 Gate Valve",
+a figure caption at the foot of p8 that also claims pages 9-16 (including the globe pages
+12-13); the only globe heading is "Y-GLOBE VALVES" from p17. As specified, the step would leave
+both rows partial and would let a gate valve item take a full match from p9 only through the
+caption. Known limits: a catalogue-wide ordering page counts as partial only; a figure caption
+naming one product can be read as a product heading.
+
 The sections below are the output of that run.
 
 | Run | Labelled | Other catalogue | Coverage | Decided accuracy | Stronger | Citations |
