@@ -38,6 +38,12 @@ class CandidateSummary(BaseModel):
     critical_met: float = 0.0
     critical_failed: int = 0
     product_heading: str | None = None
+    other_product_passages: frozenset[tuple[int, str]] = Field(
+        default_factory=frozenset,
+        exclude=True,
+        description="(page, raw_text) of chunks under another product's heading in the "
+        "document; the LLM judge never reads them (B10). Not part of the report.",
+    )
     fit_score: float
     decided: int
 

@@ -28,7 +28,7 @@ from app.matching.comparator import (
 )
 from app.matching.evidence_verifier import PageTexts, verify_comparison
 from app.matching.fields import located_fields, option_fields
-from app.matching.headings import ProductGroups, group_by_product
+from app.matching.headings import ProductGroups, group_by_product, other_product_passages
 from app.matching.product_identity import product_ask, product_identity
 from app.retrieval.text_normalizer import normalize_for_search, stem_token
 from app.schemas.enums import DecisionSource, MatchStatus, ReviewFlag
@@ -395,6 +395,11 @@ def evaluate_document(
         fit_score=score,
         decided=decided,
         product_heading=chosen,
+        other_product_passages=(
+            other_product_passages(groups, product_type, chosen)
+            if groups is not None and product_type
+            else frozenset()
+        ),
         comparisons=comparisons,
     )
 

@@ -42,49 +42,63 @@ what the comparator reads from the judge's own quote, else unsupported + needs_r
 and unit-tested, NOT measured; it changes no prompt, so it costs no new calls. Measured at
 step 9 with step 4.
 
-The sections below are still the step 0 output.
+Judge measured after steps 4 and 5 (2026-11-09, judge on gold-labelled pairs only, 84 new
+Gemini calls, cache 254 -> 338). Against the step 0 judge baseline: coverage 58% (57/99) ->
+63% (62/99), decided accuracy 74% (42/57) -> 71% (44/62), full_match precision 90% -> 90%
+(38/42), stronger 5 -> 5, citations 60% (25/42) -> 68% (30/44). Accuracy dropped, so this
+fails the gate. The judge decides 9 rows the rules leave open: 3 agree, 4 weaker, 2 stronger.
+
+Option A of the user (2026-11-09): in a document holding several products, the judge reads no
+chunk under another product's heading (`other_product_passages`). Re-measured with 8 new calls
+(cache 338 -> 346): coverage 62% (61/99), decided accuracy 72% (44/61), full_match precision
+90% (38/42), stronger 5, citations 68% (30/44). 8017367 1.5.2 "DISC : A351 CF8M" is no longer
+judged from another product's p26 line (now not decided). Still below the step 0 judge's 74%:
+the judge's own errors are 3 weaker (Operator Gear/HW, Ball & Stem A 182, pump water at ambient
+temperature) and 2 stronger (Flanged Ended, Spring).
+
+The sections below are the output of that run.
 
 | Run | Labelled | Other catalogue | Coverage | Decided accuracy | Stronger | Citations |
 |---|---|---|---|---|---|---|
-| rules | 99 | 0 | 49% (49/99) | 76% (37/49) | 3 | 65% (24/37) |
-| rules + judge | 99 | 0 | 58% (57/99) | 74% (42/57) | 5 | 60% (25/42) |
+| rules | 99 | 0 | 54% (53/99) | 77% (41/53) | 3 | 66% (27/41) |
+| rules + judge | 99 | 0 | 62% (61/99) | 72% (44/61) | 5 | 68% (30/44) |
 
 ## rules
 
 | Status | Labelled | Run gave | Correct | Precision | Recall |
 |---|---|---|---|---|---|
-| full_match | 64 | 34 | 32 | 94% | 50% |
-| partial_match | 17 | 13 | 4 | 31% | 24% |
+| full_match | 64 | 37 | 35 | 95% | 55% |
+| partial_match | 17 | 14 | 5 | 36% | 29% |
 | missing_capability | 4 | 2 | 1 | 50% | 25% |
-| unsupported | 14 | 50 | 13 | 26% | 93% |
+| unsupported | 14 | 46 | 13 | 28% | 93% |
 
 Confusion matrix (rows: label, columns: run):
 
 | Label \ run | full_match | partial_match | missing_capability | unsupported |
 |---|---|---|---|---|
-| full_match | 32 | 8 | 0 | 24 |
-| partial_match | 1 | 4 | 1 | 11 |
+| full_match | 35 | 8 | 0 | 21 |
+| partial_match | 1 | 5 | 1 | 10 |
 | missing_capability | 0 | 1 | 1 | 2 |
 | unsupported | 1 | 0 | 0 | 13 |
 
-Wrong decisions at full confidence: 17% (7/41). Below full confidence: 62% (5/8).
+Wrong decisions at full confidence: 16% (7/43). Below full confidence: 50% (5/10).
 
 ## rules + judge
 
 | Status | Labelled | Run gave | Correct | Precision | Recall |
 |---|---|---|---|---|---|
-| full_match | 64 | 40 | 36 | 90% | 56% |
-| partial_match | 17 | 15 | 5 | 33% | 29% |
+| full_match | 64 | 42 | 38 | 90% | 59% |
+| partial_match | 17 | 17 | 5 | 29% | 29% |
 | missing_capability | 4 | 2 | 1 | 50% | 25% |
-| unsupported | 14 | 42 | 13 | 31% | 93% |
+| unsupported | 14 | 38 | 13 | 34% | 93% |
 
 Confusion matrix (rows: label, columns: run):
 
 | Label \ run | full_match | partial_match | missing_capability | unsupported |
 |---|---|---|---|---|
-| full_match | 36 | 9 | 0 | 19 |
+| full_match | 38 | 11 | 0 | 15 |
 | partial_match | 3 | 5 | 1 | 8 |
 | missing_capability | 0 | 1 | 1 | 2 |
 | unsupported | 1 | 0 | 0 | 13 |
 
-Wrong decisions at full confidence: 17% (7/41). Below full confidence: 50% (8/16).
+Wrong decisions at full confidence: 16% (7/43). Below full confidence: 56% (10/18).

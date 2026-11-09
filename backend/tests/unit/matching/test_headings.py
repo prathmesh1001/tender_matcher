@@ -10,7 +10,7 @@ from app.ingestion.chunker import table_row_text
 from app.matching.chunk_source import CatalogueChunk, CatalogueDocument
 from app.matching.comparator import MatchContext
 from app.matching.documents import ItemQuery, SelectionOptions, evaluate_item
-from app.matching.headings import group_by_product
+from app.matching.headings import group_by_product, other_product_passages
 from app.ontology.loader import load_ontologies
 from app.ontology.schema import Ontology
 from app.retrieval.text_normalizer import SearchVocabulary
@@ -239,3 +239,39 @@ def test_they_are_capped_if_a_heading_names_another_product(valves: Ontology) ->
         ["DISC MOC : ASTM A351 Gr. CF8M", "STEM MOC : ASTM A479 Type 410"], chunks, valves
     )
     assert result.comparisons[1].status is MatchStatus.PARTIAL_MATCH
+
+
+def _keys(chunks: list[CatalogueChunk]) -> frozenset[tuple[int, str]]:
+    return frozenset((c.chunk.page_number, c.chunk.raw_text) for c in chunks)
+
+
+def test_the_judge_may_not_read_a_sibling_model_once_one_is_chosen(valves: Ontology) -> None:
+    alpha_stem = _row("Stem", "ASTM A479 Type 410", ALPHA, 1, 2)
+    result = _evaluate(
+        ["BODY MOC : ASTM A216 Gr. WCB", "STEM MOC : ASTM A479 Type 410"],
+        [*TWO_MODELS, alpha_stem],
+        valves,
+    )
+    assert result.product_heading == ALPHA
+    assert result.other_product_passages == _keys(TWO_MODELS[2:])
+
+
+def test_siblings_stay_readable_while_none_is_chosen(valves: Ontology) -> None:
+    result = _evaluate(["BODY MOC : ASTM A216 Gr. WCB"], TWO_MODELS, valves)
+    assert result.product_heading is None
+    assert result.other_product_passages == frozenset()
+
+
+def test_another_product_types_heading_is_never_the_items(valves: Ontology) -> None:
+    check = _row("Disc", "IS 2062 Gr. B", "Gamma Dual Plate Check Valve", 3)
+    chunks = [_row("Body", "WCB", ALPHA, 1), check]
+    vocabulary = SearchVocabulary.from_ontologies([valves])
+    groups = group_by_product(chunks, valves, vocabulary, OPTIONS.overview_min_headings)
+    assert other_product_passages(groups, "butterfly_valve", None) == _keys([check])
+    assert other_product_passages(groups, "check_valve", None) == _keys(chunks[:1])
+
+
+def test_the_excluded_chunks_are_not_written_to_the_report(valves: Ontology) -> None:
+    result = _evaluate(["DISC MOC : ASTM A351 Gr. CF8M"], TWO_MODELS, valves)
+    assert result.other_product_passages  # Alpha chosen, Beta held back
+    assert "other_product_passages" not in result.model_dump()

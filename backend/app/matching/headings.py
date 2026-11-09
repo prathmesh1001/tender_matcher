@@ -88,3 +88,27 @@ def group_by_product(
         else:
             by_heading.setdefault(current, []).append(item)
     return ProductGroups(by_heading, unclear, heading_types)
+
+
+def other_product_passages(
+    groups: ProductGroups, product_type: str, chosen: str | None
+) -> frozenset[tuple[int, str]]:
+    """The chunks under a heading of another product than the item's, as (page, raw_text).
+
+    A heading of another product type is never the item's. A sibling heading of the same type
+    is another product only once one of them is chosen; before that nothing tells them apart.
+
+    Args:
+        groups: The document's chunks by product heading.
+        product_type: The item's product type.
+        chosen: The heading chosen for the item, or None.
+
+    Returns:
+        The page and verbatim text of each such chunk.
+    """
+    return frozenset(
+        (c.chunk.page_number, c.chunk.raw_text)
+        for heading, chunks in groups.by_heading.items()
+        if groups.types[heading] != product_type or chosen not in (None, heading)
+        for c in chunks
+    )

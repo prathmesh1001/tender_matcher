@@ -59,6 +59,7 @@ def _summary(result: DocumentResult) -> CandidateSummary:
         critical_met=result.critical_met,
         critical_failed=result.critical_failed,
         product_heading=result.product_heading,
+        other_product_passages=result.other_product_passages,
         fit_score=result.fit_score,
         decided=result.decided,
     )

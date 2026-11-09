@@ -8,7 +8,8 @@ gives the same results and calls nothing; failures are never cached.
 """
 
 import logging
-from collections.abc import Sequence
+import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 from typing import Protocol
@@ -45,7 +46,7 @@ from app.schemas.enums import MatchStatus
 from app.schemas.matching import Comparison, JudgeVerdict
 from app.schemas.report import CandidateSummary, ItemReport, ManufacturerItemReport
 from app.schemas.requirements import Requirement
-from app.schemas.retrieval import RetrievalOutcome, RetrievalRequest
+from app.schemas.retrieval import RetrievalHit, RetrievalOutcome, RetrievalRequest
 from app.tender.splitter import leaves
 
 logger = logging.getLogger(__name__)
@@ -145,6 +146,20 @@ def _passage(chunk: Chunk, code_only: bool, low_score: bool = False) -> Passage:
     )
 
 
+def _allowed(
+    hits: Sequence[RetrievalHit],
+    found: Mapping[uuid.UUID, Chunk],
+    exclude: frozenset[tuple[int, str]],
+) -> list[RetrievalHit]:
+    """The hits whose chunk is not excluded (another product's), in the order given."""
+    kept = []
+    for hit in hits:
+        chunk = found[hit.chunk_id]
+        if (chunk.page_number, chunk.raw_text) not in exclude:
+            kept.append(hit)
+    return kept
+
+
 @dataclass(frozen=True, slots=True)
 class DbEvidenceFinder:
     """Retrieval over the stored chunks, in one short transaction per requirement."""
@@ -166,7 +181,7 @@ class DbEvidenceFinder:
         Returns:
             The outcome and the passages, best first: the best `max_passages` accepted ones, or,
             when the product's passages all score below the threshold, the best `low_score_hits`
-            marked low_score.
+            marked low_score. Chunks in `request.exclude_passages` are never returned.
 
         Raises:
             ExternalServiceError: If the embedder or reranker fails.
@@ -182,11 +197,13 @@ class DbEvidenceFinder:
                 params=self.params,
             )
             result = retriever.retrieve(request)
-            hits = retriever.evidence_hits(result)[: self.max_passages]
+            found = {c.id: c for c in chunks.list_by_ids([h.chunk_id for h in result.hits])}
+            allowed = _allowed(result.hits, found, request.exclude_passages)
+            accepted = {h.chunk_id for h in retriever.evidence_hits(result)}
+            hits = [h for h in allowed if h.chunk_id in accepted][: self.max_passages]
             low = not hits and result.outcome is RetrievalOutcome.BELOW_THRESHOLD
             if low:
-                hits = result.hits[: self.low_score_hits]
-            found = {c.id: c for c in chunks.list_by_ids([h.chunk_id for h in hits])}
+                hits = allowed[: self.low_score_hits]
             passages = tuple(
                 _passage(found[h.chunk_id], not low and h.rerank_score < self.params.min_score, low)
                 for h in hits
@@ -265,6 +282,7 @@ class JudgeService:
                     text=requirement.raw_text,
                     attribute=requirement.attribute,
                     document_sha256=chosen.sha256,
+                    exclude_passages=chosen.other_product_passages,
                 )
                 comparison = self._judged(entry, requirement, request, chosen, pages, progress)
             comparisons.append(comparison)

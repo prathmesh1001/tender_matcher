@@ -89,6 +89,10 @@ class RetrievalRequest(BaseModel):
     document_sha256: str | None = Field(
         default=None, description="Search only this catalogue; None for all of the manufacturer's."
     )
+    exclude_passages: frozenset[tuple[int, str]] = Field(
+        default_factory=frozenset,
+        description="(page, raw_text) of chunks that may not be returned (another product's).",
+    )
 
 
 class DocumentIndexStatus(BaseModel):

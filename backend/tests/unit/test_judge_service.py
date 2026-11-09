@@ -1,10 +1,12 @@
 """Retrieve -> judge -> verify over one item. The LLM, retrieval and pages are fakes."""
 
+import uuid
 from collections.abc import Sequence
 
 from pydantic import BaseModel
 
 from app.core.exceptions import ExternalServiceError
+from app.db.models import Chunk
 from app.matching.comparator import ComparatorOptions, MatchContext
 from app.matching.engine import ItemInput
 from app.matching.llm_judge import JudgedItems, Passage
@@ -19,9 +21,9 @@ from app.schemas.enums import (
 from app.schemas.matching import Comparison, JudgeStatus, JudgeVerdict, LabelBasis, SubTypeFit
 from app.schemas.report import CandidateSummary, ItemReport, ManufacturerItemReport
 from app.schemas.requirements import LineItem, Requirement, ValueKind
-from app.schemas.retrieval import RetrievalOutcome, RetrievalRequest
+from app.schemas.retrieval import RetrievalHit, RetrievalOutcome, RetrievalRequest
 from app.schemas.sections import EvidenceSource
-from app.services.judge_service import FoundEvidence, JudgeOptions, JudgeService
+from app.services.judge_service import FoundEvidence, JudgeOptions, JudgeService, _allowed
 from tests.conftest import make_test_settings
 
 SHA = "a" * 64
@@ -346,3 +348,28 @@ def test_a_low_score_quote_off_the_page_stays_unsupported() -> None:
     judged = _service(_Llm(), finder).judge_items(inputs, reports, _Pages("Something else"))
     assert _results(judged)[0].status is MatchStatus.UNSUPPORTED
     assert _results(judged)[0].needs_review
+
+
+def test_another_products_chunks_are_kept_from_the_search() -> None:
+    other = frozenset({(26, "Disc: IS 2062 Gr. B")})
+    inputs, reports = _inputs([_requirement()])
+    manufacturer = reports[0].manufacturers[0]
+    chosen = _chosen().model_copy(update={"other_product_passages": other})
+    report = reports[0].model_copy(
+        update={"manufacturers": [manufacturer.model_copy(update={"chosen": chosen})]}
+    )
+    finder = _Finder()
+    _service(_Llm(), finder).judge_items(inputs, [report], _Pages())
+    assert finder.requests[0].exclude_passages == other
+
+
+def test_excluded_hits_are_dropped_before_the_passage_limit() -> None:
+    ids = [uuid.uuid4() for _ in range(3)]
+    texts = ["Disc: CF8M", "Disc: IS 2062 Gr. B", "Seat: EPDM"]
+    found = {i: Chunk(page_number=26, raw_text=t) for i, t in zip(ids, texts, strict=True)}
+    hits = [
+        RetrievalHit(chunk_id=i, document_id=i, page_number=26, rerank_score=0.9, rrf_score=0.1)
+        for i in ids
+    ]
+    kept = _allowed(hits, found, frozenset({(26, "Disc: IS 2062 Gr. B")}))
+    assert [h.chunk_id for h in kept] == [ids[0], ids[2]]

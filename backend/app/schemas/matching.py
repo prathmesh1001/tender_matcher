@@ -126,6 +126,12 @@ class DocumentResult(BaseModel):
         default=None,
         description="The product heading chosen inside the document, if it holds several.",
     )
+    other_product_passages: frozenset[tuple[int, str]] = Field(
+        default_factory=frozenset,
+        exclude=True,
+        description="(page, raw_text) of chunks under another product's heading in the "
+        "document; the LLM judge never reads them (B10). Not part of the report.",
+    )
     comparisons: list[Comparison]
 
 
