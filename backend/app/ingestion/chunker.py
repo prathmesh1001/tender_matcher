@@ -317,6 +317,7 @@ def _row_chunk(
             "continued_from_page": table.continued_from_page,
             **({"stacked_unresolved": True} if row.stacked_unresolved else {}),
             **({"rule_grid": True} if table.from_rules else {}),
+            **({"ocr_confidence": row.ocr_confidence} if row.ocr_confidence is not None else {}),
             **({"cell_lines": row.cell_lines} if row.cell_lines else {}),
             **({"cell_line_ys": row.cell_line_ys} if _ys_fit(row) else {}),
             # A value printed across these columns was re-joined (V5); check the row bbox.

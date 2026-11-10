@@ -181,3 +181,23 @@ def test_real_tesseract_reads_a_scanned_page(scanned_pdf: Path) -> None:
     ).pages[0]
     assert page.ocr is True
     assert "SS316" in page.text
+
+
+def test_lines_keep_their_words_with_boxes() -> None:
+    body = words_to_lines(TESSERACT_DATA)[0]
+    assert [w.text for w in body.words] == ["Body", "SS316"]
+    assert (body.words[1].left, body.words[1].right) == (60, 110)
+    assert body.words[1].confidence == pytest.approx(0.80)
+
+
+def test_engine_adds_the_page_segmentation_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def capture(*args: object, **kwargs: object) -> dict[str, list[object]]:
+        captured.update(kwargs)
+        return TESSERACT_DATA
+
+    monkeypatch.setattr(pytesseract, "image_to_data", capture)
+    engine = TesseractOcrEngine(language="eng", tessdata_dir=Path("C:/tessdata"))
+    engine.recognize(_png(), page_segmentation=4)
+    assert captured["config"] == "--tessdata-dir C:/tessdata --psm 4"

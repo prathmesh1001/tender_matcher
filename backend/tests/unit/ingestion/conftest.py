@@ -57,7 +57,7 @@ class FakeOcrEngine:
         self.lines = lines
         self.calls: list[bytes] = []
 
-    def recognize(self, image_png: bytes) -> OcrResult:
+    def recognize(self, image_png: bytes, page_segmentation: int | None = None) -> OcrResult:
         self.calls.append(image_png)
         return OcrResult(lines=self.lines)
 

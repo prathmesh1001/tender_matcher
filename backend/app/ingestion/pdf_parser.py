@@ -14,7 +14,7 @@ import pymupdf
 from app.core.config import Settings
 from app.core.exceptions import DocumentParseError
 from app.ingestion.glyph_repair import RepairOptions, page_repair, repair_text
-from app.ingestion.ocr import OcrEngine, OcrResult
+from app.ingestion.ocr import OcrEngine, OcrLine, OcrResult, OcrWord
 from app.schemas.parsing import BBox, ParsedDocument, ParsedPage, TextBlock, count_text_chars
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ class ParserOptions:
     ocr_min_image_coverage: float
     ocr_dpi: int
     glyphs: RepairOptions | None = None  # repair shifted fonts; None = off
+    ocr_page_segmentation: int | None = None  # Tesseract --psm; None = engine default
 
     @classmethod
     def from_settings(cls, settings: Settings) -> ParserOptions:
@@ -143,19 +144,35 @@ def ocr_lines_to_blocks(result: OcrResult, dpi: int) -> list[TextBlock]:
         One block per OCR line, with its confidence.
     """
     scale = PDF_POINTS_PER_INCH / dpi
-    return [
-        TextBlock(
-            text=line.text,
-            bbox=BBox(
-                x0=line.left * scale,
-                y0=line.top * scale,
-                x1=line.right * scale,
-                y1=line.bottom * scale,
-            ),
-            confidence=line.confidence,
-        )
-        for line in result.lines
-    ]
+    return [_scaled_block(line, scale) for line in result.lines]
+
+
+def ocr_words_to_blocks(result: OcrResult, dpi: int) -> list[TextBlock]:
+    """Convert every OCR word (image pixels at `dpi`) into a text block in PDF points.
+
+    Args:
+        result: OCR output for the page image.
+        dpi: Resolution the page was rendered at.
+
+    Returns:
+        One block per word, with its confidence, in the engine's reading order.
+    """
+    scale = PDF_POINTS_PER_INCH / dpi
+    return [_scaled_block(word, scale) for line in result.lines for word in line.words]
+
+
+def _scaled_block(box: OcrLine | OcrWord, scale: float) -> TextBlock:
+    """A line or word box in image pixels as a text block in PDF points."""
+    return TextBlock(
+        text=box.text,
+        bbox=BBox(
+            x0=box.left * scale,
+            y0=box.top * scale,
+            x1=box.right * scale,
+            y1=box.bottom * scale,
+        ),
+        confidence=box.confidence,
+    )
 
 
 def _native_page(page: pymupdf.Page, blocks: list[TextBlock], *, needs_ocr: bool) -> ParsedPage:
@@ -171,10 +188,12 @@ def _native_page(page: pymupdf.Page, blocks: list[TextBlock], *, needs_ocr: bool
     )
 
 
-def _ocr_page(page: pymupdf.Page, engine: OcrEngine, dpi: int) -> ParsedPage:
+def _ocr_page(
+    page: pymupdf.Page, engine: OcrEngine, dpi: int, page_segmentation: int | None = None
+) -> ParsedPage:
     """Render a page and build it from OCR output."""
     image_png = page.get_pixmap(dpi=dpi).tobytes("png")
-    result = engine.recognize(image_png)
+    result = engine.recognize(image_png, page_segmentation)
     return ParsedPage(
         page_number=page.number + 1,
         text=result.text,
@@ -183,6 +202,7 @@ def _ocr_page(page: pymupdf.Page, engine: OcrEngine, dpi: int) -> ParsedPage:
         height=page.rect.height,
         ocr=True,
         ocr_confidence=result.mean_confidence,
+        ocr_words=ocr_words_to_blocks(result, dpi),
     )
 
 
@@ -209,7 +229,7 @@ def parse_page(page: pymupdf.Page, options: ParserOptions, engine: OcrEngine | N
     if engine is None:
         logger.warning("Page %d looks scanned but OCR is disabled", page.number + 1)
         return _native_page(page, blocks, needs_ocr=True)
-    return _ocr_page(page, engine, options.ocr_dpi)
+    return _ocr_page(page, engine, options.ocr_dpi, options.ocr_page_segmentation)
 
 
 def parse_pdf(path: Path, options: ParserOptions, engine: OcrEngine | None) -> ParsedDocument:

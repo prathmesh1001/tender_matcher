@@ -663,6 +663,74 @@ class Settings(BaseSettings):
         default=None,
         description="Folder with *.traineddata files, if not Tesseract's built-in tessdata.",
     )
+    # Scanned tender tables (CLAUDE.md C5): rows rebuilt from OCR word boxes.
+    OCR_TENDER_PAGE_SEGMENTATION: int | None = Field(
+        default=4,
+        ge=0,
+        le=13,
+        description="Tesseract --psm for scanned tender pages; 4 reads a table row by row "
+        "(the default 3 skipped value cells on 8169451). None = Tesseract's default.",
+    )
+    OCR_TABLE_CELL_GAP_FACTOR: float = Field(
+        default=2.5,
+        gt=0,
+        description="A gap between words wider than this many median word heights splits cells.",
+    )
+    OCR_TABLE_MAX_ROW_HEIGHT_FACTOR: float = Field(
+        default=2.0,
+        gt=1,
+        description="A row band never grows taller than this many median word heights; a word "
+        "taller than that spans several rows (merged serial numbers) and is dropped as noise.",
+    )
+    OCR_TABLE_MIN_ROWS: int = Field(
+        default=3, ge=2, description="Fewest rows with two or more cells that make a table."
+    )
+    OCR_TABLE_SERIAL_MAX_CHARS: int = Field(
+        default=3,
+        ge=1,
+        description="A cell with at most this many letters/digits is short (a serial number).",
+    )
+    OCR_TABLE_PROSE_WIDTH_FRACTION: float = Field(
+        default=0.6,
+        gt=0,
+        le=1,
+        description="A one-cell line wider than this fraction of the page's text ends a table.",
+    )
+    OCR_TABLE_MAX_WIDE_SHARE: float = Field(
+        default=0.25,
+        ge=0,
+        le=1,
+        description="A scanned table is rebuilt as label | value only if at most this share of "
+        "its lines has three or more cells; wider tables keep the OCR reading.",
+    )
+    OCR_TABLE_MIN_LABELLED_SHARE: float = Field(
+        default=0.6,
+        ge=0,
+        le=1,
+        description="A scanned table is rebuilt only if at least this share of its rows has a "
+        "label (a size or quantity list leaves most rows without one).",
+    )
+    OCR_ROW_MIN_CONFIDENCE: float = Field(
+        default=0.6,
+        ge=0,
+        le=1,
+        description="A scanned table row read with a lower mean word confidence is flagged.",
+    )
+    OCR_CODE_CONFUSIONS: dict[str, str] = Field(
+        default_factory=lambda: {
+            "5": "s",
+            "s": "5",
+            "0": "o",
+            "o": "0",
+            "1": "li",
+            "l": "1",
+            "i": "1",
+            "8": "b",
+            "b": "8",
+        },
+        description="Characters OCR confuses: a token is repaired only when one of these "
+        "variants is exactly an ontology code (55304 -> SS304, CLAUDE.md A7).",
+    )
 
     @model_validator(mode="after")
     def _chunk_sizes_are_consistent(self) -> Settings:

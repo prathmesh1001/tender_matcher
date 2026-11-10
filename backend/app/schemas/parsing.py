@@ -41,6 +41,10 @@ class ParsedPage(BaseModel):
         default=False, description="Page looks scanned but no OCR engine was available."
     )
     ocr_confidence: float | None = Field(default=None, ge=0, le=1)
+    ocr_words: list[TextBlock] = Field(
+        default_factory=list,
+        description="OCR pages only: every word with its box, to rebuild scanned tables.",
+    )
 
     @property
     def char_count(self) -> int:

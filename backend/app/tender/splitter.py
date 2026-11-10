@@ -38,6 +38,8 @@ SIZE_LABEL: Final = "SIZE"
 DEFAULT_INLINE_KEY_MAX_WORDS: Final = 3
 RATING_LABEL: Final = "CLASS"
 _LABEL_LINE: Final = re.compile(r"^(?P<label>[^:]+?)\s*:\s*(?P<value>.*)$")
+# The value's first colon sits inside a code ("IS:318"): letter, colon, digit, no spaces.
+_CODE_COLON: Final = re.compile(r"^[^:]*[A-Za-z]:\d")
 # Parts of a list: split on commas that are not inside a number ("1,000").
 _PART_SPLIT: Final = re.compile(r",\s*(?!\d{3}\b)")
 # "Body- CI" (dash against the key) or "Body - CI" (spaced); "Butt-weld" has no space after it.
@@ -86,8 +88,11 @@ def inline_key(label: str, value: str, max_words: int) -> tuple[str, str]:
 
     Returns:
         The inner key and its value, or the line's own if the value has no key. A key with a
-        digit is not one ("EN 1561 NOMINAL SIZE: 50 MM"), nor is a web address.
+        digit is not one ("EN 1561 NOMINAL SIZE: 50 MM"), nor is a web address, nor a code
+        whose colon joins a letter and a digit with no space ("BRONZE IS:318").
     """
+    if _CODE_COLON.match(value):
+        return label, value
     inner = label_of(value, max_words)
     if inner is None or any(ch.isdigit() for ch in inner[0]) or inner[1].startswith("/"):
         return label, value

@@ -66,7 +66,21 @@ both rows partial and would let a gate valve item take a full match from p9 only
 caption. Known limits: a catalogue-wide ordering page counts as partial only; a figure caption
 naming one product can be read as a product heading.
 
-The sections below are the output of that run.
+Step 7, scanned tender tables rebuilt from OCR word boxes (`ingestion/ocr_table.py`: row bands,
+label | value split, serial numbers dropped, only two-column tables with labelled rows; Tesseract
+--psm 4 on tender pages; ontology codes repaired from OCR confusions, 55304 -> SS304; requirements
+from low-confidence scans flagged for review). Rules only, committed by the user's decision with
+the gold left as it is: coverage 54% (50/93), decided accuracy 76% (38/50), stronger 3,
+citations 63% (24/38), 6 rows "other catalogue". The other four gold tenders are unchanged row
+for row. All the change is 8169451, whose scan now gives 32 item requirements instead of 20
+(pump speed, size, seal, motor, spares now reach the item), so its gold ids point at other rows.
+By hand on the new ids: casing, impeller bronze and shaft agree (partial); "Liquid to be handle"
+is still not decided; gold row 1.1 (description with the flow merged in) is now two rows.
+Open: "impeller : Type -enclosed" now gives Kirloskar missing_capability where gold says
+unsupported (one stronger row once re-keyed). 8011173 (no gold) goes from 38 to 61 clean item
+requirements. The eval diffs below are not regenerated for this step.
+
+The sections below are the output of the step 6 run.
 
 | Run | Labelled | Other catalogue | Coverage | Decided accuracy | Stronger | Citations |
 |---|---|---|---|---|---|---|

@@ -20,6 +20,7 @@ from app.ingestion.docx_reader import docx_page, read_docx_items
 from app.ingestion.glyph_repair import RepairOptions
 from app.ingestion.layout import LayoutOptions
 from app.ingestion.ocr import OcrEngine
+from app.ingestion.ocr_table import OcrTableOptions, ocr_tables
 from app.ingestion.pdf_parser import ParserOptions, open_pdf, parse_pdf
 from app.ingestion.product_tagger import (
     Declared,
@@ -62,6 +63,11 @@ class ProcessingOptions:
     key_value_tables: bool = False
     # Rebuild tables from drawn rules where PyMuPDF finds none (tender files only, see for_tender).
     rule_grid_tables: bool = False
+    ocr_table: OcrTableOptions | None = None
+    # Rebuild tables on scanned pages from OCR word boxes (tender files only, see for_tender).
+    ocr_tables: bool = False
+    # Tesseract --psm for scanned tender pages (row by row reading keeps table cells).
+    tender_page_segmentation: int | None = None
 
     @classmethod
     def from_settings(
@@ -95,6 +101,8 @@ class ProcessingOptions:
                 load_section_rules(settings.SECTION_CATEGORIES_FILE), vocabulary
             ),
             ocr_engine=ocr_engine,
+            ocr_table=OcrTableOptions.from_settings(settings, vocabulary.code_rules),
+            tender_page_segmentation=settings.OCR_TENDER_PAGE_SEGMENTATION,
         )
 
     def for_tender(self) -> ProcessingOptions:
@@ -111,6 +119,8 @@ class ProcessingOptions:
             self,
             key_value_tables=True,
             rule_grid_tables=True,
+            ocr_tables=self.ocr_table is not None,
+            parser=replace(self.parser, ocr_page_segmentation=self.tender_page_segmentation),
             chunker=replace(self.chunker, variant_header_keywords=()),
             table_cleanup=replace(self.table_cleanup, max_label_words=0),
         )
@@ -217,6 +227,22 @@ def extract_tables(
     return merge_continued_tables(found, heights, edge)
 
 
+def scanned_tables(
+    pages: Sequence[ParsedPage], options: OcrTableOptions
+) -> dict[int, list[ExtractedTable]]:
+    """Tables rebuilt from OCR words on every scanned page (CLAUDE.md C5).
+
+    Args:
+        pages: Parsed pages; only OCR pages with words are read.
+        options: Thresholds and code rules.
+
+    Returns:
+        Tables keyed by 1-based page number, only for pages that have some.
+    """
+    found = {p.page_number: ocr_tables(p.ocr_words, p.page_number, options) for p in pages if p.ocr}
+    return {page: tables for page, tables in found.items() if tables}
+
+
 def process_pdf(path: Path, options: ProcessingOptions) -> ProcessedDocument:
     """Parse, extract tables, and chunk a PDF.
 
@@ -239,6 +265,8 @@ def process_pdf(path: Path, options: ProcessingOptions) -> ProcessedDocument:
         options.table_cleanup,
         options.layout if options.rule_grid_tables else None,
     )
+    if options.ocr_tables and options.ocr_table is not None:
+        tables = {**tables, **scanned_tables(parsed.pages, options.ocr_table)}
     chunks = chunk_document(cleaned, tables, options.chunker)
     pages = [
         ProcessedPage(

@@ -58,6 +58,7 @@ from app.schemas.sections import EvidenceSource
 from app.storage.file_store import FileStore, build_file_store
 from app.tender.items import ItemSource, TenderFile, TenderRequirements, parse_tender_files
 from app.tender.link_fetcher import MANIFEST_FILENAME, read_manifest
+from app.tender.ocr_flags import LowRow, flag_low_ocr, low_confidence_rows
 from app.tender.pipeline import ItemRequirements, RequirementOptions, ontology_for
 from app.tender.quality import ItemFacts, extraction_quality, low_confidence_pages
 from app.tender.splitter import leaves
@@ -143,14 +144,22 @@ class MatchService:
         ontologies = self._ontologies if use_ontology else []
         files: list[TenderFile] = []
         low_ocr: set[tuple[str, int]] = set()
-        min_confidence = self._requirement_options.quality.ocr_min_confidence
+        low_rows: set[LowRow] = set()
+        quality = self._requirement_options.quality
         for entry in manifest.stored_files():
             path = tender_dir / (entry.file or "")
             if is_supported(path) and path.is_file():
                 processed = process_file(path, self._tender_options)
                 files.append(TenderFile(path.name, entry.role, processed.chunks))
-                low_ocr |= low_confidence_pages(path.name, processed.pages, min_confidence)
-        found = parse_tender_files(files, self._requirement_options, ontologies)
+                low_ocr |= low_confidence_pages(
+                    path.name, processed.pages, quality.ocr_min_confidence
+                )
+                low_rows |= low_confidence_rows(
+                    path.name, processed.chunks, quality.ocr_row_min_confidence
+                )
+        found = flag_low_ocr(
+            parse_tender_files(files, self._requirement_options, ontologies), low_ocr, low_rows
+        )
         return ParsedTender(
             bid_number=manifest.bid_number,
             files=[f.name for f in files],

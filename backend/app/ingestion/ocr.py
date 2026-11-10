@@ -18,6 +18,19 @@ from app.core.exceptions import ExternalServiceError
 _TESSERACT_CONF_MAX: Final = 100.0
 
 
+class OcrWord(BaseModel):
+    """One recognized word with its box in image pixels."""
+
+    model_config = ConfigDict(frozen=True)
+
+    text: str
+    left: float
+    top: float
+    right: float
+    bottom: float
+    confidence: float = Field(ge=0, le=1)
+
+
 class OcrLine(BaseModel):
     """One recognized line of text with its box in image pixels."""
 
@@ -29,6 +42,9 @@ class OcrLine(BaseModel):
     right: float
     bottom: float
     confidence: float = Field(ge=0, le=1)
+    words: list[OcrWord] = Field(
+        default_factory=list, description="The line's words, so table cells can be rebuilt."
+    )
 
 
 class OcrResult(BaseModel):
@@ -54,11 +70,12 @@ class OcrResult(BaseModel):
 class OcrEngine(Protocol):
     """Anything that turns a page image into text lines."""
 
-    def recognize(self, image_png: bytes) -> OcrResult:
+    def recognize(self, image_png: bytes, page_segmentation: int | None = None) -> OcrResult:
         """Recognize text in a PNG image.
 
         Args:
             image_png: The rendered page as PNG bytes.
+            page_segmentation: Tesseract page segmentation mode, or None for the engine default.
 
         Returns:
             Lines with pixel boxes and confidences.
@@ -100,13 +117,25 @@ def _merge_words(data: Mapping[str, Sequence[object]], idx: list[int]) -> OcrLin
     def num(field: str, i: int) -> float:
         return float(str(data[field][i]))
 
+    words = [
+        OcrWord(
+            text=str(data["text"][i]).strip(),
+            left=num("left", i),
+            top=num("top", i),
+            right=num("left", i) + num("width", i),
+            bottom=num("top", i) + num("height", i),
+            confidence=min(num("conf", i) / _TESSERACT_CONF_MAX, 1.0),
+        )
+        for i in idx
+    ]
     return OcrLine(
-        text=" ".join(str(data["text"][i]).strip() for i in idx),
-        left=min(num("left", i) for i in idx),
-        top=min(num("top", i) for i in idx),
-        right=max(num("left", i) + num("width", i) for i in idx),
-        bottom=max(num("top", i) + num("height", i) for i in idx),
-        confidence=sum(num("conf", i) for i in idx) / len(idx) / _TESSERACT_CONF_MAX,
+        text=" ".join(w.text for w in words),
+        left=min(w.left for w in words),
+        top=min(w.top for w in words),
+        right=max(w.right for w in words),
+        bottom=max(w.bottom for w in words),
+        confidence=sum(w.confidence for w in words) / len(words),
+        words=words,
     )
 
 
@@ -127,11 +156,12 @@ class TesseractOcrEngine:
         if tesseract_cmd:
             pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
 
-    def recognize(self, image_png: bytes) -> OcrResult:
+    def recognize(self, image_png: bytes, page_segmentation: int | None = None) -> OcrResult:
         """Recognize text in a PNG image with Tesseract.
 
         Args:
             image_png: The rendered page as PNG bytes.
+            page_segmentation: Tesseract `--psm` mode, or None for Tesseract's default.
 
         Returns:
             Recognized lines.
@@ -144,7 +174,7 @@ class TesseractOcrEngine:
                 data = pytesseract.image_to_data(
                     image,
                     lang=self._language,
-                    config=self._config,
+                    config=_with_psm(self._config, page_segmentation),
                     output_type=pytesseract.Output.DICT,
                 )
         except pytesseract.TesseractNotFoundError as exc:
@@ -154,6 +184,13 @@ class TesseractOcrEngine:
         except (pytesseract.TesseractError, OSError) as exc:
             raise ExternalServiceError(f"Tesseract failed: {exc}") from exc
         return OcrResult(lines=words_to_lines(data))
+
+
+def _with_psm(config: str, page_segmentation: int | None) -> str:
+    """Tesseract config with a `--psm` option added when a mode is given."""
+    if page_segmentation is None:
+        return config
+    return f"{config} --psm {page_segmentation}".strip()
 
 
 def build_ocr_engine(settings: Settings) -> OcrEngine | None:

@@ -41,6 +41,7 @@ class QualityRules:
     title_only_share: float
     ocr_min_confidence: float
     low_ocr_share: float
+    ocr_row_min_confidence: float = 0.0
 
     @classmethod
     def from_settings(cls, settings: Settings) -> QualityRules:
@@ -57,6 +58,7 @@ class QualityRules:
             title_only_share=settings.EXTRACTION_TITLE_ONLY_SHARE,
             ocr_min_confidence=settings.EXTRACTION_OCR_MIN_CONFIDENCE,
             low_ocr_share=settings.EXTRACTION_LOW_OCR_SHARE,
+            ocr_row_min_confidence=settings.OCR_ROW_MIN_CONFIDENCE,
         )
 
 

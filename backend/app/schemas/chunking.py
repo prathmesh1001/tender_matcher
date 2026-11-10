@@ -37,6 +37,12 @@ class TableRow(BaseModel):
         default=(),
         description="Columns holding one value that was printed across them and re-joined.",
     )
+    ocr_confidence: float | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description="Rebuilt from OCR words: their mean confidence. None for vector tables.",
+    )
 
 
 class ExtractedTable(BaseModel):

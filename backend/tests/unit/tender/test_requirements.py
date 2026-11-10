@@ -542,6 +542,12 @@ def test_temperature_part_of_a_list_is_labelled(ontology: Ontology) -> None:
         ),
         ("BODY: EN 1561 NOMINAL SIZE: 50 MM", "BODY", "EN 1561 NOMINAL SIZE: 50 MM"),
         ("website: https://example.invalid", "website", "https://example.invalid"),
+        # A code's colon (scanned 8169451): the value stays whole.
+        (
+            "impeller : BRONZE IS:318 GR-LTB2 (110), Type -enclosed",
+            "impeller",
+            "BRONZE IS:318 GR-LTB2 (110), Type -enclosed",
+        ),
     ],
 )
 def test_inline_keys(line: str, label: str, value: str) -> None:
