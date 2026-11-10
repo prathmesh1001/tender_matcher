@@ -9,7 +9,7 @@ from pydantic import BaseModel, SecretStr
 
 from app.core.config import Settings
 from app.core.exceptions import ExternalServiceError, InvalidInputError
-from app.llm.factory import build_llm_client
+from app.llm.factory import build_llm_client, llm_configured
 from app.llm.providers.gemini import GeminiClient, gemini_schema, token_usage
 
 KEY = "secret-test-key"
@@ -202,3 +202,11 @@ def test_factory_passes_the_callers_thinking_level(settings: Settings) -> None:
     default = build_llm_client(configured)
     assert isinstance(default, GeminiClient)
     assert default.thinking_level is None
+
+
+def test_an_empty_key_is_not_configured(settings: Settings) -> None:
+    assert not llm_configured(settings.model_copy(update={"GEMINI_API_KEY": None}))
+    assert not llm_configured(settings.model_copy(update={"GEMINI_API_KEY": SecretStr(" ")}))
+    assert llm_configured(settings.model_copy(update={"GEMINI_API_KEY": SecretStr(KEY)}))
+    with pytest.raises(InvalidInputError, match="GEMINI_API_KEY"):
+        build_llm_client(settings.model_copy(update={"GEMINI_API_KEY": SecretStr("")}))

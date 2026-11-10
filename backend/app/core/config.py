@@ -441,8 +441,9 @@ class Settings(BaseSettings):
         default=0.75, ge=0, le=1, description="Decided results below this confidence need review."
     )
     LLM_JUDGE_ENABLED: bool = Field(
-        default=False,
-        description="API runs send free-text requirements to the LLM judge (the CLI: --judge).",
+        default=True,
+        description="API runs send free-text requirements to the LLM judge (the CLI: --judge); "
+        "without an LLM API key runs are rules only, with a warning.",
     )
     LLM_JUDGE_MAX_CALLS: int = Field(
         default=35,

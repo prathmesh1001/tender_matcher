@@ -8,6 +8,21 @@ from app.llm.base import LLMClient
 from app.llm.providers.gemini import GeminiClient
 
 
+def llm_configured(settings: Settings) -> bool:
+    """True if the configured provider has its API key (an empty value counts as missing).
+
+    Args:
+        settings: Application settings.
+
+    Returns:
+        Whether `build_llm_client` can build a client.
+    """
+    match settings.LLM_PROVIDER:
+        case LLMProvider.GEMINI:
+            key = settings.GEMINI_API_KEY
+            return key is not None and bool(key.get_secret_value().strip())
+
+
 def build_llm_client(settings: Settings, thinking_level: str | None = None) -> LLMClient:
     """Build the LLM client from settings.
 
@@ -23,7 +38,7 @@ def build_llm_client(settings: Settings, thinking_level: str | None = None) -> L
     """
     match settings.LLM_PROVIDER:
         case LLMProvider.GEMINI:
-            if settings.GEMINI_API_KEY is None:
+            if settings.GEMINI_API_KEY is None or not llm_configured(settings):
                 raise InvalidInputError("GEMINI_API_KEY is not set (see .env.example)")
             return GeminiClient(
                 http=httpx.Client(timeout=settings.LLM_TIMEOUT_SECONDS),

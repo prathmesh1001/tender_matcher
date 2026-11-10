@@ -20,11 +20,12 @@ from app.core.logging import log_context
 from app.db.models import Run, Tender
 from app.db.repositories import RunRepository, TenderRepository
 from app.db.session import session_scope
+from app.llm.factory import llm_configured
 from app.schemas.enums import RunStatus
 from app.schemas.report import TenderReport
 from app.schemas.runs import RunResponse, StartRunRequest
 from app.services.ingestion_service import build_ingestion_service
-from app.services.judge_service import build_judge_service
+from app.services.judge_service import JudgeService, build_judge_service
 from app.services.manufacturer_service import ManufacturerService, build_manufacturer_service
 from app.services.match_service import build_match_service
 from app.services.report_service import build_report_service
@@ -238,6 +239,32 @@ def _warm(warm_up: Callable[[], int]) -> None:
         logger.warning("catalogue warm-up failed", extra={"error": str(exc)})
 
 
+def judge_or_none(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> JudgeService | None:
+    """The LLM judge for API runs, or None for rules only.
+
+    The judge is on by default; without an LLM API key runs are rules only and say so in the
+    log, instead of failing.
+
+    Args:
+        settings: Application settings.
+        session_factory: Opens the transactions retrieval reads in.
+
+    Returns:
+        The judge, or None when it is off or not configured.
+    """
+    if not settings.LLM_JUDGE_ENABLED:
+        return None
+    if not llm_configured(settings):
+        logger.warning(
+            "LLM judge is enabled but no API key is set: runs are rules only",
+            extra={"provider": str(settings.LLM_PROVIDER)},
+        )
+        return None
+    return build_judge_service(settings, session_factory)
+
+
 def build_run_service(
     settings: Settings, session_factory: sessionmaker[Session], queue: JobQueue
 ) -> RunService:
@@ -252,14 +279,7 @@ def build_run_service(
         A ready service.
     """
     matcher = cache(
-        lambda: build_match_service(
-            settings,
-            judge=(
-                build_judge_service(settings, session_factory)
-                if settings.LLM_JUDGE_ENABLED
-                else None
-            ),
-        )
+        lambda: build_match_service(settings, judge=judge_or_none(settings, session_factory))
     )
     ingestion = cache(lambda: build_ingestion_service(settings))
 

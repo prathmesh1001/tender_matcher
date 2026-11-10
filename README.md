@@ -77,7 +77,7 @@ to change:
 |---|---|---|
 | `GEMINI_API_KEY` | none | Needed by the judge and `extract-specs` |
 | `LLM_MODEL` | `gemini-3.8-flash` | Model id at the provider |
-| `LLM_JUDGE_ENABLED` | `false` | API runs send free-text lines to the LLM judge (CLI: `match-tender --judge`) |
+| `LLM_JUDGE_ENABLED` | `true` | API runs send free-text lines to the LLM judge (CLI: `match-tender --judge`). Without `GEMINI_API_KEY` runs are rules only, with a warning in the log; `false` turns the judge off |
 | `LLM_JUDGE_MAX_CALLS` | `35` | Most judge calls per tender; further lines stay `unsupported`. Caps the cost (about Rs 0.10 a call, so under Rs 5 a tender) |
 | `LLM_JUDGE_MAX_PASSAGES` | `5` | Best catalogue passages sent to the judge per requirement |
 | `LLM_JUDGE_THINKING_LEVEL` | `low` | Gemini thinking level of judge calls; `low` adds no billed thinking tokens (empty: model default) |

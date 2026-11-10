@@ -25,7 +25,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Optional: GEMINI_API_KEY and any tuning. `environment` below wins over this file.
+    # Optional: GEMINI_API_KEY (the LLM judge is on by default and needs it; without it runs are
+    # rules only) and any tuning. `environment` below wins over this file.
     env_file:
       - path: ./backend/.env
         required: false

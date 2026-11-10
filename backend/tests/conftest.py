@@ -29,6 +29,7 @@ def make_test_settings() -> Settings:
         LOG_JSON=False,
         DATABASE_URL=get_test_database_url(),  # type: ignore[arg-type]
         CATALOGUE_WARM_ON_STARTUP=False,
+        LLM_JUDGE_ENABLED=False,
     )
 
 
