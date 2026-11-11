@@ -307,9 +307,45 @@ def _table_and_list(
     return found.status, found.needs_review
 
 
-def test_options_list_turns_a_failure_into_partial(valves: Ontology) -> None:
+def test_an_ordering_page_of_the_whole_document_turns_a_failure_into_full(
+    valves: Ontology,
+) -> None:
     option = _ordering(_doc("range", ()), "LCB for ASTM A352 Gr. LCB")
-    assert _table_and_list(valves, "SEAT MOC : LCB", option) == (MatchStatus.PARTIAL_MATCH, True)
+    assert _table_and_list(valves, "SEAT MOC : LCB", option) == (MatchStatus.FULL_MATCH, False)
+
+
+def test_an_options_list_on_another_products_page_gives_partial(valves: Ontology) -> None:
+    doc = _doc("range", (), ("butterfly_valve", "check_valve"))
+    option = _ordering(doc, "LCB for ASTM A352 Gr. LCB")
+    check = CatalogueChunk(
+        doc,
+        ChunkDraft(
+            page_number=9,
+            position=1,
+            chunk_type=ChunkType.PROSE,
+            raw_text="Disc: IS 2062",
+            section="Gamma Dual Plate Check Valve",
+            token_count=1,
+        ),
+    )
+    chunks = [_seat(doc, "ASTM A216 Gr. WCB"), option, check]
+    item = LineItem(
+        item_no="1",
+        title=TITLE,
+        description_lines=["SEAT MOC : LCB"],
+        document="t.pdf",
+        page_number=1,
+    )
+    result = evaluate_item(
+        ItemQuery("Acme", "1", TITLE, "butterfly_valve"),
+        leaves(item_requirements(item, valves, SplitOptions(6, 2))),
+        chunks,
+        MatchContext.for_ontology(valves),
+        OPTIONS,
+        _Pages(chunks),
+    )
+    found = result.documents[0].comparisons[0]
+    assert (found.status, found.needs_review) == (MatchStatus.PARTIAL_MATCH, True)
 
 
 def test_options_list_needs_the_whole_value(valves: Ontology) -> None:
@@ -324,7 +360,7 @@ def test_other_sections_are_not_an_options_list(valves: Ontology) -> None:
     assert status is MatchStatus.MISSING_CAPABILITY
 
 
-def test_an_option_never_gives_more_than_partial_and_a_match_stays(valves: Ontology) -> None:
+def test_a_match_in_the_table_stays(valves: Ontology) -> None:
     option = _ordering(_doc("range", ()), "WCB for ASTM A216 Gr. WCB")
     status, _ = _table_and_list(valves, "SEAT MOC : ASTM A216 Gr. WCB", option)
     assert status is MatchStatus.FULL_MATCH  # the table itself states it

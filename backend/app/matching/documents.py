@@ -52,6 +52,7 @@ class SelectionOptions:
     quote_threshold: float
     min_coverage_pct: float
     overview_min_headings: int = 3
+    page_title_max_words: int = 5
     product_label_words: frozenset[str] = frozenset()
 
     @classmethod
@@ -63,6 +64,7 @@ class SelectionOptions:
             quote_threshold=settings.QUOTE_MATCH_THRESHOLD,
             min_coverage_pct=settings.RANKING_MIN_COVERAGE_PCT,
             overview_min_headings=settings.CATALOGUE_OVERVIEW_MIN_HEADINGS,
+            page_title_max_words=settings.CATALOGUE_PAGE_TITLE_MAX_WORDS,
             product_label_words=frozenset(stem_token(w) for w in settings.PRODUCT_TYPE_LABEL_WORDS),
         )
 
@@ -307,6 +309,21 @@ def _reading_order(
     return [*own, *sorted(rest, key=lambda c: (c.chunk.page_number, c.chunk.position))]
 
 
+def _own_option_pages(
+    groups: ProductGroups | None, product_type: str | None, chosen: str | None
+) -> frozenset[int]:
+    """Pages whose options lists are the item's own product's.
+
+    The pages of the chosen heading (or of the type's only heading), plus the document's shared
+    pages (front matter and ordering pages no product heading owns). Without groups, none.
+    """
+    if groups is None or not product_type:
+        return frozenset()
+    headings = groups.headings_of(product_type)
+    own = [chosen] if chosen is not None else headings if len(headings) == 1 else []
+    return groups.pages_of(own) | groups.shared_pages(product_type)
+
+
 def _identified(
     requirements: Sequence[Requirement],
     raw: Sequence[Comparison],
@@ -357,7 +374,13 @@ def evaluate_document(
     with several headings of the item's product type is read through `_by_heading`.
     """
     groups = (
-        group_by_product(chunks, ctx.ontology, ctx.vocabulary, options.overview_min_headings)
+        group_by_product(
+            chunks,
+            ctx.ontology,
+            ctx.vocabulary,
+            options.overview_min_headings,
+            options.page_title_max_words,
+        )
         if ctx.ontology is not None and ctx.vocabulary is not None and product_type
         else None
     )
@@ -377,8 +400,10 @@ def evaluate_document(
     ordered = _reading_order(chunks, groups, chosen, product_type)
     raw = _identified(requirements, raw, ordered, product_type, ctx, options, groups, chosen)
     offers = option_fields(chunks, options.comparator.fields)
+    own = _own_option_pages(groups, product_type, chosen)
+    owned = [f for f in offers if f.source.chunk.page_number in own]
     softened = [
-        offered_as_option(r, c, offers, ctx, options.comparator)
+        offered_as_option(r, c, offers, ctx, options.comparator, owned)
         for r, c in zip(requirements, raw, strict=True)
     ]
     comparisons = [verify_comparison(c, pages, options.quote_threshold) for c in softened]

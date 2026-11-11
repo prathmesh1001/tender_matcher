@@ -205,8 +205,8 @@ Details, the step by step results and their causes are in the [write-up](docs/wr
 - Only about 100 labelled rows on 5 tenders, so one row moves accuracy by about 2 points.
 - The judge varies by about 1 labelled row between fresh runs; the cache only fixes reruns. It can
   over-infer from free text ("prevents spring failure" read as a spring match).
-- A figure caption can be read as a product heading, and catalogue-wide ordering pages give
-  `partial_match` only.
+- A range title naming several products in a form the ontology misses (L&T API 600 p16) leaves
+  that page under the previous product heading.
 - Spec fact extraction has never run on real catalogues, so `spec_facts` is empty.
 - No Redis queue: jobs run inside the API process, so a restart fails any run in progress.
 - Files are not in Postgres; they stay in the mounted `data/` folder.

@@ -344,6 +344,12 @@ class Settings(BaseSettings):
         ge=2,
         description="A catalogue page naming this many products is an overview of them.",
     )
+    CATALOGUE_PAGE_TITLE_MAX_WORDS: int = Field(
+        default=5,
+        ge=1,
+        description="A page's first line is a product title when its lead (up to a dash, colon "
+        "or bracket) has at most this many words and names one product type.",
+    )
     EXTRACTION_TITLE_FRAGMENT_MAX_WORDS: int = Field(
         default=3,
         ge=1,

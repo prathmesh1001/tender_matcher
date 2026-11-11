@@ -88,6 +88,18 @@ The 8169451 gold was re-keyed to the step 7 ids (1.1 -> 2.1 description + 3.1 fl
 tender alone gives 9 agree, 4 not decided, 1 stronger ("Impeller : Type -enclosed", Kirloskar
 `missing_capability`, label `unsupported`). Totals over all tenders were not recomputed.
 
+Product headings and options lists (2026-11-11, rules only, after the 8169451 re-key): figure
+captions (a section whose text is only the page number) are no product headings; in documents
+declaring several product types a page's title line ("Gate Valves - ASME Classes 150, 300 & 600")
+is one; an option makes a full match from a list under the item's own heading or on a page of the
+whole document. Baseline on the re-keyed gold: coverage 53% (54/101), decided accuracy 76%
+(41/54), stronger 4, citations 66% (27/41). After: 52% (53/101), 79% (42/53), 4, 69% (29/42).
+Only 7956201 changed: "Body & Bonnet MOC : LCB" and "Stem/Hinge pin : SS316" now agree (full from
+the p9 ordering page); "Valve Ends : Flanged." goes from partial (agree) to not decided, because
+it is stated only on the Y-globe pages, a sibling of the chosen globe heading. A first version
+that also read page titles in one-product catalogues split the L&T triple offset range and lost 5
+rows on 8119613 (48% coverage); it was changed before keeping.
+
 The sections below are the output of the step 6 run.
 
 | Run | Labelled | Other catalogue | Coverage | Decided accuracy | Stronger | Citations |

@@ -377,12 +377,16 @@ The flag warns but does not fix anything. Two tenders with garbled scanned lines
 - The judge reads too much into a passage. "Spring" (8017367) became `full_match` from a line
   saying the design "prevents spring failure", which shows a spring exists but not the material
   or type asked. The guardrail re-checks numbers and codes only, not free-text inference.
-- A catalogue-wide ordering page gives `partial_match` only. Options lists that serve every
-  product in a catalogue (L&T API 600 p9) do not belong to the item's product heading, so an
-  option found there never makes a full match (recall plan step 6, skipped).
-- A figure caption can be read as a product heading. "48-inch Class 150 Gate Valve" at the foot
-  of L&T API 600 p8 claims pages 9-16, including the globe valve pages, so evidence under it is
-  given to gate valves. This affects rules and judge alike.
+- Product headings come from section names and, in documents declaring several product types,
+  from a page's title line (fixed 2026-11-11; before, the figure caption "48-inch Class 150 Gate
+  Valve" on L&T API 600 p8 owned pages 9-16, globe pages included). Still wrong: a range title
+  the ontology does not read as naming several products ("ASME B16.34 L&T Gate, Y-Globe & Swing
+  Check Valves", API 600 p16) leaves that page under the previous product. One-product
+  catalogues read no page titles, so their variants are told apart by section names only.
+- Options lists: an option makes a `full_match` only from a list under the item's own product
+  heading or on a page of the whole document (front matter, ordering page); any other list gives
+  `partial_match` + review. A shared ordering page does not say which product an option is for,
+  so in a document whose products differ in options this may claim too much.
 - "Impeller : Type -enclosed" (8169451) gives Kirloskar `missing_capability` where the label says
   `unsupported`: the catalogue does not state an impeller type, so this is a stronger row.
 - Recall: 25 rows labelled `full_match` stayed `unsupported` with the judge before the recall plan;
@@ -437,7 +441,5 @@ The flag warns but does not fix anything. Two tenders with garbled scanned lines
    figures rest on more than about 100 rows on 5 tenders.
 3. Run spec fact extraction on the real catalogues, so `spec_facts` is filled and numeric checks
    use the structured lookup instead of text fields.
-4. Treat figure captions as captions, not product headings, and give catalogue-wide ordering
-   pages to every product of the catalogue.
-5. Use Gemini vision extraction for the flagged tenders and the scanned layouts step 7 does not
+4. Use Gemini vision extraction for the flagged tenders and the scanned layouts step 7 does not
    rebuild (8157758, 8167974, the pump table of 7959356).

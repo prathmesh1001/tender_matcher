@@ -92,7 +92,9 @@ def _evaluate(lines: list[str], chunks: list[CatalogueChunk], ontology: Ontology
 
 def _groups(chunks: list[CatalogueChunk], ontology: Ontology) -> tuple[list[str], int]:
     vocabulary = SearchVocabulary.from_ontologies([ontology])
-    groups = group_by_product(chunks, ontology, vocabulary, OPTIONS.overview_min_headings)
+    groups = group_by_product(
+        chunks, ontology, vocabulary, OPTIONS.overview_min_headings, OPTIONS.page_title_max_words
+    )
     return groups.headings_of("butterfly_valve"), len(groups.unclear)
 
 
@@ -117,6 +119,82 @@ def test_a_heading_holds_until_the_next_one(valves: Ontology) -> None:
 def test_a_flanged_variant_is_the_same_heading(valves: Ontology) -> None:
     chunks = [_row("Body", "WCB", ALPHA, 1), _row("Disc", "CF8M", f"{ALPHA} (Flanged)", 2)]
     assert _groups(chunks, valves) == ([ALPHA], 0)
+
+
+def _text(text: str, section: str | None, page: int, position: int = 0) -> CatalogueChunk:
+    chunk = ChunkDraft(
+        page_number=page,
+        position=position,
+        chunk_type=ChunkType.PROSE,
+        raw_text=text,
+        section=section,
+        token_count=1,
+    )
+    return CatalogueChunk(DOC, chunk)
+
+
+RANGE = replace(DOC, product_types=("butterfly_valve", "check_valve"))
+
+
+def _in_range(chunks: list[CatalogueChunk]) -> list[CatalogueChunk]:
+    """The chunks moved to a document declaring several product types (page titles are read)."""
+    return [CatalogueChunk(RANGE, c.chunk) for c in chunks]
+
+
+def test_a_figure_caption_above_the_page_number_is_no_heading(valves: Ontology) -> None:
+    chunks = [
+        _row("Seat", "EPDM", "Introduction", 1),
+        _text("08", "48-inch Class 150 Butterfly Valve", 1, 1),
+        _row("Trim", "SS 316", "Trim Materials", 2),
+    ]
+    assert _groups(chunks, valves) == ([], 3)
+
+
+def test_a_page_title_line_is_a_product_heading(valves: Ontology) -> None:
+    chunks = [
+        _row("Seat", "EPDM", "Introduction", 1),
+        _text("Alpha Butterfly Valves - ASME Class 150\nStandard materials", "Stem Packing", 2),
+        _row("Body", "WCB", "Stem Packing", 2, 1),
+        _row("Disc", "CF8M", "BUTT-WELD END", 3),
+    ]
+    assert _groups(_in_range(chunks), valves) == (["Alpha Butterfly Valves - ASME Class 150"], 1)
+    assert _groups(chunks, valves) == ([], 4)  # a one-product catalogue reads no page titles
+
+
+def test_a_title_naming_several_products_ends_the_heading(valves: Ontology) -> None:
+    chunks = [
+        _row("Body", "WCB", ALPHA, 1),
+        _text("Butterfly & Check Valves - ASME B16.34\nPressure seal", None, 2),
+    ]
+    assert _groups(_in_range(chunks), valves) == ([ALPHA], 1)
+
+
+def test_a_sentence_opening_a_page_is_no_title(valves: Ontology) -> None:
+    line = "The butterfly valve body is cast in one piece for every size"
+    chunks = [_row("Body", "WCB", "Introduction", 1), _text(line, None, 2)]
+    assert _groups(_in_range(chunks), valves) == ([], 2)
+
+
+def test_a_comma_does_not_end_a_title(valves: Ontology) -> None:
+    line = "Triple-offset Butterfly Valve, an inherently fire-safe valve that provides"
+    chunks = [_row("Body", "WCB", "Introduction", 1), _text(line, None, 2)]
+    assert _groups(_in_range(chunks), valves) == ([], 2)
+
+
+def test_shared_pages_are_those_no_heading_owns_and_naming_no_other_product(
+    valves: Ontology,
+) -> None:
+    chunks = [
+        _text("Ordering Information\nTrim: 8, 12, 16", "Ordering Information", 1),
+        _text("Dual plate check valves for sea water", None, 2),
+        _row("Body", "WCB", ALPHA, 3),
+    ]
+    vocabulary = SearchVocabulary.from_ontologies([valves])
+    groups = group_by_product(
+        chunks, valves, vocabulary, OPTIONS.overview_min_headings, OPTIONS.page_title_max_words
+    )
+    assert groups.shared_pages("butterfly_valve") == frozenset({1})
+    assert groups.shared_pages("check_valve") == frozenset({1, 2})
 
 
 def test_a_page_naming_many_products_is_an_overview(valves: Ontology) -> None:
@@ -266,7 +344,9 @@ def test_another_product_types_heading_is_never_the_items(valves: Ontology) -> N
     check = _row("Disc", "IS 2062 Gr. B", "Gamma Dual Plate Check Valve", 3)
     chunks = [_row("Body", "WCB", ALPHA, 1), check]
     vocabulary = SearchVocabulary.from_ontologies([valves])
-    groups = group_by_product(chunks, valves, vocabulary, OPTIONS.overview_min_headings)
+    groups = group_by_product(
+        chunks, valves, vocabulary, OPTIONS.overview_min_headings, OPTIONS.page_title_max_words
+    )
     assert other_product_passages(groups, "butterfly_valve", None) == _keys([check])
     assert other_product_passages(groups, "check_valve", None) == _keys(chunks[:1])
 

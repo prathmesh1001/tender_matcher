@@ -615,12 +615,14 @@ def offered_as_option(
     fields: Sequence[LocatedField],
     ctx: MatchContext,
     options: ComparatorOptions,
+    owned: Sequence[LocatedField] = (),
 ) -> Comparison:
-    """Soften a failure if the document's options list offers the tender's whole value.
+    """Lift a failure if the document's options list offers the tender's whole value.
 
     A table showing the standard build fails "LCB", yet the same document may offer LCB on order.
-    Positive beats negative only so far: the list does not say which part or model the value is
-    for, so the result is partial + review, never full.
+    An options list of the item's own product (under its heading, or an ordering page of the whole
+    document) makes it full. Any other list does not say which product the value is for: partial
+    + review.
 
     Args:
         requirement: An atomic requirement.
@@ -628,6 +630,7 @@ def offered_as_option(
         fields: The document's options fields (`option_fields`).
         ctx: The item's ontology context (may be empty).
         options: Comparator settings.
+        owned: Those of `fields` on the item's own product's pages.
 
     Returns:
         The comparison, changed only if it was a failure of a code value and a field offers it.
@@ -636,24 +639,33 @@ def offered_as_option(
         return comparison
     if requirement.kind is ValueKind.NUMERIC:
         return comparison
-    reason = "fails in a table, but the document's options list offers it"
-    outcome = _Outcome(MatchStatus.PARTIAL_MATCH, reason)
-    offered = [
-        _evidence(located, located.field.value, outcome)
-        for located in fields
-        if judge_code(requirement, located.field.value, ctx, options).status
-        is MatchStatus.FULL_MATCH
-    ]
-    if not offered:
-        return comparison
-    return comparison.model_copy(
-        update={
-            "status": MatchStatus.PARTIAL_MATCH,
-            "needs_review": True,
-            "reason": reason,
-            "evidence": [*offered[: options.max_evidence], *comparison.evidence],
-        }
-    )
+    for status, among, reason in (
+        (MatchStatus.FULL_MATCH, owned, "the product's own options list offers it"),
+        (
+            MatchStatus.PARTIAL_MATCH,
+            fields,
+            "fails in a table, but the document's options list offers it",
+        ),
+    ):
+        outcome = _Outcome(status, reason)
+        offered = [
+            _evidence(located, located.field.value, outcome)
+            for located in among
+            if judge_code(requirement, located.field.value, ctx, options).status
+            is MatchStatus.FULL_MATCH
+        ]
+        if offered:
+            return comparison.model_copy(
+                update={
+                    "status": status,
+                    "needs_review": comparison.needs_review or status is not MatchStatus.FULL_MATCH,
+                    "reason": reason,
+                    "evidence": offered[: options.max_evidence]
+                    if status is MatchStatus.FULL_MATCH
+                    else [*offered[: options.max_evidence], *comparison.evidence],
+                }
+            )
+    return comparison
 
 
 def _decide(
