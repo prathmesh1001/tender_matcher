@@ -182,17 +182,16 @@ python ../eval/run_eval.py --judge    # also rules + LLM judge; calls Gemini
 that page. A person reviews the `unsupported` and `partial_match` rows. It is not fit for automatic
 bidder ranking.
 
-Against about 100 hand-labelled rows on 5 tenders ([eval/results.md](eval/results.md)), latest
-measured figures after the recall plan. Rules were measured after step 7, the judge after steps 4-5
-(on gold-labelled pairs only); no single final run was made:
+Against 101 hand-labelled rows on 5 tenders ([eval/results.md](eval/results.md)), final run of
+2026-11-11 (judge on gold-labelled pairs only, 43 new Gemini calls):
 
 | Measure | Rules | Rules + judge |
 |---|---|---|
-| Coverage | 54% (50/93) | 62% (61/99) |
-| Decided accuracy | 76% (38/50) | 72% (44/61) |
-| `full_match` precision | 95% (35/37) | 90% (38/42) |
-| Stronger than label | 3 | 5 |
-| Citation accuracy | 63% (24/38) | 68% (30/44) |
+| Coverage | 52% (53/101) | 58% (59/101) |
+| Decided accuracy | 79% (42/53) | 78% (46/59) |
+| `full_match` precision | 95% (37/39) | 93% (40/43) |
+| Stronger than label | 4 | 5 |
+| Citation accuracy | 69% (29/42) | 70% (32/46) |
 
 Details, the step by step results and their causes are in the [write-up](docs/writeup.md).
 
@@ -202,7 +201,7 @@ Details, the step by step results and their causes are in the [write-up](docs/wr
   to review.
 - Scanned pages are partly fixed: two-column scanned tables are rebuilt from OCR word boxes, other
   layouts (8157758, 8167974) keep plain OCR text. 7959356's pump table came out as one merged line.
-- Only about 100 labelled rows on 5 tenders, so one row moves accuracy by about 2 points.
+- Only 101 labelled rows on 5 tenders, so one row moves accuracy by about 2 points.
 - The judge varies by about 1 labelled row between fresh runs; the cache only fixes reruns. It can
   over-infer from free text ("prevents spring failure" read as a spring match).
 - A range title naming several products in a form the ontology misses (L&T API 600 p16) leaves

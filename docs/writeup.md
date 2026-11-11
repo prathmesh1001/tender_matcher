@@ -5,7 +5,7 @@ short. Setup is in the [README](../README.md).
 
 **Verdict.** A first-pass assistant with checked evidence. Every decision cites a page and a quote
 that was found on that page; a `full_match` agrees with the hand label 9 times in 10 (95% rules
-only, 90% with the judge). A person reviews the `unsupported` and `partial_match` rows (about 4 in
+only, 93% with the judge). A person reviews the `unsupported` and `partial_match` rows (about 4 in
 10 labelled rows stay undecided, and a `partial_match` agrees with its label only about a third of
 the time). It is not fit for automatic bidder ranking: 6 of 19 tenders give wrong reports, and the
 ranking rests on low coverage.
@@ -73,12 +73,12 @@ catalogue is chosen, so it cannot change that choice or any rule result. For eac
    catalogue only, with the attribute's ontology synonyms in the query. In a document holding
    several products, passages under another product's heading are left out. With no evidence
    hit, the LLM is not called; at most 5 passages are sent (`LLM_JUDGE_MAX_PASSAGES`).
-2. The model answers in JSON and may cite only the passages it was given.
-3. Its answer is not trusted. Document and page come from the cited passage, the quote must name
+1. The model answers in JSON and may cite only the passages it was given.
+2. Its answer is not trusted. Document and page come from the cited passage, the quote must name
    the attribute and must be found on the page. A `full_match` or `missing_capability` on a
    numeric or code requirement must also be what the comparator reads from the judge's own quote.
    Anything failing stays `unsupported`.
-4. Every LLM decision is marked `needs_review`.
+3. Every LLM decision is marked `needs_review`.
 
 If the API fails or a run's call limit is reached, the remaining lines stay `unsupported` and the
 run finishes.
@@ -184,33 +184,37 @@ not drop and "stronger than label" rose by at most 1. Step by step notes are in
 | 6 | Options lists under the item's own product heading | skipped (see known limits) |
 | 7 | Scanned tender tables rebuilt from OCR word boxes | kept |
 | 8 | Judge on by default when a key is set | kept |
-| 9 | This write-up; no final evaluation run (decision of 2026-11-11, to save calls) | |
+| 9 | This write-up and one final evaluation with the judge (43 new calls) | measured |
 
-Latest measured figures. The two columns were measured at different times: rules after step 7, the
-judge after steps 4-5 (on gold-labelled item x manufacturer pairs only, 92 Gemini calls). No run
-with the judge was made after steps 6-8, so the judge column does not include step 7.
+Final figures: one run of `eval/run_eval.py --judge` on 2026-11-11, on the current code and the
+re-keyed gold (101 labelled rows on 5 tenders). The judge read only gold-labelled item x
+manufacturer pairs and made 43 new Gemini calls (389 answers cached). The step 0 columns are the
+baseline on 99 rows with the old pump ids.
 
-| Measure | Rules, step 0 | Rules, step 7 | Rules + judge, step 0 | Rules + judge, steps 4-5 |
+| Measure | Rules, step 0 | Rules, final | Rules + judge, step 0 | Rules + judge, final |
 |---|---|---|---|---|
-| Coverage | 49% (49/99) | 54% (50/93) | 58% (57/99) | 62% (61/99) |
-| Decided accuracy | 76% (37/49) | 76% (38/50) | 74% (42/57) | 72% (44/61) |
-| `full_match` precision | 94% (32/34) | 95% (35/37) at step 6 | 90% (36/40) | 90% (38/42) |
-| Stronger than label | 3 | 3 | 5 | 5 |
-| Citation accuracy | 65% (24/37) | 63% (24/38) | 60% (25/42) | 68% (30/44) |
+| Coverage | 49% (49/99) | 52% (53/101) | 58% (57/99) | 58% (59/101) |
+| Decided accuracy | 76% (37/49) | 79% (42/53) | 74% (42/57) | 78% (46/59) |
+| `full_match` precision | 94% (32/34) | 95% (37/39) | 90% (36/40) | 93% (40/43) |
+| `partial_match` precision | | 36% (4/11) | | 38% (5/13) |
+| Stronger than label | 3 | 4 | 5 | 5 |
+| Citation accuracy | 65% (24/37) | 69% (29/42) | 60% (25/42) | 70% (32/46) |
 
-- **Rules gained 5 points of coverage at the same accuracy.** Every kept rules step turned
-  `unsupported` rows into agreements, and none produced a new stronger row.
-- **The judge gained coverage but lost accuracy** (74% -> 72%), below the gate. The user accepted
-  it on 2026-11-09 after the judge was limited to the item's own product heading. Of the rows only
-  the judge decides, its errors are 3 cautious (weaker than label: "Operator : Gear/HW", "Ball &
-  Stem : SS A182", pump water at ambient temperature) and 2 stronger ("Flanged Ended", whose
-  label is coarser than the requirement, and "Spring", see known limits).
+- **Rules: more coverage and higher accuracy.** The recall steps and the heading fix of
+  2026-11-11 (figure captions, page titles, shared ordering pages) raised decided accuracy from 76%
+  to 79%. The one new stronger row is the pump's "Impeller : Type -enclosed", which only became
+  comparable once step 7 read the scanned table.
+- **The judge now adds coverage without losing accuracy** (78% against 79% for rules, 74% at step
+  0). It decides 6 rows the rules leave open: 4 agree ("Gasket : Graphite or equivalent", "DUAL
+  PLATE CHECK VALVE", "TORQUE SEATED", "Valve Size : 450MM"), 1 is weaker ("Ball & Stem : SS
+  (ASTM A 182 or equivalent)": the catalogue names other stainless grades) and 1 stronger
+  ("Spring", see known limits). The pump tender's 33 new questions all came back "no evidence".
 - **Step 7 moved the pump tender's ids.** 8169451's scan now gives 32 item requirements instead of
-  20, so the step 7 rules run counted 6 of its labelled rows as another catalogue (hence 93 rows,
-  not 99). The gold was re-keyed on 2026-11-11 (14 rows now: the old description row with the flow
-  merged in is two rows). On a rules-only run of that tender alone: 9 agree, 4 not decided, 1
-  stronger ("Impeller type enclosed": Kirloskar `missing_capability`, label `unsupported`). The
-  totals above were not recomputed after the re-key.
+  20; the gold was re-keyed (14 rows: the old description row with the flow merged in is two
+  rows). It gives 9 agree, 4 not decided, 1 stronger, with or without the judge.
+- **A first judge run failed quietly.** 12 Gemini calls failed (3 in a row stop the judge for a
+  tender), and the judge column fell to 53% coverage. The run was discarded and repeated; the
+  report counts failed calls, but the evaluation summary does not show them.
 
 ### One tender, rules against rules + judge
 
@@ -371,9 +375,6 @@ The flag warns but does not fix anything. Two tenders with garbled scanned lines
 
 - Only about 100 labelled rows on 5 tenders (1 pump). One row moves decided accuracy by about 2
   points, so the figures are not firm.
-- The final figures are not one run. Rules were last measured after step 7, the judge after steps
-  4-5, and neither after the 8169451 gold re-key. A full `run_eval.py --judge` would need new
-  Gemini calls and was not run (decision of 2026-11-11).
 - The judge reads too much into a passage. "Spring" (8017367) became `full_match` from a line
   saying the design "prevents spring failure", which shows a spring exists but not the material
   or type asked. The guardrail re-checks numbers and codes only, not free-text inference.
@@ -435,11 +436,9 @@ The flag warns but does not fix anything. Two tenders with garbled scanned lines
 
 ## What to do next
 
-1. Run `eval/run_eval.py --judge` once on the current code and re-keyed gold, so rules and judge
-   figures come from one run (recount the new Gemini calls first).
-2. Label more tenders, especially pumps (8169451's speed, size, seal and motor rows first), so the
+1. Label more tenders, especially pumps (8169451's speed, size, seal and motor rows first), so the
    figures rest on more than about 100 rows on 5 tenders.
-3. Run spec fact extraction on the real catalogues, so `spec_facts` is filled and numeric checks
+2. Run spec fact extraction on the real catalogues, so `spec_facts` is filled and numeric checks
    use the structured lookup instead of text fields.
-4. Use Gemini vision extraction for the flagged tenders and the scanned layouts step 7 does not
+3. Use Gemini vision extraction for the flagged tenders and the scanned layouts step 7 does not
    rebuild (8157758, 8167974, the pump table of 7959356).

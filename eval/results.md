@@ -100,49 +100,57 @@ it is stated only on the Y-globe pages, a sibling of the chosen globe heading. A
 that also read page titles in one-product catalogues split the L&T triple offset range and lost 5
 rows on 8119613 (48% coverage); it was changed before keeping.
 
-The sections below are the output of the step 6 run.
+Final evaluation (2026-11-11, current code, re-keyed gold, judge on gold-labelled pairs only,
+43 new Gemini calls, cache 346 -> 389; a first attempt lost 12 calls to Gemini errors and was
+discarded): rules 52% (53/101) / 79% (42/53) / 4 stronger / citations 69% (29/42), full_match
+precision 95% (37/39); rules + judge 58% (59/101) / 78% (46/59) / 5 stronger / 70% (32/46),
+full_match precision 93% (40/43). The judge decides 6 rows the rules leave open: 4 agree
+(Gasket graphite, dual plate check valve, torque seated, valve size 450 mm), 1 weaker (Ball &
+Stem A 182), 1 stronger (Spring). All 33 new pump calls answered no evidence.
+
+The sections below are the output of that final run.
 
 | Run | Labelled | Other catalogue | Coverage | Decided accuracy | Stronger | Citations |
 |---|---|---|---|---|---|---|
-| rules | 99 | 0 | 54% (53/99) | 77% (41/53) | 3 | 66% (27/41) |
-| rules + judge | 99 | 0 | 62% (61/99) | 72% (44/61) | 5 | 68% (30/44) |
+| rules | 101 | 0 | 52% (53/101) | 79% (42/53) | 4 | 69% (29/42) |
+| rules + judge | 101 | 0 | 58% (59/101) | 78% (46/59) | 5 | 70% (32/46) |
 
 ## rules
 
 | Status | Labelled | Run gave | Correct | Precision | Recall |
 |---|---|---|---|---|---|
-| full_match | 64 | 37 | 35 | 95% | 55% |
-| partial_match | 17 | 14 | 5 | 36% | 29% |
-| missing_capability | 4 | 2 | 1 | 50% | 25% |
-| unsupported | 14 | 46 | 13 | 28% | 93% |
+| full_match | 64 | 39 | 37 | 95% | 58% |
+| partial_match | 18 | 11 | 4 | 36% | 22% |
+| missing_capability | 4 | 3 | 1 | 33% | 25% |
+| unsupported | 15 | 48 | 13 | 27% | 87% |
 
 Confusion matrix (rows: label, columns: run):
 
 | Label \ run | full_match | partial_match | missing_capability | unsupported |
 |---|---|---|---|---|
-| full_match | 35 | 8 | 0 | 21 |
-| partial_match | 1 | 5 | 1 | 10 |
+| full_match | 37 | 6 | 0 | 21 |
+| partial_match | 1 | 4 | 1 | 12 |
 | missing_capability | 0 | 1 | 1 | 2 |
-| unsupported | 1 | 0 | 0 | 13 |
+| unsupported | 1 | 0 | 1 | 13 |
 
-Wrong decisions at full confidence: 16% (7/43). Below full confidence: 50% (5/10).
+Wrong decisions at full confidence: 14% (6/44). Below full confidence: 56% (5/9).
 
 ## rules + judge
 
 | Status | Labelled | Run gave | Correct | Precision | Recall |
 |---|---|---|---|---|---|
-| full_match | 64 | 42 | 38 | 90% | 59% |
-| partial_match | 17 | 17 | 5 | 29% | 29% |
-| missing_capability | 4 | 2 | 1 | 50% | 25% |
-| unsupported | 14 | 38 | 13 | 34% | 93% |
+| full_match | 64 | 43 | 40 | 93% | 62% |
+| partial_match | 18 | 13 | 5 | 38% | 28% |
+| missing_capability | 4 | 3 | 1 | 33% | 25% |
+| unsupported | 15 | 42 | 13 | 31% | 87% |
 
 Confusion matrix (rows: label, columns: run):
 
 | Label \ run | full_match | partial_match | missing_capability | unsupported |
 |---|---|---|---|---|
-| full_match | 38 | 11 | 0 | 15 |
-| partial_match | 3 | 5 | 1 | 8 |
+| full_match | 40 | 7 | 0 | 17 |
+| partial_match | 2 | 5 | 1 | 10 |
 | missing_capability | 0 | 1 | 1 | 2 |
-| unsupported | 1 | 0 | 0 | 13 |
+| unsupported | 1 | 0 | 1 | 13 |
 
-Wrong decisions at full confidence: 16% (7/43). Below full confidence: 56% (10/18).
+Wrong decisions at full confidence: 14% (6/44). Below full confidence: 47% (7/15).
