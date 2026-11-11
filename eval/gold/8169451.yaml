@@ -15,6 +15,12 @@
 # KDS-2050+ gives 28.8 L/s at 32 m head (p2 chart), short of the 30.6 L/s asked, and its pipe
 # sizes are 100 x 80 mm, not 65 x 80 mm.
 #
+# Re-keyed 2026-11-11 after recall plan step 7 (OCR table rebuild): the scan now gives 32 item
+# requirements, so ids moved (1.1 -> 2.1 + 3.1, 2.1 -> 8.1, 2.2.1 -> 9.1.1, 2.2.2 -> 9.1.2,
+# 2.3 -> 10.1, 3.1 -> 12.1). The old row 1.1 held the description with the flow merged in; it is
+# now two rows, each keeping the reason of the checked label. Speed, size, seal and motor now
+# reach the item too but are not labelled.
+#
 # Status: full_match | partial_match | missing_capability | unsupported.
 tender: GEM_2026_B_8169451
 source: Claude draft from buyer_spec.pdf p1 and catalogue pages, checked by the user
@@ -24,38 +30,44 @@ evaluations:
     manufacturer: Kirloskar Brothers
     document: kbl_monobloc_kds_ks_kdt_srf_kdi.pdf
     requirements:
-      - id: "1.buyer_spec.pdf.1.1"
-        manual_row: Pump description, centrifugal single stage, motor on MS base plate (flow merged in)
+      - id: "1.buyer_spec.pdf.2.1"
+        manual_row: Pump description, centrifugal single stage, motor on MS base plate
         status: partial_match
         pages: [2]
-        evidence: 'p2 "2 POLE, MONOBLOC PUMPS"; KDS-2050+ gives 28.8 L/s at 32 m'
+        evidence: 'p2 "2 POLE, MONOBLOC PUMPS"'
         note: >-
           Centrifugal water pump, but a monobloc (pump and motor share one shaft), not a pump with
-          its motor on a base plate; the flow merged into this row is a near miss (28.8 vs 30.6 L/s).
-          Could be argued as missing_capability for the duty point.
-      - id: "1.buyer_spec.pdf.2.1"
+          its motor on a base plate.
+      - id: "1.buyer_spec.pdf.3.1"
+        manual_row: Discharge 110.160 m3/h (30.60 L/s) at 32.20 m
+        status: partial_match
+        pages: [2]
+        evidence: 'p2 chart: KDS-2050+ gives 28.8 L/s at 32 m'
+        note: >-
+          Near miss (28.8 vs 30.6 L/s). Could be argued as missing_capability for the duty point.
+      - id: "1.buyer_spec.pdf.8.1"
         manual_row: Casing cast iron IS 210 FG 260
         status: partial_match
         pages: [2]
         evidence: 'p2 "Delivery Casing  Cast Iron" (KDS column)'
         note: Cast iron stated, grade FG 260 not printed.
-      - id: "1.buyer_spec.pdf.2.2.1"
+      - id: "1.buyer_spec.pdf.9.1.1"
         manual_row: Impeller bronze IS 318 GR-LTB2
         status: partial_match
         pages: [2]
         evidence: 'p2 "Impeller  Cast Iron/ Bronze /Stainless Steel" (KDS column)'
         note: Bronze is one of the options, grade LTB2 not printed.
-      - id: "1.buyer_spec.pdf.2.2.2"
+      - id: "1.buyer_spec.pdf.9.1.2"
         manual_row: Impeller type enclosed
         status: unsupported
         evidence: impeller type not stated
-      - id: "1.buyer_spec.pdf.2.3"
+      - id: "1.buyer_spec.pdf.10.1"
         manual_row: Shaft SS ASTM A276-410
         status: partial_match
         pages: [2]
         evidence: 'p2 "Pump Shaft  Carbon Steel /Stainless Steel" (KDS column)'
         note: Stainless steel is one of the options, grade 410 not printed.
-      - id: "1.buyer_spec.pdf.3.1"
+      - id: "1.buyer_spec.pdf.12.1"
         manual_row: Liquid water at ambient temperature
         status: full_match
         pages: [1]
@@ -66,31 +78,35 @@ evaluations:
     manufacturer: KSB
     document: ksb_etanorm_brochure.pdf
     requirements:
-      - id: "1.buyer_spec.pdf.1.1"
-        manual_row: Pump description, centrifugal single stage, motor on MS base plate (flow merged in)
+      - id: "1.buyer_spec.pdf.2.1"
+        manual_row: Pump description, centrifugal single stage, motor on MS base plate
         status: unsupported
         evidence: >-
           "Standardised Water Pumps" for "Cooling circuits" (p1); single stage, centrifugal and
-          base plate are not stated, and no performance curve is given (only "Up to 640 m3/h").
-      - id: "1.buyer_spec.pdf.2.1"
+          base plate are not stated.
+      - id: "1.buyer_spec.pdf.3.1"
+        manual_row: Discharge 110.160 m3/h (30.60 L/s) at 32.20 m
+        status: unsupported
+        evidence: no performance curve is given (only "Up to 640 m3/h").
+      - id: "1.buyer_spec.pdf.8.1"
         manual_row: Casing cast iron IS 210 FG 260
         status: unsupported
         evidence: >-
           p2 lists "Grey cast iron EN-GJL-250" as a material variant of the pump, without naming
           the casing: no value for this component.
-      - id: "1.buyer_spec.pdf.2.2.1"
+      - id: "1.buyer_spec.pdf.9.1.1"
         manual_row: Impeller bronze IS 318 GR-LTB2
         status: unsupported
         evidence: p2 lists "Bronze CC480K-GS" as a material variant, without naming the impeller.
-      - id: "1.buyer_spec.pdf.2.2.2"
+      - id: "1.buyer_spec.pdf.9.1.2"
         manual_row: Impeller type enclosed
         status: unsupported
         evidence: impeller type not stated
-      - id: "1.buyer_spec.pdf.2.3"
+      - id: "1.buyer_spec.pdf.10.1"
         manual_row: Shaft SS ASTM A276-410
         status: unsupported
         evidence: shaft material not stated
-      - id: "1.buyer_spec.pdf.3.1"
+      - id: "1.buyer_spec.pdf.12.1"
         manual_row: Liquid water at ambient temperature
         status: full_match
         pages: [1, 2]

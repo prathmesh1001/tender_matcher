@@ -80,6 +80,14 @@ Open: "impeller : Type -enclosed" now gives Kirloskar missing_capability where g
 unsupported (one stronger row once re-keyed). 8011173 (no gold) goes from 38 to 61 clean item
 requirements. The eval diffs below are not regenerated for this step.
 
+Step 8, judge on by default when a key is set: no matching change, not measured.
+
+Step 9 (2026-11-11): no final evaluation was run, by the user's decision, to save Gemini calls.
+The 8169451 gold was re-keyed to the step 7 ids (1.1 -> 2.1 description + 3.1 flow, 2.1 -> 8.1,
+2.2.1 -> 9.1.1, 2.2.2 -> 9.1.2, 2.3 -> 10.1, 3.1 -> 12.1; 14 rows). A rules-only run of that
+tender alone gives 9 agree, 4 not decided, 1 stronger ("Impeller : Type -enclosed", Kirloskar
+`missing_capability`, label `unsupported`). Totals over all tenders were not recomputed.
+
 The sections below are the output of the step 6 run.
 
 | Run | Labelled | Other catalogue | Coverage | Decided accuracy | Stronger | Citations |

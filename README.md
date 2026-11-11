@@ -182,31 +182,31 @@ python ../eval/run_eval.py --judge    # also rules + LLM judge; calls Gemini
 that page. A person reviews the `unsupported` and `partial_match` rows. It is not fit for automatic
 bidder ranking.
 
-Against 99 hand-labelled rows on 5 tenders ([eval/results.md](eval/results.md)), before and after
-the judge cache and sending low-score passages to the judge:
+Against about 100 hand-labelled rows on 5 tenders ([eval/results.md](eval/results.md)), latest
+measured figures after the recall plan. Rules were measured after step 7, the judge after steps 4-5
+(on gold-labelled pairs only); no single final run was made:
 
-| Measure | Rules | Rules + judge before | Rules + judge after |
-|---|---|---|---|
-| Coverage | 43% (43/99) | 49% (49/99) | 51% (50/99) |
-| Decided accuracy | 74% (32/43) | 76% (37/49) | 74% (37/50) |
-| `full_match` precision | 93% (27/29) | 91% (31/34) | 91% (31/34) |
-| `partial_match` precision | 33% (4/12) | 38% (5/13) | 36% (5/14) |
-| Stronger than label | 3 | 4 | 4 |
-| Citation accuracy | 72% (23/32) | 68% (25/37) | 68% (25/37) |
-| Flagged tenders | 9 of 19 | 9 of 19 | 9 of 19 |
-| Gemini calls | 0 | 32 | 52 new + 32 cached |
+| Measure | Rules | Rules + judge |
+|---|---|---|
+| Coverage | 54% (50/93) | 62% (61/99) |
+| Decided accuracy | 76% (38/50) | 72% (44/61) |
+| `full_match` precision | 95% (35/37) | 90% (38/42) |
+| Stronger than label | 3 | 5 |
+| Citation accuracy | 63% (24/38) | 68% (30/44) |
 
-The rules-only run is the same before and after. Details and causes are in the
-[write-up](docs/writeup.md).
+Details, the step by step results and their causes are in the [write-up](docs/writeup.md).
 
 ## Known limits
 
 - 6 of 19 tenders give wrong reports; the extraction warning flags 9 of 19 and sends their results
   to review.
-- Scanned pages are not fixed: 8011173 reads "SS304" as "55304". Pump extraction: 7959356's pump
-  table came out as one merged line; 8169451 lost 6 of its 11 specification rows.
-- Only 99 labelled rows on 5 tenders, so one row moves accuracy by about 2 points.
-- The judge varies by about 1 labelled row between fresh runs; the cache only fixes reruns.
+- Scanned pages are partly fixed: two-column scanned tables are rebuilt from OCR word boxes, other
+  layouts (8157758, 8167974) keep plain OCR text. 7959356's pump table came out as one merged line.
+- Only about 100 labelled rows on 5 tenders, so one row moves accuracy by about 2 points.
+- The judge varies by about 1 labelled row between fresh runs; the cache only fixes reruns. It can
+  over-infer from free text ("prevents spring failure" read as a spring match).
+- A figure caption can be read as a product heading, and catalogue-wide ordering pages give
+  `partial_match` only.
 - Spec fact extraction has never run on real catalogues, so `spec_facts` is empty.
 - No Redis queue: jobs run inside the API process, so a restart fails any run in progress.
 - Files are not in Postgres; they stay in the mounted `data/` folder.

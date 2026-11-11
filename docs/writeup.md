@@ -4,10 +4,11 @@ This describes what the system does, how it decides, how well it works today and
 short. Setup is in the [README](../README.md).
 
 **Verdict.** A first-pass assistant with checked evidence. Every decision cites a page and a quote
-that was found on that page; a `full_match` agrees with the hand label 91% of the time. A person
-reviews the `unsupported` and `partial_match` rows (about half the labelled rows stay undecided,
-and a `partial_match` agrees with its label only 36% of the time). It is not fit for automatic
-bidder ranking: 6 of 19 tenders give wrong reports, and the ranking rests on low coverage.
+that was found on that page; a `full_match` agrees with the hand label 9 times in 10 (95% rules
+only, 90% with the judge). A person reviews the `unsupported` and `partial_match` rows (about 4 in
+10 labelled rows stay undecided, and a `partial_match` agrees with its label only about a third of
+the time). It is not fit for automatic bidder ranking: 6 of 19 tenders give wrong reports, and the
+ranking rests on low coverage.
 
 ## The problem
 
@@ -64,15 +65,19 @@ is never checked against catalogue "Body", and a working pressure is never check
 pressure. With no like-for-like value the result is `unsupported`, even if the same number appears
 elsewhere on the page.
 
-**The LLM judge handles the rest.** Only free-text and unlabelled lines reach Gemini
-(`gemini-3.8-flash`). It runs after the catalogue is chosen, so it cannot change that choice or any
-rule result. For each line:
+**The LLM judge handles the rest.** Every requirement the rules leave `unsupported` for a catalogue
+reason (no labelled field, free text) reaches Gemini (`gemini-3.8-flash`). It runs after the
+catalogue is chosen, so it cannot change that choice or any rule result. For each line:
 
 1. Hybrid search (BM25 and embeddings, fused with RRF, then a cross-encoder) runs inside the chosen
-   catalogue only. With no evidence hit, the LLM is not called.
+   catalogue only, with the attribute's ontology synonyms in the query. In a document holding
+   several products, passages under another product's heading are left out. With no evidence
+   hit, the LLM is not called; at most 5 passages are sent (`LLM_JUDGE_MAX_PASSAGES`).
 2. The model answers in JSON and may cite only the passages it was given.
 3. Its answer is not trusted. Document and page come from the cited passage, the quote must name
-   the attribute and must be found on the page. Anything failing stays `unsupported`.
+   the attribute and must be found on the page. A `full_match` or `missing_capability` on a
+   numeric or code requirement must also be what the comparator reads from the judge's own quote.
+   Anything failing stays `unsupported`.
 4. Every LLM decision is marked `needs_review`.
 
 If the API fails or a run's call limit is reached, the remaining lines stay `unsupported` and the
@@ -139,7 +144,9 @@ tender saying only one firm is acceptable gets a warning at the top of the repor
 **Unreliable tenders.** Tenders whose items cannot be trusted are flagged, every result goes to
 review, and the LLM is not called for them.
 
-**Judge off by default.** `LLM_JUDGE_ENABLED` defaults to `false`, and each tender has a call limit,
+**Judge on when a key is set** (2026-11-10, replacing "judge off by default"). `LLM_JUDGE_ENABLED`
+defaults to `true`; without `GEMINI_API_KEY` a run is rules only and logs a warning instead of
+failing. Each tender has a call limit (`LLM_JUDGE_MAX_CALLS`, 35, about Rs 5 a tender at most),
 because the API costs quota.
 
 **Judge cache.** Every judge answer is stored in `judge_answers`, keyed by a sha256 of the prompt
@@ -159,7 +166,55 @@ larger change than adding a store.
 
 ## Results
 
+### Recall plan (2026-11-07 to 2026-11-11)
+
+The last round of work aimed at recall: the system left too many rows `unsupported` that a person
+could decide. Each step was measured against the hand labels and kept only if decided accuracy did
+not drop and "stronger than label" rose by at most 1. Step by step notes are in
+[eval/results.md](../eval/results.md).
+
+| Step | Change | Result |
+|---|---|---|
+| 0 | Baseline | measured |
+| 1 | Interleaved table cells cited line by line | kept, rules coverage 49% -> 52% |
+| 2 | Standard codes from an untagged standards row (code only evidence) | kept, 53% |
+| 3 | Product type lines met by the product heading | kept, 54% |
+| 4 | Judge reach: every catalogue-unsupported line, 5 passages, synonyms | kept with step 5 |
+| 5 | Judge guardrail: numeric and code verdicts re-checked by the comparator | kept with step 4 |
+| 6 | Options lists under the item's own product heading | skipped (see known limits) |
+| 7 | Scanned tender tables rebuilt from OCR word boxes | kept |
+| 8 | Judge on by default when a key is set | kept |
+| 9 | This write-up; no final evaluation run (decision of 2026-11-11, to save calls) | |
+
+Latest measured figures. The two columns were measured at different times: rules after step 7, the
+judge after steps 4-5 (on gold-labelled item x manufacturer pairs only, 92 Gemini calls). No run
+with the judge was made after steps 6-8, so the judge column does not include step 7.
+
+| Measure | Rules, step 0 | Rules, step 7 | Rules + judge, step 0 | Rules + judge, steps 4-5 |
+|---|---|---|---|---|
+| Coverage | 49% (49/99) | 54% (50/93) | 58% (57/99) | 62% (61/99) |
+| Decided accuracy | 76% (37/49) | 76% (38/50) | 74% (42/57) | 72% (44/61) |
+| `full_match` precision | 94% (32/34) | 95% (35/37) at step 6 | 90% (36/40) | 90% (38/42) |
+| Stronger than label | 3 | 3 | 5 | 5 |
+| Citation accuracy | 65% (24/37) | 63% (24/38) | 60% (25/42) | 68% (30/44) |
+
+- **Rules gained 5 points of coverage at the same accuracy.** Every kept rules step turned
+  `unsupported` rows into agreements, and none produced a new stronger row.
+- **The judge gained coverage but lost accuracy** (74% -> 72%), below the gate. The user accepted
+  it on 2026-11-09 after the judge was limited to the item's own product heading. Of the rows only
+  the judge decides, its errors are 3 cautious (weaker than label: "Operator : Gear/HW", "Ball &
+  Stem : SS A182", pump water at ambient temperature) and 2 stronger ("Flanged Ended", whose
+  label is coarser than the requirement, and "Spring", see known limits).
+- **Step 7 moved the pump tender's ids.** 8169451's scan now gives 32 item requirements instead of
+  20, so the step 7 rules run counted 6 of its labelled rows as another catalogue (hence 93 rows,
+  not 99). The gold was re-keyed on 2026-11-11 (14 rows now: the old description row with the flow
+  merged in is two rows). On a rules-only run of that tender alone: 9 agree, 4 not decided, 1
+  stronger ("Impeller type enclosed": Kirloskar `missing_capability`, label `unsupported`). The
+  totals above were not recomputed after the re-key.
+
 ### One tender, rules against rules + judge
+
+Earlier measurement (2026-11-02), before the recall plan.
 
 Tender GEM/2026/B/8119613, two triple offset butterfly valve items, rules plus 5 Gemini calls. No
 call failed, all 8 LLM decisions verified on their pages, and no rule result changed.
@@ -175,7 +230,7 @@ Valve", against a tender asking for triple offset.
 
 ### Against hand labels, rules only
 
-87 rows on 4 tenders were checked by hand ([manual check](manual_match_check.md)) and compared with
+Earlier measurement, before the recall plan. 87 rows on 4 tenders were checked by hand ([manual check](manual_match_check.md)) and compared with
 the current code, rules only ([example diff](../eval/diffs/GEM_2026_B_8119613.md)).
 
 | Run | Agree | Not decided | Weaker than label | Stronger than label | Other catalogue |
@@ -203,7 +258,7 @@ How to read this:
 
 ### Evaluation, rules against rules + judge
 
-`eval/run_eval.py` scores both runs on 99 labelled rows: the 87 above plus 12 on pump tender
+Earlier measurement (2026-11-02), before the recall plan. `eval/run_eval.py` scores both runs on 99 labelled rows: the 87 above plus 12 on pump tender
 8169451. Full tables, with precision and recall per status and confusion matrices, are in
 [eval/results.md](../eval/results.md).
 
@@ -299,23 +354,39 @@ The flag warns but does not fix anything. Two tenders with garbled scanned lines
 - 6 of 19 tenders give wrong reports (by a read-through, not a measurement), and the extraction
   warning flags 9 of 19 (those 6 and 3 more). A flagged report sends every result to review; it
   does not fix the items. Wrong item rows on 8026686 and 8132165 are flagged, not fixed.
-- Scanned pages are not fixed. 8011173 (submersible pump) reads "SS304" as "55304" and splits its
-  table into 38 rows such as "No. il" and "3 4". It is not flagged, so a clean report does not
-  prove clean extraction.
+- Scanned pages are only partly fixed. Recall plan step 7 rebuilds two-column scanned tables from
+  OCR word boxes and repairs ontology codes ("55304" -> SS304): 8011173 went from 38 garbled rows
+  to 61 clean item requirements, and 8169451 from 20 to 32. Other scanned layouts (8157758,
+  8167974) keep the plain OCR text, and pages with low OCR confidence are flagged for review, not
+  fixed.
 - Pump extraction:
   - 7959356 (60 HP centrifugal pump): the pump table on `buyer_spec.pdf` page 2 came out as one
     merged line, so its item holds 1 requirement, "Starter Panel", and it gets no technical
     result. It is flagged.
-  - 8169451 (water circulation pump, scanned): 6 of its 11 specification rows never became
-    requirements (pump speed, size, seal, motor, spares, base plate). Not flagged, because its
-    item still holds 20 requirements.
+  - 8169451 (water circulation pump, scanned): since step 7 the speed, size, seal, motor, spares
+    and base plate rows reach the item (32 requirements), but they have no hand labels yet.
   - 8071357 (submersible sewerage pump) is fixed by the spec-row rule (1 requirement to 15).
 
 **Accuracy**
 
-- Only 99 labelled rows on 5 tenders (1 pump). One row moves decided accuracy by about 2 points,
-  so the figures are not firm.
-- Recall: 25 rows labelled `full_match` stay `unsupported` with the judge. Most have no catalogue
+- Only about 100 labelled rows on 5 tenders (1 pump). One row moves decided accuracy by about 2
+  points, so the figures are not firm.
+- The final figures are not one run. Rules were last measured after step 7, the judge after steps
+  4-5, and neither after the 8169451 gold re-key. A full `run_eval.py --judge` would need new
+  Gemini calls and was not run (decision of 2026-11-11).
+- The judge reads too much into a passage. "Spring" (8017367) became `full_match` from a line
+  saying the design "prevents spring failure", which shows a spring exists but not the material
+  or type asked. The guardrail re-checks numbers and codes only, not free-text inference.
+- A catalogue-wide ordering page gives `partial_match` only. Options lists that serve every
+  product in a catalogue (L&T API 600 p9) do not belong to the item's product heading, so an
+  option found there never makes a full match (recall plan step 6, skipped).
+- A figure caption can be read as a product heading. "48-inch Class 150 Gate Valve" at the foot
+  of L&T API 600 p8 claims pages 9-16, including the globe valve pages, so evidence under it is
+  given to gate valves. This affects rules and judge alike.
+- "Impeller : Type -enclosed" (8169451) gives Kirloskar `missing_capability` where the label says
+  `unsupported`: the catalogue does not state an impeller type, so this is a stronger row.
+- Recall: 25 rows labelled `full_match` stayed `unsupported` with the judge before the recall plan;
+  steps 1-5 decided some of them (coverage 58% -> 62% with the judge). Most have no catalogue
   field naming the attribute (codes stated in prose, such as "Testing Standard : API 598"), or a
   correct judge answer whose quote fails the page check because table chunks are rebuilt as
   "Header: value" text. Sending low-score passages to the judge added 1 row (above). Three earlier
@@ -354,13 +425,19 @@ The flag warns but does not fix anything. Two tenders with garbled scanned lines
   --build`.
 - The Docker image is CPU only: 20 chunks took about 160 seconds to embed, so a new database should
   be embedded on a GPU host. A run with the judge took about 7 minutes on CPU.
-- Gemini quota is unknown. The evaluation asked the judge 84 distinct questions on 5 tenders; a
-  full pass over the 13 reliable tenders has 184 distinct lines to judge, per catalogue.
+- Gemini quota is unknown, and the judge is now on by default whenever a key is set (35 calls per
+  tender at most). The evaluation cache holds 346 judge answers; judging every item x
+  manufacturer pair of the gold tenders, not only labelled ones, would need about 670 new calls.
 
 ## What to do next
 
-1. Label more tenders, especially pumps, so the figures rest on more than 99 rows on 5 tenders.
-2. Run spec fact extraction on the real catalogues, so `spec_facts` is filled and numeric checks
+1. Run `eval/run_eval.py --judge` once on the current code and re-keyed gold, so rules and judge
+   figures come from one run (recount the new Gemini calls first).
+2. Label more tenders, especially pumps (8169451's speed, size, seal and motor rows first), so the
+   figures rest on more than about 100 rows on 5 tenders.
+3. Run spec fact extraction on the real catalogues, so `spec_facts` is filled and numeric checks
    use the structured lookup instead of text fields.
-3. Use Gemini vision extraction for the flagged tenders and the scanned pages (8011173, 8169451,
-   the pump table of 7959356).
+4. Treat figure captions as captions, not product headings, and give catalogue-wide ordering
+   pages to every product of the catalogue.
+5. Use Gemini vision extraction for the flagged tenders and the scanned layouts step 7 does not
+   rebuild (8157758, 8167974, the pump table of 7959356).
