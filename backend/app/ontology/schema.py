@@ -117,6 +117,11 @@ class Ontology(BaseModel):
         default_factory=list,
         description="Words that may follow a synonym in a label without changing what it names.",
     )
+    label_distinct_words: list[str] = Field(
+        default_factory=list,
+        description="Printed words that stem like a synonym but never name it "
+        "('Designation' is not 'Design').",
+    )
     other_products: list[str] = Field(
         default_factory=list,
         description="Products of the category with no product type here (no catalogues): a title "

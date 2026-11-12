@@ -650,6 +650,37 @@ def test_a_labelled_field_decides_before_a_standard_code(valves: Ontology) -> No
     assert result.status is MISSING
 
 
+def test_a_material_designation_is_not_a_design_standard(valves: Ontology) -> None:
+    # KSB BOAX-B / KITZ: "Designation" stems to "design"; it names the part or its grade.
+    rows = [
+        _row(["Designation", "Material"], ["Body", "EN-GJL-250"], "Materials"),
+        _row(["Part", "Designation"], ["Disc", "CAC406 (BC6)"], "Materials"),
+    ]
+    result = _compare("Conformity to Governing Specification (ISS) : IS 13095", rows, valves)
+    assert result.status is UNSUPPORTED
+
+
+def test_a_word_under_a_design_header_is_no_standard(valves: Ontology) -> None:
+    # L&T: a "Parameter | Design" header row states no standard.
+    header_row = _row(["Design Parameter", "Value"], ["Design", "API 609"], "Design data")
+    result = _compare("Design Standard : IS 13095", [_row(["Parameter"], ["Design"])], valves)
+    assert result.status is UNSUPPORTED
+    assert _compare("Design Standard : IS 13095", [header_row], valves).status is not FULL
+
+
+def test_flange_drilling_after_a_design_scope_is_not_the_design_standard(
+    valves: Ontology,
+) -> None:
+    # KBL p8: the scope cell "(AWWA C 504 / C 516 Design)" names the flange drilling row.
+    row = _row(
+        ["Scope", "Flange Drilling Standard"],
+        ["Standard Supply (AWWA C 504 / C 516 Design)", "ANSI B16.5 / 16.47 for Cast Steel"],
+        "End Connection",
+    )
+    result = _compare("Design Standard : IS 13095", [row], valves)
+    assert result.status is UNSUPPORTED
+
+
 def test_a_standard_code_needs_the_ontology(valves: Ontology) -> None:
     result = _compare("Testing Standard : API 598", [_prose("Tested to API 598.")], None)
     assert result.status is UNSUPPORTED

@@ -361,6 +361,12 @@ def _coded(tokens: frozenset[str]) -> bool:
     return any(is_code(t) or t.isdigit() for t in tokens)
 
 
+def _is_standard(requirement: Requirement, ctx: MatchContext) -> bool:
+    """True if the requirement's attribute is a standard (its ontology lists standard codes)."""
+    attribute = ctx.attribute(requirement)
+    return attribute is not None and bool(attribute.codes)
+
+
 def judge_code(
     requirement: Requirement, value: str, ctx: MatchContext, options: ComparatorOptions
 ) -> _Outcome:
@@ -374,7 +380,8 @@ def judge_code(
     partial if the catalogue leaves its grade out ("SS ASTM A276" against "Stainless Steel"): that
     is no contradiction. Without an ontology's equivalents only a code can fail against a code:
     "CI" against "A216 WCB" may or may not be the same material. An empty value, bare numbers ("5"
-    in a "No." column, B4) or a sentence without codes decide nothing.
+    in a "No." column, B4) or a sentence without codes decide nothing, and neither does a value
+    without a code for a standard ("Design" under a "Design Parameter" header).
     """
     have = code_tokens(value, options.code_noise_words, ctx.vocabulary)
     if not any(not t.isdigit() for t in have):
@@ -400,6 +407,8 @@ def judge_code(
         return _Outcome(MatchStatus.PARTIAL_MATCH, _NEAR_MISS)
     if same_material:
         return _Outcome(MatchStatus.PARTIAL_MATCH, "same material, grade not printed")
+    if _is_standard(requirement, ctx) and not any(is_code(t) for t in have):
+        return _Outcome(None, "a standard is stated as a code; this value names none")
     knows_materials = ctx.ontology is not None and bool(ctx.ontology.equivalents)
     if not knows_materials and not (_coded(have) and any(_coded(w) for w in wanted)):
         return _Outcome(None, "no material equivalents: cannot tell if these are the same")

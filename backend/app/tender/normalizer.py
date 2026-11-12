@@ -373,6 +373,20 @@ def _synonym_spans(label_words: tuple[str, ...], attribute: Attribute) -> list[t
     return spans
 
 
+def _label_stems(label: str, ontology: Ontology) -> tuple[str, ...]:
+    """Stemmed label words; a distinct word ("Designation") keeps its printed form.
+
+    Snowball folds "designation" into "design", a design-standard synonym; kept printed, such
+    a word matches no synonym. Positions stay aligned with `stems(label)`.
+    """
+    distinct = {fold_text(w) for w in ontology.label_distinct_words}
+    printed = _COMPOUND.findall(fold_text(label))
+    return tuple(
+        f"={word}" if word in distinct else stem
+        for word, stem in zip(printed, stems(label), strict=True)
+    )
+
+
 def _rest_is_ignorable(label: str, end: int, ontology: Ontology) -> bool:
     """True if every label word after position `end` is generic, a unit or a code.
 
@@ -422,7 +436,7 @@ def resolve_attribute(
     """
     if label is None or ontology is None:
         return None
-    label_words = stems(label)
+    label_words = _label_stems(label, ontology)
     best: tuple[int, int, str] | None = None
     for attribute in ontology.attributes:
         if not _fits(attribute, value):

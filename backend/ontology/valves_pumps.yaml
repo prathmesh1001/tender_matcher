@@ -102,6 +102,10 @@ label_generic_words: [valve, moc, material, parameter, component, part, sl, "no"
                       iso, asme, of, to, and, for, at, the, max, maximum, min, minimum,
                       iss]
 
+# Stemming folds these into a synonym's stem ("designation" -> "design"), but a material
+# "Designation" column is never a design standard.
+label_distinct_words: [designation, designations, designated]
+
 attributes:
   - name: nominal_size
     critical: true
@@ -209,6 +213,9 @@ attributes:
     dimension: none
     synonyms: [testing standard, test standard, inspection and testing]
     codes: [API 598, ISO 5208, BS 6755, EN 12266]
+  - name: flange_drilling
+    dimension: none
+    synonyms: [flange drilling, flange drilling standard, drilling standard]
   - name: face_to_face_standard
     dimension: none
     synonyms: [face to face, face-to-face, f to f]
