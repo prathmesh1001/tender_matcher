@@ -21,6 +21,16 @@ _NUM: Final = r"-?\d+(?:\.\d+)?"
 _UNIT: Final = r"""(?:"|''|(?!to\b|thru\b|through\b|and\b|or\b)[a-z°][a-z0-9°/²³]*)"""
 # "50 to 600", "2" thru 12"" (Mueller), "50 - 600": one range, never a list of two values.
 _RANGE_SEP: Final = r"\s*(?:to|thru|through|-|~)\s*"
+# A size printed in both units, one in brackets: "50 mm (2")" or "2" (50 mm)". The mm value is
+# kept, so "from 50 mm (2") to 600 mm (24")" is one range, not four sizes, and "up to 100"
+# (2500 mm)" keeps 2500 mm even where 100" has no DN in the NPS table.
+_INCH: Final = r"""(?:"|''|inch(?:es)?\b)"""
+_MM_THEN_INCH: Final = re.compile(
+    rf"(\d+(?:\.\d+)?\s*mm|\b(?:dn|nb)\s*-?\s*\d+)\s*\(\s*\d+(?:\.\d+)?\s*{_INCH}\s*\)"
+)
+_INCH_THEN_MM: Final = re.compile(rf"\d+(?:\.\d+)?\s*{_INCH}\s*\(\s*(\d+(?:\.\d+)?\s*mm)\s*\)")
+# An edition or revision number ("5TH EDITION", "2nd"): never part of a code.
+_ORDINAL: Final = re.compile(r"\b\d+(?:st|nd|rd|th)\b", re.IGNORECASE)
 _NUMBER_VALUE: Final = re.compile(
     rf"(?<![\w.])(?P<a>{_NUM})\s*(?P<ua>{_UNIT})?(?:{_RANGE_SEP}(?P<b>{_NUM})\s*(?P<ub>{_UNIT})?)?"
 )
@@ -95,6 +105,7 @@ def quantities(text: str, prefixes: Sequence[str]) -> list[Quantity]:
     """
     spelled = fold_text(spell_fractions(text))
     folded = _INCH_FRACTION.sub(_decimal_inches, _THOUSANDS.sub("", spelled))
+    folded = _INCH_THEN_MM.sub(r"\1", _MM_THEN_INCH.sub(r"\1", folded))
     found, rest = _prefixed(folded, tuple(p.lower() for p in prefixes))
     open_end = -1  # end of the last "up to" value: its bracketed equivalent is open too
     for m in _NUMBER_VALUE.finditer(rest):
@@ -141,6 +152,6 @@ def code_tokens(
     Returns:
         The tokens.
     """
-    compacted = compact_codes(text, noise)
+    compacted = compact_codes(_ORDINAL.sub(" ", text), noise)
     raw = search_tokens(compacted, vocabulary) if vocabulary else _WORD.findall(compacted)
     return frozenset(t for t in (stem_token(r) for r in raw) if t not in noise)

@@ -196,14 +196,53 @@ def _inline_value(
         return None
     for end in range(1, min(len(tokens), options.fields.label_max_words) + 1):
         prefix = " ".join(tokens[:end])
-        if any(ch.isdigit() for ch in prefix):
-            return None
+        last_word = fold_text(tokens[end - 1]).strip(" ,:")
+        if any(ch.isdigit() for ch in prefix) or last_word in options.condition_words:
+            break
         if label_names(requirement, prefix, ctx, options):
             last = fold_text(tokens[end - 1]).strip()
             start = end - 1 if last in options.designation_prefixes else end
             rest = " ".join(tokens[start:])
             return rest if rest != tokens[end - 1] else None
+    return _value_in_sentence(requirement, tokens, ctx, options)
+
+
+def _value_in_sentence(
+    requirement: Requirement, tokens: Sequence[str], ctx: MatchContext, options: ComparatorOptions
+) -> str | None:
+    """The range after label words inside a sentence, up to the next comma or full stop.
+
+    "Butterfly Valve is available in sizes from 50 mm (2") to 600 mm (24"), in PN 10 ..." ->
+    "from 50 mm (2") to 600 mm (24")". The label must be followed by "from" or a number, and
+    must not follow a condition word ("for sizes 6 inch and above" states when, not what).
+    """
+    width = options.fields.label_max_words
+    words_in = [fold_text(t).strip(" ,:") for t in tokens]
+    for i in range(1, len(tokens)):
+        if any(w in options.condition_words for w in words_in[max(0, i - 2) : i]):
+            continue  # "for sizes", "when the size": states when something else applies
+        for end in range(i + 1, min(len(tokens), i + width) + 1):
+            label = " ".join(tokens[i:end])
+            if end >= len(tokens) or any(ch.isdigit() for ch in label):
+                break
+            if words_in[end - 1] in options.condition_words:
+                break  # "water For sizes 6 ...": the label never runs past a condition word
+            after = fold_text(tokens[end]).strip()
+            if not (after == "from" or after[:1].isdigit()):
+                continue
+            if label_names(requirement, label, ctx, options):
+                return _until_clause_end(tokens[end:])
     return None
+
+
+def _until_clause_end(tokens: Sequence[str]) -> str:
+    """The tokens up to and including the first one ending a clause ("," or ".")."""
+    kept: list[str] = []
+    for token in tokens:
+        kept.append(token.rstrip(",."))
+        if token.endswith((",", ".")):
+            break
+    return " ".join(kept)
 
 
 def field_value(
@@ -721,9 +760,11 @@ def offered_as_option(
                     "status": status,
                     "needs_review": comparison.needs_review or status is not MatchStatus.FULL_MATCH,
                     "reason": reason,
-                    "evidence": offered[: options.max_evidence]
-                    if status is MatchStatus.FULL_MATCH
-                    else [*offered[: options.max_evidence], *comparison.evidence],
+                    "evidence": (
+                        offered[: options.max_evidence]
+                        if status is MatchStatus.FULL_MATCH
+                        else [*offered[: options.max_evidence], *comparison.evidence]
+                    ),
                 }
             )
     return comparison

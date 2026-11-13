@@ -283,8 +283,13 @@ class Settings(BaseSettings):
             "to",
             "as",
             "per",
+            "edition",
+            "latest",
+            "revision",
+            "rev",
         ],
-        description="Words ignored when comparing codes ('ASTM A216 Gr. WCB' -> a216, wcb).",
+        description="Words ignored when comparing codes ('ASTM A216 Gr. WCB' -> a216, wcb; "
+        "'API 609 5TH EDITION' -> api609, ordinals are dropped too).",
     )
     COMPARATOR_CONDITION_WORDS: list[str] = Field(
         default_factory=lambda: ["for", "if", "when", "where"],

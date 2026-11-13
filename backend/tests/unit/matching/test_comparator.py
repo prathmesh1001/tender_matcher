@@ -425,6 +425,36 @@ def test_number_before_the_label_is_not_a_labelled_line(valves: Ontology) -> Non
     assert _compare("SIZE : 400 MM", [line], valves).status is UNSUPPORTED
 
 
+AQUASEAL_PROSE = (
+    "Aquaseal Chek Valve is a soft-seated dual-plate check valve that conforms to API 594. The\n"
+    "valve with cast iron body is available in sizes 2” (50 mm) to 8” (200 mm), in PN 10, PN 16\n"
+    "and ASME Class 125 pressure ratings."
+)
+
+
+@pytest.mark.parametrize(("size", "status"), [("DN50", FULL), ("DN300", MISSING)])
+def test_a_size_range_inside_a_wrapped_sentence_decides(
+    valves: Ontology, size: str, status: MatchStatus
+) -> None:
+    # L&T Aquaseal p24 (8017367 items 1 and 5): the range is prose, wrapped over two lines.
+    result = _compare(f"SIZE : {size}", [_prose(AQUASEAL_PROSE)], valves)
+    assert result.status is status
+    assert "2” (50 mm) to 8” (200 mm)" in result.evidence[0].value
+
+
+@pytest.mark.parametrize(
+    ("text", "low", "high"),
+    [
+        ("from 50 mm (2”) to 600 mm (24”)", 50.0, 600.0),
+        ("2” (50 mm) to 8” (200 mm)", 50.0, 200.0),
+        ('DN 50 (2") to DN 300', 50.0, 300.0),
+    ],
+)
+def test_a_size_printed_in_both_units_is_one_range(text: str, low: float, high: float) -> None:
+    [found] = quantities(text, ("dn", "nb"))
+    assert (found.low, found.high) == (low, high)
+
+
 def test_up_to_is_an_open_range(valves: Ontology) -> None:
     line = _prose('Size: up to 100" (2500 mm)')
     inside = _compare("SIZE : 250 MM", [line], valves)
@@ -728,6 +758,12 @@ def test_flange_drilling_after_a_design_scope_is_not_the_design_standard(
     )
     result = _compare("Design Standard : IS 13095", [row], valves)
     assert result.status is UNSUPPORTED
+
+
+def test_an_edition_is_not_part_of_the_standard(valves: Ontology) -> None:
+    # 8119613: "API 609 5TH EDITION" against a catalogue printing "API 609".
+    row = _row(["Item", "Standard"], ["Design", "API 609"], "Technical data")
+    assert _compare("VALVE DESIGN : API 609 5TH EDITION", [row], valves).status is FULL
 
 
 def test_a_standard_offered_as_optional_is_partial(valves: Ontology) -> None:

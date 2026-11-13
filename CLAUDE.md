@@ -269,6 +269,9 @@ tender-matcher/
 - LLM judge only for free-text/ambiguous cases; must return JSON with `status, capability, chunk_id, quote, reasoning`.
 - `evidence_verifier` re-checks every quote against the page. Failed verification → downgrade to `unsupported` + `needs_review`.
 - Match against **one product model/family per manufacturer**; never combine specs from different models.
+  A value printed only for a sibling product of the same document is at most `partial_match` +
+  `needs_review` (flag `sibling_product`), never full; a sibling lacking the value is `unsupported`,
+  never a failure (decided by the user 2026-11-13).
 
 **Status definitions (keep consistent everywhere):**
 

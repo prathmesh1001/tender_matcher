@@ -74,6 +74,7 @@ class ReviewFlag(StrEnum):
     TIED_CATALOGUES = "tied_catalogues"  # nothing tells the best catalogues apart
     CODE_ONLY_HIT = "code_only_hit"  # search accepted the passage only for a code it holds
     LOW_SCORE_HIT = "low_score_hit"  # no passage reached the rerank threshold
+    SIBLING_PRODUCT = "sibling_product"  # stated only for another product of the same document
 
 
 class DecisionSource(StrEnum):

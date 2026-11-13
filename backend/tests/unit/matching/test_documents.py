@@ -12,6 +12,7 @@ from app.matching.documents import (
     ItemQuery,
     SelectionOptions,
     _capped,
+    _from_another_product,
     evaluate_item,
     item_sub_type,
     sub_type_fit,
@@ -522,3 +523,20 @@ def test_heading_cap_leaves_a_code_only_standard_alone() -> None:
     capped = _capped(_rule_result([]))
     assert capped.status is MatchStatus.PARTIAL_MATCH
     assert ReviewFlag.HEADING_UNCLEAR in capped.flags
+
+
+@pytest.mark.parametrize("status", [MatchStatus.FULL_MATCH, MatchStatus.PARTIAL_MATCH])
+def test_a_sibling_products_value_is_partial_for_review(status: MatchStatus) -> None:
+    # 8157057 "Disc : SGI": printed only for another butterfly valve of the same catalogue (B10).
+    found = _from_another_product(
+        _rule_result([]).model_copy(update={"status": status}), "Aquaseal 10"
+    )
+    assert (found.status, found.needs_review) == (MatchStatus.PARTIAL_MATCH, True)
+    assert ReviewFlag.SIBLING_PRODUCT in found.flags
+    assert "another product" in found.reason
+
+
+def test_a_sibling_lacking_the_value_never_fails_this_product() -> None:
+    missing = _rule_result([]).model_copy(update={"status": MatchStatus.MISSING_CAPABILITY})
+    found = _from_another_product(missing, "Aquaseal 10")
+    assert (found.status, found.needs_review) == (MatchStatus.UNSUPPORTED, True)

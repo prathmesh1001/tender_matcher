@@ -4,8 +4,10 @@ Like-for-like (CLAUDE.md section 7) needs the label and the value on the same ta
 printed line, so a chunk is cut into fields:
   table row  one field per shown cell, labelled by the row's key cell and the column header
              ("Body" + "Materials WCB/ WCC" -> "A 216 Gr. WCB/ WCC")
-  prose      one field per "Label: value" line group (wrapped lines continue the value), and
-             one unlabelled field per other line ("Size range 80 to 2500 mm")
+  prose      one field per "Label: value" line group (wrapped lines continue the value),
+             one unlabelled field per other line ("Size range 80 to 2500 mm"), and one more per
+             sentence wrapped over several unlabelled lines ("... available in sizes from 50 mm
+             (2") to" + "600 mm (24"), in PN 10 pressure rating.")
 Only columns printed in the chunk's text are used: a version chunk shows one version column.
 A key cell can swallow the first column's values when the table has no key column of its own
 ("Pump Shaft" / "Carbon Steel" on separate lines of one cell): it is split into key and value.
@@ -322,6 +324,40 @@ def prose_fields(chunk: ChunkDraft, options: FieldOptions) -> list[CatalogueFiel
             group[1].append(text)
             group[2].append(line)
     close()
+    return [*out, *wrapped_sentences(chunk.raw_text, options.label_max_words)]
+
+
+def wrapped_sentences(raw_text: str, label_max_words: int) -> list[CatalogueField]:
+    """Unlabelled sentences printed over several lines, each as one field.
+
+    A line not ending in ".", ";" or ":" continues on the next unlabelled line. The quote is
+    the lines as printed, so it is a substring of the chunk's text.
+
+    Args:
+        raw_text: A prose chunk's text.
+        label_max_words: Longest label ("Label: value" lines are never joined).
+
+    Returns:
+        One field per sentence of two or more lines.
+    """
+    out: list[CatalogueField] = []
+    run: list[str] = []
+
+    def flush() -> None:
+        if len(run) > 1:
+            parts = tuple(_clean(x) for x in run)
+            out.append(CatalogueField("", " ".join(parts), "\n".join(run), parts))
+        run.clear()
+
+    for line in raw_text.splitlines():
+        text = _clean(line)
+        if not text or label_of(text, label_max_words) is not None:
+            flush()
+            continue
+        run.append(line)
+        if text.endswith((".", ";", ":")):
+            flush()
+    flush()
     return out
 
 

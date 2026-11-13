@@ -9,14 +9,14 @@ from app.core.config import Settings
 from app.ingestion.chunker import table_row_text
 from app.matching.chunk_source import CatalogueChunk, CatalogueDocument
 from app.matching.comparator import MatchContext
-from app.matching.documents import ItemQuery, SelectionOptions, evaluate_item
-from app.matching.headings import group_by_product, other_product_passages
+from app.matching.documents import ItemQuery, SelectionOptions, _names_this_type, evaluate_item
+from app.matching.headings import ProductGroups, group_by_product, other_product_passages
 from app.ontology.loader import load_ontologies
 from app.ontology.schema import Ontology
 from app.retrieval.text_normalizer import SearchVocabulary
 from app.schemas.chunking import ChunkDraft
-from app.schemas.enums import ChunkType, DocType, MatchStatus
-from app.schemas.matching import DocumentResult
+from app.schemas.enums import ChunkType, DecisionSource, DocType, MatchStatus, ReviewFlag
+from app.schemas.matching import Comparison, DocumentResult, Evidence, LabelBasis
 from app.schemas.requirements import LineItem
 from app.tender.splitter import SplitOptions, item_requirements, leaves
 
@@ -212,7 +212,8 @@ def test_a_heading_naming_several_products_owns_nothing(valves: Ontology) -> Non
     assert _groups(chunks, valves) == ([], 1)
 
 
-def test_evidence_of_a_sibling_model_is_unsupported(valves: Ontology) -> None:
+def test_evidence_of_a_sibling_model_is_partial_for_review(valves: Ontology) -> None:
+    # B10 (decided 2026-11-13): a sibling's value is never full for this model, but partial.
     chunks = [*TWO_MODELS, _row("Stem", "ASTM A479 Type 410", ALPHA, 1, 2)]
     lines = [
         "BODY MOC : ASTM A216 Gr. WCB",
@@ -224,8 +225,9 @@ def test_evidence_of_a_sibling_model_is_unsupported(valves: Ontology) -> None:
     assert result.product_heading == ALPHA
     *own, seat = result.comparisons
     assert [c.status for c in own] == [MatchStatus.FULL_MATCH] * 3
-    assert seat.status is MatchStatus.UNSUPPORTED
+    assert seat.status is MatchStatus.PARTIAL_MATCH
     assert seat.needs_review is True
+    assert ReviewFlag.SIBLING_PRODUCT in seat.flags
     assert ALPHA in seat.reason
     assert seat.evidence[0].page_number == 2  # shown, so a reviewer can look
 
@@ -355,3 +357,53 @@ def test_the_excluded_chunks_are_not_written_to_the_report(valves: Ontology) -> 
     result = _evaluate(["DISC MOC : ASTM A351 Gr. CF8M"], TWO_MODELS, valves)
     assert result.other_product_passages  # Alpha chosen, Beta held back
     assert "other_product_passages" not in result.model_dump()
+
+
+def _found_on(*pages: int) -> Comparison:
+    return Comparison(
+        requirement_id="1.1",
+        status=MatchStatus.FULL_MATCH,
+        needs_review=False,
+        decided_by=DecisionSource.RULE,
+        basis=LabelBasis.ATTRIBUTE,
+        reason="",
+        evidence=[
+            Evidence(
+                document="r.pdf",
+                sha256="r" * 64,
+                title="t",
+                page_number=p,
+                label="l",
+                value="v",
+                quote="q",
+                quote_parts=[],
+            )
+            for p in pages
+        ],
+    )
+
+
+def test_a_range_page_naming_the_type_is_not_capped(valves: Ontology) -> None:
+    # L&T API 600 p5: "Cast Steel Gate, Globe and Check Valves are offered in ..." (no heading).
+    groups = ProductGroups(
+        by_heading={},
+        unclear=[],
+        types={},
+        unowned={5: frozenset({"gate_valve", "globe_valve", "check_valve"}), 6: frozenset()},
+    )
+    item = leaves(
+        item_requirements(
+            LineItem(
+                item_no="1",
+                title="GLOBE VALVE",
+                description_lines=["DESIGN TEMP : 40 C"],
+                document="t.pdf",
+                page_number=1,
+            ),
+            valves,
+            SplitOptions(6, 2),
+        )
+    )[0].model_copy(update={"product_type": "globe_valve"})
+    assert _names_this_type(_found_on(5), groups, item) is True
+    assert _names_this_type(_found_on(6), groups, item) is False  # names no type: stays capped
+    assert _names_this_type(_found_on(5, 7), groups, item) is False  # p7 is owned elsewhere

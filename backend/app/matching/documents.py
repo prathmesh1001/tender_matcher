@@ -218,9 +218,40 @@ def _capped(comparison: Comparison) -> Comparison:
     )
 
 
+def _names_this_type(
+    comparison: Comparison, groups: ProductGroups, requirement: Requirement
+) -> bool:
+    """True if every evidence page is a page of the whole range naming the item's product type.
+
+    "L&T Valves Cast Steel Gate, Globe and Check Valves are offered in ..." (API 600 p5) is owned
+    by no heading but says it covers globe valves: no cap. An overview listing several products'
+    own values (Aquaseal p3) is owned by its headings, so it is not such a page and stays capped.
+    """
+    if requirement.product_type is None or not comparison.evidence:
+        return False
+    return all(
+        requirement.product_type in groups.unowned.get(e.page_number, frozenset())
+        for e in comparison.evidence
+    )
+
+
 def _from_another_product(comparison: Comparison, chosen: str | None) -> Comparison:
-    """Evidence from a sibling product says nothing about this one: unsupported + review."""
+    """Evidence only a sibling product of the same document gives: at most partial + review.
+
+    The maker offers the value on a product of the same family, so it may be available for
+    this one too, but the document does not say so: never full (B10, decided 2026-11-13). A
+    sibling product lacking the value says nothing against this one: unsupported, never missing.
+    """
     reason = f"stated only for another product in this document, not {chosen}"
+    if comparison.status in (MatchStatus.FULL_MATCH, MatchStatus.PARTIAL_MATCH):
+        return comparison.model_copy(
+            update={
+                "status": MatchStatus.PARTIAL_MATCH,
+                "needs_review": True,
+                "reason": reason,
+                "flags": [*comparison.flags, ReviewFlag.SIBLING_PRODUCT],
+            }
+        )
     return comparison.model_copy(
         update={
             "status": MatchStatus.UNSUPPORTED,
@@ -257,7 +288,7 @@ def _by_heading(
     open_chunks = groups.unclear if chosen is not None else [*groups.unclear, *other]
     result = compare(requirement, located_fields(open_chunks, fields), ctx, options.comparator)
     if result.status in decides:
-        return _capped(result)
+        return result if _names_this_type(result, groups, requirement) else _capped(result)
     whole = located_fields([*groups.unclear, *other], fields)
     result = compare(requirement, whole, ctx, options.comparator)
     return _from_another_product(result, chosen) if result.status in decides else result
