@@ -160,6 +160,7 @@ attributes:
     synonyms: [speed, rpm, rotational speed]
   - name: body_material
     dimension: none
+    material: true
     synonyms: [body, body material, body moc, moc of body, shell material, body bonnet,
                body and bonnet]
   - name: bonnet_type
@@ -167,28 +168,36 @@ attributes:
     synonyms: [bonnet type, bonnet construction, body bonnet construction]
   - name: disc_material
     dimension: none
+    material: true
     synonyms: [disc, disc material, disk, wedge, ball material, closure member]
   - name: seat_material
     dimension: none
+    material: true
     synonyms: [seat, seat material, seat ring, seal ring, liner, body liner, seat liner]
   - name: stem_material
     dimension: none
+    material: true
     synonyms: [stem, stem material, shaft, shaft material, pump shaft, spindle, hinge pin]
   - name: impeller_material
     dimension: none
+    material: true
     synonyms: [impeller, impeller material, impeller moc, moc of impeller]
   - name: casing_material
     dimension: none
+    material: true
     synonyms: [casing, casing material, casing moc, moc of casing, pump casing, delivery casing,
                volute casing]
   - name: motor_body_material  # "Motor Body" is not the pump's body
     dimension: none
+    material: true
     synonyms: [motor body]
   - name: trim_material
     dimension: none
+    material: true
     synonyms: [trim, trim material]
   - name: packing_material
     dimension: none
+    material: true
     synonyms: [packing, gland packing, stem seal]
   - name: end_connection
     dimension: none
@@ -220,8 +229,14 @@ attributes:
     dimension: none
     synonyms: [face to face, face-to-face, f to f]
 
+# Also what makes a vendor value a material: a material attribute fails only on a value naming
+# one of these, an equivalents term or a code ("CODE" or a lone "S" column mark decides nothing).
 material_names: [cast iron, ductile iron, sg iron, cast steel, carbon steel, stainless steel,
-                 alloy steel, ss, bronze, gun metal, gunmetal, brass, noryl]
+                 alloy steel, mild steel, ss, ci, cs, ms, bronze, gun metal, gunmetal, brass,
+                 noryl, aluminium, aluminum, copper, nickel, monel, inconel, hastelloy, titanium,
+                 duplex, stellite, chrome, chromium, epdm, nbr, nitrile, buna, viton, fkm, ptfe,
+                 rptfe, teflon, neoprene, hypalon, graphite, rubber, silicone, peek, nylon,
+                 polypropylene, pvc, upvc, cpvc, hdpe]
 
 codes:
   # Stainless grades: "SS 316L", "SS-316", "316 SS", "AISI 316"

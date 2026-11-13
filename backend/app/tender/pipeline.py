@@ -17,13 +17,13 @@ from app.ontology.schema import Ontology, ProductType
 from app.ontology.units import canonical_number
 from app.retrieval.text_normalizer import fold_text
 from app.schemas.chunking import ChunkDraft
-from app.schemas.enums import Operator
+from app.schemas.enums import Operator, RequirementType
 from app.schemas.requirements import LineItem, Requirement, ValueKind
 from app.tender.classifier import RequirementClassifier
 from app.tender.general import general_requirements
 from app.tender.line_items import ItemColumnOptions, is_schedule_row, line_items
 from app.tender.link_fetcher import BID_ROLE
-from app.tender.normalizer import stems, title_size, words
+from app.tender.normalizer import names_material, stems, title_size, words
 from app.tender.quality import QualityRules
 from app.tender.splitter import SIZE_LABEL, SplitOptions, item_requirements
 
@@ -181,10 +181,15 @@ def _classified(
         else (requirement.value_text)
     )
     line = options.classifier.classify(text, is_item=True)
+    req_type = line.req_type
+    if req_type is RequirementType.VAGUE and names_material(requirement.value_text, ontology):
+        # "High-quality aluminium die casting": the material is checkable, the praise is not.
+        category = options.classifier.sections.category(line.category)
+        req_type = options.classifier.rules.kind_types[category.kind] if category else req_type
     conflict = size_conflict(requirement, entry.title, ontology, options.designation_prefixes)
     return requirement.model_copy(
         update={
-            "req_type": line.req_type,
+            "req_type": req_type,
             "category": line.category,
             "evidence": line.evidence,
             "mandatory": line.mandatory,

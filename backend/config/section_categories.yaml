@@ -59,7 +59,8 @@ categories:
     description: Certificates and approvals asked of the bidder or with the supply.
     headings: [certificate, certification, approval, license, licence, undertaking]
     text: [iso 9001, bis licence, bis license, test certificate, mill test certificate,
-           type test, 3.1 certificate, en 10204, certificate of conformity, ibr certificate]
+           type test, 3.1 certificate, en 10204, certificate of conformity, ibr certificate,
+           test report, nabl]
 
   - name: costing_and_commercial
     kind: commercial

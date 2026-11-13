@@ -50,7 +50,7 @@ from app.schemas.enums import (
 from app.schemas.matching import Comparison, Evidence, LabelBasis
 from app.schemas.requirements import Requirement, ValueKind
 from app.schemas.sections import EvidenceSource
-from app.tender.normalizer import ParsedValue, resolve_attribute, stems, words
+from app.tender.normalizer import ParsedValue, names_material, resolve_attribute, stems, words
 
 _RANK: Final = {
     MatchStatus.FULL_MATCH: 3,
@@ -72,6 +72,7 @@ class ComparatorOptions:
     rel_tolerance: float
     max_evidence: int
     value_max_words: int
+    optional_markers: tuple[re.Pattern[str], ...] = ()
 
     @classmethod
     def from_settings(cls, settings: Settings) -> ComparatorOptions:
@@ -87,6 +88,10 @@ class ComparatorOptions:
             rel_tolerance=settings.COMPARATOR_REL_TOLERANCE,
             max_evidence=settings.COMPARATOR_MAX_EVIDENCE,
             value_max_words=settings.COMPARATOR_VALUE_MAX_WORDS,
+            optional_markers=tuple(
+                re.compile(rf"\b{re.escape(fold_text(m))}\b")
+                for m in settings.COMPARATOR_OPTIONAL_MARKERS
+            ),
         )
 
 
@@ -367,6 +372,25 @@ def _is_standard(requirement: Requirement, ctx: MatchContext) -> bool:
     return attribute is not None and bool(attribute.codes)
 
 
+def _names_no_material(
+    requirement: Requirement, value: str, have: frozenset[str], ctx: MatchContext
+) -> bool:
+    """True if a material is asked and the value names none ("CODE", a lone "S" column mark).
+
+    A material is named by an ontology material name ("Cast Iron"), an equivalents term ("CI")
+    or a code ("a216_wcb"); anything else is no evidence either way (bug 5, 8226616).
+    """
+    attribute = ctx.attribute(requirement)
+    if attribute is None or not attribute.material:
+        return False
+    named = (
+        names_material(value, ctx.ontology)
+        or bool(_families(value, ctx.ontology))
+        or any(is_code(t) for t in have)
+    )
+    return not named
+
+
 def judge_code(
     requirement: Requirement, value: str, ctx: MatchContext, options: ComparatorOptions
 ) -> _Outcome:
@@ -409,6 +433,8 @@ def judge_code(
         return _Outcome(MatchStatus.PARTIAL_MATCH, "same material, grade not printed")
     if _is_standard(requirement, ctx) and not any(is_code(t) for t in have):
         return _Outcome(None, "a standard is stated as a code; this value names none")
+    if _names_no_material(requirement, value, have, ctx):
+        return _Outcome(None, "a material is asked; this value names none")
     knows_materials = ctx.ontology is not None and bool(ctx.ontology.equivalents)
     if not knows_materials and not (_coded(have) and any(_coded(w) for w in wanted)):
         return _Outcome(None, "no material equivalents: cannot tell if these are the same")
@@ -510,6 +536,31 @@ def needs_judge(requirement: Requirement) -> bool:
     return routed(requirement) is None
 
 
+def only_offered(
+    outcome: _Outcome, located: LocatedField, value: str, options: ComparatorOptions
+) -> _Outcome:
+    """A full match the field marks "optional" or "on request" is partial (C7).
+
+    Only the field's own label and value are read: "optional" in another column of the row says
+    nothing about this one.
+
+    Args:
+        outcome: What the field decided.
+        located: The field.
+        value: Its value.
+        options: Holds the markers.
+
+    Returns:
+        The outcome, partial if the field only offers the value.
+    """
+    if outcome.status is not MatchStatus.FULL_MATCH:
+        return outcome
+    text = fold_text(f"{located.field.label} {value}")
+    if any(p.search(text) for p in options.optional_markers):
+        return _Outcome(MatchStatus.PARTIAL_MATCH, "catalogue offers it as optional / on request")
+    return outcome
+
+
 def compare(
     requirement: Requirement,
     fields: Sequence[LocatedField],
@@ -545,7 +596,7 @@ def compare(
             )
         else:
             outcome = judge_code(requirement, value, ctx, options)
-        judged.append(_evidence(located, value, outcome))
+        judged.append(_evidence(located, value, only_offered(outcome, located, value, options)))
     result = _decide(requirement, judged, basis, options)
     if result.status is not MatchStatus.FULL_MATCH:
         in_label = result.status is not MatchStatus.UNSUPPORTED
@@ -608,7 +659,8 @@ def _by_standard_code(
         have = code_tokens(text, noise, vocabulary)
         found = [w for w in wanted if w <= have]
         if found and (len(found) == len(wanted) or requirement.any_alternative):
-            (own if mine else untagged).append(_evidence(located, field.value, outcome))
+            offered = only_offered(outcome, located, field.value, options)
+            (own if mine else untagged).append(_evidence(located, field.value, offered))
     if own:
         return _decide(requirement, own, LabelBasis.ATTRIBUTE, options)
     if not untagged:

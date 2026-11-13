@@ -322,6 +322,11 @@ class Settings(BaseSettings):
         ge=0,
         description="Relative tolerance for numeric comparison after unit conversion.",
     )
+    COMPARATOR_OPTIONAL_MARKERS: list[str] = Field(
+        default=["optional", "on request", "upon request", "on demand"],
+        description="A catalogue field saying one of these only offers the value (C7): a full "
+        "match becomes partial.",
+    )
     COMPARATOR_VALUE_MAX_WORDS: int = Field(
         default=4,
         ge=1,

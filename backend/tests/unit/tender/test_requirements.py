@@ -244,6 +244,10 @@ def test_or_higher_stays_a_direction() -> None:
         ("Seat Retainer", "SS 410", None),
         ("Body Gasket", "Graphite", None),
         ("Stem packing Specification", "Graphite", "packing_material"),
+        # 8226616: the motor's body is not the pump's (like-for-like component).
+        ("Motor Body Material", "Aluminium die casting", "motor_body_material"),
+        # GeM prints the unit in brackets after the number.
+        ("Motor Power", "1.5 (horsepower)", "power"),
     ],
 )
 def test_whole_label_decides_the_attribute(

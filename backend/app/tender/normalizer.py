@@ -230,6 +230,26 @@ def operator_for(label: str | None, value: str) -> Operator:
     return Operator.EQ
 
 
+def names_material(text: str, ontology: Ontology | None) -> bool:
+    """True if the text names one of the ontology's materials anywhere ("... aluminium die ...").
+
+    Args:
+        text: A requirement's value.
+        ontology: Provides the material names; None names none.
+
+    Returns:
+        Whether a material name's words appear in order in the text.
+    """
+    if ontology is None:
+        return False
+    found = stems(text)
+    for name in ontology.material_names:
+        wanted = stems(name)
+        if any(found[i : i + len(wanted)] == wanted for i in range(len(found))):
+            return True
+    return False
+
+
 def label_unit(label: str | None, ontology: Ontology | None) -> str | None:
     """The one known unit a label prints in brackets ("Nominal Size (DN) (mm)" -> "mm").
 
@@ -279,6 +299,8 @@ def _numeric(
 ) -> ParsedValue:
     designation = match.group("designation")
     unit = fold_text(designation or match.group("unit") or "").strip() or None
+    if unit and not designation and unit.startswith("(") and unit.endswith(")"):
+        unit = unit[1:-1].strip() or None  # GeM prints "1.5 (horsepower)"
     if unit is None:
         unit = label_unit(label, ontology)
     canonical = None
@@ -421,7 +443,8 @@ def resolve_attribute(
     """Canonical attribute for a printed label, or None (no ontology, no match, no fit).
 
     The label's last words name the thing ("VALVE BODY MOC" -> body moc; "BODY SEAT" ->
-    seat), so a synonym ending at the label's end wins, then the longer synonym, and only
+    seat), so the synonym starting first wins ("MOTOR BODY MATERIAL" -> motor body), then one
+    ending at the label's end, then the longer synonym, and only
     generic words or codes may follow a synonym ("Design Temp." is not `design_standard`).
     The value must fit the attribute: "TORQUE AT SHAFT : 820 Nm" is not the shaft material.
     Words are stemmed on both sides, so catalogue labels ("Body Materials") resolve the same.
@@ -437,14 +460,16 @@ def resolve_attribute(
     if label is None or ontology is None:
         return None
     label_words = _label_stems(label, ontology)
-    best: tuple[int, int, str] | None = None
+    best: tuple[int, int, int, str] | None = None
     for attribute in ontology.attributes:
         if not _fits(attribute, value):
             continue
         for end, length in _synonym_spans(label_words, attribute):
             if not _rest_is_ignorable(label, end, ontology):
                 continue
-            rank = (int(end == len(label_words)), length, attribute.name)
-            if best is None or rank[:2] > best[:2]:
+            # Only generic words follow any candidate, so the one starting first names the
+            # most: "Motor Body Material" is the motor body, not the body.
+            rank = (length - end, int(end == len(label_words)), length, attribute.name)
+            if best is None or rank[:3] > best[:3]:
                 best = rank
-    return best[2] if best else None
+    return best[3] if best else None

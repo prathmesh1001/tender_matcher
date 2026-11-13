@@ -527,6 +527,38 @@ def test_another_material_is_still_missing(valves: Ontology) -> None:
     assert result.status is MatchStatus.MISSING_CAPABILITY
 
 
+@pytest.mark.parametrize(
+    ("header", "cells"),
+    [
+        (["Cast Iron Impeller", "Code"], ["Impeller", "CODE"]),  # DAB: a column title
+        (["Part", "CS"], ["Impeller", "S"]),  # Lowara: a lone column mark
+    ],
+)
+def test_a_value_naming_no_material_decides_nothing(
+    valves: Ontology, header: list[str], cells: list[str]
+) -> None:
+    result = _compare("IMPELLER MOC : Brass", [_row(header, cells)], valves)
+    assert result.status is MatchStatus.UNSUPPORTED
+
+
+@pytest.mark.parametrize("value", ["EPDM", "Ductile Iron", "Cast Iron"])
+def test_a_named_material_still_fails(valves: Ontology, value: str) -> None:
+    row = _row(["Part", "Material"], ["Impeller", value])
+    assert _compare("IMPELLER MOC : Brass", [row], valves).status is MatchStatus.MISSING_CAPABILITY
+
+
+@pytest.mark.parametrize("value", ["Cast Iron (optional)", "Cast Iron on request"])
+def test_an_optional_offer_is_partial(valves: Ontology, value: str) -> None:
+    row = _row(["Part", "Material"], ["Body", value])
+    result = _compare("BODY MOC : CI", [row], valves)
+    assert result.status is MatchStatus.PARTIAL_MATCH  # C7
+
+
+def test_optional_in_another_column_does_not_matter(valves: Ontology) -> None:
+    row = _row(["Part", "Material", "Gear Operator"], ["Body", "Cast Iron", "Optional"])
+    assert _compare("BODY MOC : CI", [row], valves).status is MatchStatus.FULL_MATCH
+
+
 def test_tender_naming_only_the_material_is_met_by_its_grade_code(valves: Ontology) -> None:
     row = _row(["Part", "Material"], ["Body", "Cast Iron EN 1561 Gr. 200"])
     assert _compare("BODY MOC : CI", [row], valves).status is MatchStatus.FULL_MATCH
@@ -679,6 +711,13 @@ def test_flange_drilling_after_a_design_scope_is_not_the_design_standard(
     )
     result = _compare("Design Standard : IS 13095", [row], valves)
     assert result.status is UNSUPPORTED
+
+
+def test_a_standard_offered_as_optional_is_partial(valves: Ontology) -> None:
+    # KBL (8188046): "Optional for Valves as per IS 13095" offers the standard, it is no default.
+    prose = _prose("Optional for Valves as per IS 13095")
+    result = _compare("Design Standard : IS 13095", [prose], valves)
+    assert result.status is PARTIAL
 
 
 def test_a_standard_code_needs_the_ontology(valves: Ontology) -> None:

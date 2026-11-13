@@ -56,6 +56,10 @@ class Attribute(BaseModel):
     critical: bool = Field(
         default=False, description="Identifies the product: decides which catalogue is chosen."
     )
+    material: bool = Field(
+        default=False,
+        description="Its value is a material: a vendor value naming none decides nothing.",
+    )
     codes: list[str] = Field(
         default_factory=list,
         description="Standards that can only be this attribute ('API 598'): printed in the "

@@ -44,6 +44,11 @@ single_firm_patterns:
   - '\bsingle\s+tender\s+applicable\s*:\s*yes\b'
   - '\bproprietary\s+tender\b'
 
+# GeM's bracketed notes inside a specification name, cut before the line is classified (the
+# printed text is kept). "Face to Face Dimension (In this context, the final decision made by
+# the consignee/ Buyer shall be binding)" is a size, not a delivery line (8188046).
+note_pattern: '\(\s*(?:in\s+this\s+context|hint)\b[^)]*\)'
+
 # An acceptable-make list: the line naming it, each entry, and what ends the list. Roman
 # markers (i, v, x) number the entries; any other letter ("b)") is the next clause.
 make_list_pattern: 'following\s+makes?\b[^:]*:\s*(?P<list>.*)'

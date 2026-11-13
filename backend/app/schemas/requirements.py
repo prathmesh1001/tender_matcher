@@ -22,6 +22,7 @@ class RequirementRules(BaseModel):
     or_equivalent: list[str] = Field(default_factory=list)
     make_patterns: list[str] = Field(default_factory=list)
     single_firm_patterns: list[str] = Field(default_factory=list)
+    note_pattern: str = ""
     make_list_pattern: str
     make_list_item_pattern: str
     make_list_end_pattern: str

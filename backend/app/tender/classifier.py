@@ -82,6 +82,7 @@ class RequirementClassifier:
     make_list: re.Pattern[str]
     make_list_item: re.Pattern[str]
     make_list_end: re.Pattern[str]
+    note: re.Pattern[str] | None = None
 
     @classmethod
     def from_settings(cls, settings: Settings) -> RequirementClassifier:
@@ -110,7 +111,12 @@ class RequirementClassifier:
             make_list=re.compile(rules.make_list_pattern, re.IGNORECASE),
             make_list_item=re.compile(rules.make_list_item_pattern, re.IGNORECASE),
             make_list_end=re.compile(rules.make_list_end_pattern),
+            note=re.compile(rules.note_pattern, re.IGNORECASE) if rules.note_pattern else None,
         )
+
+    def without_notes(self, text: str) -> str:
+        """The line without GeM's bracketed notes ("(Hint: Select NA ...)"), for classifying."""
+        return self.note.sub(" ", text) if self.note else text
 
     def named_make(self, text: str) -> str | None:
         """The make a line names ("Make: M/s. X"), as printed, or None."""
@@ -159,7 +165,7 @@ class RequirementClassifier:
             The classification. A line naming no category gets the item default when
             `is_item`, else the default category with no evidence source.
         """
-        normalized = normalize_for_search(text, _NEUTRAL)
+        normalized = normalize_for_search(self.without_notes(text), _NEUTRAL)
         found = self.sections.classify(normalize_for_search(heading or "", _NEUTRAL), normalized)
         name = found.category
         if name == self.sections.default and is_item:

@@ -180,6 +180,29 @@ def test_unknown_line_has_no_evidence_source(classifier: RequirementClassifier) 
     assert (found.category, found.evidence) == ("other", None)
 
 
+def test_gem_note_in_a_spec_name_does_not_decide_the_category(
+    classifier: RequirementClassifier,
+) -> None:
+    # 8188046: the note names the consignee, the row is a dimension.
+    found = classifier.classify(
+        "Face to Face Dimension (In this context the final decision made by the consignee/ "
+        "Buyer shall be binding) : Wafer Short (PN 2.5) Class 125/150",
+        is_item=True,
+    )
+    assert (found.category, found.evidence) == ("size_and_dimensions", EvidenceSource.CATALOGUE)
+
+
+def test_test_report_row_is_a_vendor_document(classifier: RequirementClassifier) -> None:
+    found = classifier.classify(
+        "Availability of Test Report from type of Lab to prove the conformity of product to the "
+        'specification (Hint: Select ""NA""If test report not available) : NABL Accredited Lab',
+        is_item=True,
+    )
+    assert (found.category, found.evidence) == (
+        "certifications_and_licenses", EvidenceSource.VENDOR_DOCUMENTS,
+    )  # fmt: skip
+
+
 def test_item_line_with_no_category_is_technical(classifier: RequirementClassifier) -> None:
     found = classifier.classify("FLUID: WATER", is_item=True)
     assert (found.category, found.req_type) == (
@@ -307,6 +330,16 @@ def test_item_requirements_are_classified(options: RequirementOptions, ontology:
     assert (body.evidence, body.mandatory) == (EvidenceSource.CATALOGUE, True)
     assert body.product_type == "butterfly_valve"
     assert warranty.evidence is EvidenceSource.VENDOR_DOCUMENTS
+
+
+def test_a_named_material_is_not_vague(options: RequirementOptions, ontology: Ontology) -> None:
+    line = "Motor Body Material : High-quality aluminium die casting"
+    chunk = _schedule("MONOBLOCK PUMP", f"{line}\nFINISH : good quality")
+    chunk.meta["cell_lines"] = [[], [], [line, "FINISH : good quality"]]
+    [entry] = tender_requirements([chunk], "spec.pdf", options, [ontology])
+    body, finish = entry.requirements
+    assert (body.attribute, body.req_type) == ("motor_body_material", RequirementType.TECHNICAL)
+    assert finish.req_type is RequirementType.VAGUE  # nothing named, still vague
 
 
 def test_make_in_the_column_header_applies_to_the_item(
