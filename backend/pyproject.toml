@@ -29,6 +29,8 @@ dependencies = [
     #   pip install torch --index-url https://download.pytorch.org/whl/cu130
     "sentence-transformers>=3.0",
     "rank-bm25>=0.2.2",      # Okapi BM25 over the product-filtered chunks' search_text
+    "redis>=5.0",            # job queue store (JOB_QUEUE_BACKEND=rq)
+    "rq>=2.0",               # run jobs in a worker process; queued runs survive an API restart
 ]
 
 [project.optional-dependencies]

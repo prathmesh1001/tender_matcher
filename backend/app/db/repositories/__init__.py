@@ -8,6 +8,7 @@ from app.db.repositories.result_repository import ResultRepository
 from app.db.repositories.run_repository import RunRepository
 from app.db.repositories.section_repository import SectionRepository
 from app.db.repositories.spec_fact_repository import SpecFactRepository
+from app.db.repositories.stored_file_repository import StoredFileRepository
 from app.db.repositories.tender_repository import TenderRepository
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "RunRepository",
     "SectionRepository",
     "SpecFactRepository",
+    "StoredFileRepository",
     "TenderRepository",
 ]

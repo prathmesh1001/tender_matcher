@@ -30,9 +30,17 @@ class LogLevel(StrEnum):
 
 
 class FileStoreBackend(StrEnum):
-    """Where source files are stored (Postgres is added in plan step 16)."""
+    """Where source files are stored."""
 
-    LOCAL = "local"
+    LOCAL = "local"  # on disk under FILE_STORE_ROOT
+    POSTGRES = "postgres"  # in the database (`import-files` copies the local files in)
+
+
+class JobQueueBackend(StrEnum):
+    """Where runs wait and execute."""
+
+    THREAD = "thread"  # one worker thread inside the API process (dev, Windows)
+    RQ = "rq"  # Redis queue + `python -m app.workers.worker` process (Docker)
 
 
 class LLMProvider(StrEnum):
@@ -551,6 +559,14 @@ class Settings(BaseSettings):
     RUNS_LIST_LIMIT: int = Field(default=100, ge=1, description="Most runs `GET /runs` returns.")
     RUN_ERROR_MAX_CHARS: int = Field(
         default=2000, ge=1, description="Longest failure reason kept on a run."
+    )
+    JOB_QUEUE_BACKEND: JobQueueBackend = Field(default=JobQueueBackend.THREAD)
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379/0", description="Redis for the RQ job queue."
+    )
+    RQ_QUEUE_NAME: str = Field(default="runs", min_length=1)
+    RQ_JOB_TIMEOUT_S: int = Field(
+        default=3600, ge=1, description="A run taking longer is stopped and marked failed."
     )
     TENDER_LINK_RULES_FILE: Path = Field(
         default=Path("config/tender_links.yaml"),

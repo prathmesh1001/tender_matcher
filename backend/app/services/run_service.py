@@ -30,7 +30,7 @@ from app.services.manufacturer_service import ManufacturerService, build_manufac
 from app.services.match_service import build_match_service
 from app.services.report_service import build_report_service
 from app.tender.link_fetcher import tender_folder
-from app.workers.tasks import JobQueue
+from app.workers.tasks import JobName, JobQueue
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +114,19 @@ class RunService:
         self._fetch_links = fetch_links
         self._manufacturers = manufacturers
         self._warm_up = warm_up
+        queue.bind(self.handle)
+
+    def handle(self, job: JobName, argument: str) -> None:
+        """Execute one queued job, in whichever process runs the queue.
+
+        Args:
+            job: Which job.
+            argument: The run id for a run; unused for a warm-up.
+        """
+        if job is JobName.RUN:
+            self.execute(uuid.UUID(argument))
+        elif self._warm_up is not None:
+            _warm(self._warm_up)
 
     def warm_catalogues(self) -> bool:
         """Queue reading every catalogue into the cache; runs queued after it find it ready.
@@ -125,7 +138,7 @@ class RunService:
         """
         if self._warm_up is None:
             return False
-        self._queue.enqueue(_warm, self._warm_up)
+        self._queue.submit(JobName.WARM_UP)
         return True
 
     def start(self, request: StartRunRequest) -> RunResponse:
@@ -153,7 +166,7 @@ class RunService:
                 )
             )
             response = _response(run)
-        self._queue.enqueue(self.execute, response.run_id)
+        self._queue.submit(JobName.RUN, str(response.run_id))
         return response
 
     def get(self, run_id: uuid.UUID) -> RunResponse:

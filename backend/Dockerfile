@@ -26,5 +26,6 @@ USER app
 
 EXPOSE 8000
 
-# One worker only: startup marks unfinished runs failed, and the job queue lives in this process.
+# The API; docker compose runs the same image as `python -m app.workers.worker` for the runs.
+# One uvicorn worker: each API process queues a catalogue warm-up when it starts.
 CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000 --workers 1"]

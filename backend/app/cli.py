@@ -14,6 +14,7 @@ Usage (from backend/):
     python -m app.cli parse-tender --tender GEM_2026_B_8119613      # requirements, no matching
     python -m app.cli gold-diff --gold ../eval/gold/8119613.yaml [--out FILE]
     python -m app.cli extract-specs [--manufacturer NAME] [--reprocess]   # calls the LLM
+    python -m app.cli import-files       # copy local PDFs into Postgres (FILE_STORE_BACKEND)
 
 Exit code 1 if any file failed.
 """
@@ -34,6 +35,7 @@ from app.reporting.json_report import write_json_report
 from app.schemas.enums import DocumentSource, ExtractionStatus
 from app.schemas.report import ExtractionQuality, SingleFirmWarning
 from app.schemas.requirements import Requirement
+from app.services.file_import_service import build_file_import_service
 from app.services.indexing_service import build_indexing_service
 from app.services.ingestion_service import (
     BatchResult,
@@ -275,6 +277,20 @@ def run_extract_specs(settings: Settings, manufacturer: str | None, *, reprocess
     return _report_failures(result)
 
 
+def run_import_files(settings: Settings) -> int:
+    """Copy every local source file into the Postgres file store and print what changed."""
+    folders = [settings.MANUFACTURER_DATA_DIR, settings.TENDER_DATA_DIR]
+    result = build_file_import_service(settings).import_files(folders)
+    _out(
+        f"Files: {len(result.copied)} copied ({result.new_blobs} new contents), "
+        f"{len(result.unchanged)} already stored"
+    )
+    for ref in result.copied:
+        _out(f"  + {ref}")
+    _out("Set FILE_STORE_BACKEND=postgres to read them from the database.")
+    return 0
+
+
 def run_gold_diff(settings: Settings, gold_file: str, out: str | None) -> int:
     """Match the gold's tender with and without the ontology and write the diff as markdown."""
     gold = load_gold(Path(gold_file))
@@ -328,6 +344,7 @@ def build_parser() -> argparse.ArgumentParser:
     diff = sub.add_parser("gold-diff", help="compare match results with a gold file -> markdown")
     diff.add_argument("--gold", required=True, help="gold file, e.g. ../eval/gold/8119613.yaml")
     diff.add_argument("--out", default=None, help="diff path (default: REPORT_DIR)")
+    sub.add_parser("import-files", help="copy local source files into the Postgres file store")
     specs = sub.add_parser("extract-specs", help="LLM spec facts from stored catalogues")
     specs.add_argument("--manufacturer", default=None)
     specs.add_argument("--reprocess", action="store_true", help="replace facts already stored")
@@ -368,6 +385,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_extract_specs(settings, args.manufacturer, reprocess=args.reprocess)
     if args.command == "index-status":
         return run_index_status(settings)
+    if args.command == "import-files":
+        return run_import_files(settings)
     service = build_ingestion_service(settings)
     failures = 0
     match args.command:

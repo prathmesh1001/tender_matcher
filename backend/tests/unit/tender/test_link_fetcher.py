@@ -219,7 +219,7 @@ def test_failed_download_is_reported_not_raised(tmp_path: Path, rules: CompiledL
 def test_manifest_round_trip_and_init(tmp_path: Path) -> None:
     folder = tmp_path / "T2"
     _pdf_with_links(folder / "bid.pdf", [], text="Bid Number: GEM/2026/B/1234567")
-    manifest = init_manifest(folder)
+    manifest = init_manifest(folder / "bid.pdf")
     assert manifest.bid_number == "GEM/2026/B/1234567"
     assert manifest.files[0].url is None
     write_manifest(folder / "tender.yaml", manifest)

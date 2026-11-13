@@ -9,6 +9,7 @@ from app.db.models.result import Evidence, MatchResult
 from app.db.models.run import Run
 from app.db.models.section import DocumentSection
 from app.db.models.spec_fact import SpecFact
+from app.db.models.stored_file import FileBlob, StoredFile
 from app.db.models.tender import LineItem, Requirement, Tender, TenderDocument
 
 __all__ = [
@@ -17,6 +18,7 @@ __all__ = [
     "Document",
     "DocumentSection",
     "Evidence",
+    "FileBlob",
     "JudgeAnswer",
     "LineItem",
     "MatchResult",
@@ -24,6 +26,7 @@ __all__ = [
     "Requirement",
     "Run",
     "SpecFact",
+    "StoredFile",
     "Tender",
     "TenderDocument",
     "TextEmbedding",

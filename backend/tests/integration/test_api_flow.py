@@ -29,6 +29,7 @@ from app.schemas.requirements import LineItem, Requirement, ValueKind
 from app.schemas.sources import RegisteredSource
 from app.services.manufacturer_service import ManufacturerService
 from app.services.run_service import Matcher, RunService
+from app.workers.tasks import JobHandler, JobName
 from tests.conftest import make_test_settings
 from tests.integration.factories import make_document
 
@@ -130,14 +131,26 @@ def _report(citing: str | None = None) -> TenderReport:
 class _Inline:
     """Runs jobs at once, so a test sees the finished run."""
 
-    def enqueue[T](self, job: Callable[[T], None], argument: T) -> None:
-        job(argument)
+    survives_restart = False
+
+    def __init__(self) -> None:
+        self._handler: JobHandler | None = None
+
+    def bind(self, handler: JobHandler) -> None:
+        self._handler = handler
+
+    def submit(self, job: JobName, argument: str = "") -> None:
+        assert self._handler is not None
+        self._handler(job, argument)
+
+    def shutdown(self) -> None:
+        return None
 
 
-class _Hold:
+class _Hold(_Inline):
     """Never runs jobs, so a test sees the queued run."""
 
-    def enqueue[T](self, job: Callable[[T], None], argument: T) -> None:
+    def submit(self, job: JobName, argument: str = "") -> None:
         return None
 
 

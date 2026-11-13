@@ -308,16 +308,15 @@ def tender_folder(bid_number: str, revision: int = 1) -> str:
     return folder if revision == 1 else f"{folder}_r{revision}"
 
 
-def init_manifest(tender_dir: Path) -> TenderManifest:
+def init_manifest(bid: Path) -> TenderManifest:
     """Create a manifest for a tender folder that only has a user-provided bid.pdf.
 
     Args:
-        tender_dir: Folder containing `bid.pdf`.
+        bid: A readable copy of the folder's `bid.pdf` (from the file store).
 
     Returns:
         A manifest with the bid document (URL unknown) as its only file.
     """
-    bid = tender_dir / BID_FILENAME
     content = bid.read_bytes()
     entry = ManifestFile(
         file=BID_FILENAME,

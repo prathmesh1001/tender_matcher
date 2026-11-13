@@ -114,8 +114,12 @@ class TenderService:
         revision = first
         while True:
             bid = self._tender_root / tender_folder(bid_number, revision) / BID_FILENAME
-            if not bid.is_file() or sha256_hex(bid.read_bytes()) == sha256:
+            ref = self._store.ref_for(bid)
+            if not self._store.exists(ref):
                 return revision
+            with self._store.local_path(ref) as stored:
+                if sha256_hex(stored.read_bytes()) == sha256:
+                    return revision
             revision += 1
 
     def _store_files(self, folder: str, content: bytes) -> str:
@@ -123,11 +127,13 @@ class TenderService:
         tender_dir = self._tender_root / folder
         bid = tender_dir / BID_FILENAME
         ref = self._store.ref_for(bid)
-        if not bid.is_file():
+        if not self._store.exists(ref):
             self._store.write(ref, content)
         manifest = tender_dir / MANIFEST_FILENAME
-        if not manifest.is_file():
-            write_manifest(manifest, init_manifest(tender_dir))
+        if not manifest.is_file():  # provenance stays on disk whatever the store
+            tender_dir.mkdir(parents=True, exist_ok=True)
+            with self._store.local_path(ref) as stored:
+                write_manifest(manifest, init_manifest(stored))
         return ref
 
 

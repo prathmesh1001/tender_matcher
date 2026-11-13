@@ -17,20 +17,21 @@ from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.db.session import create_db_engine, create_session_factory
 from app.services.run_service import build_run_service
-from app.workers.tasks import ThreadJobQueue
+from app.workers.tasks import build_job_queue
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Fail lost runs and warm the catalogue cache; on shutdown stop the queue and the DB."""
-    try:
-        lost = app.state.run_service.fail_interrupted()
-        if lost:
-            logger.warning("marked interrupted runs failed", extra={"runs": lost})
-    except SQLAlchemyError as exc:  # the API still starts without a DB; requests then report it
-        logger.warning("could not check for interrupted runs", extra={"error": str(exc)})
+    """Fail runs a thread queue lost, warm the catalogue cache; on shutdown stop queue and DB."""
+    if not app.state.job_queue.survives_restart:  # RQ runs still wait in Redis
+        try:
+            lost = app.state.run_service.fail_interrupted()
+            if lost:
+                logger.warning("marked interrupted runs failed", extra={"runs": lost})
+        except SQLAlchemyError as exc:  # the API starts without a DB; requests then report it
+            logger.warning("could not check for interrupted runs", extra={"error": str(exc)})
     app.state.run_service.warm_catalogues()
     yield
     app.state.job_queue.shutdown()
@@ -63,7 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # The engine connects lazily, so building the app never requires a reachable DB.
     app.state.engine = create_db_engine(settings)
     app.state.session_factory = create_session_factory(app.state.engine)
-    app.state.job_queue = ThreadJobQueue()
+    app.state.job_queue = build_job_queue(settings)
     app.state.run_service = build_run_service(
         settings, app.state.session_factory, app.state.job_queue
     )

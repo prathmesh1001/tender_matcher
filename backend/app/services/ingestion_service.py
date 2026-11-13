@@ -222,10 +222,12 @@ class IngestionService:
     def _fetch_one(self, tender_dir: Path, client: httpx.Client) -> CrawlReport:
         """Crawl one tender folder and save its manifest."""
         manifest_path = tender_dir / MANIFEST_FILENAME
-        manifest = (
-            read_manifest(manifest_path) if manifest_path.is_file() else init_manifest(tender_dir)
-        )
         new = not manifest_path.is_file()
+        if new:
+            with self.store.local_path(self.store.ref_for(tender_dir / BID_FILENAME)) as bid:
+                manifest = init_manifest(bid)
+        else:
+            manifest = read_manifest(manifest_path)
         report = self._crawler(client).crawl(self.store.ref_for(tender_dir), manifest)
         if new or report.fetched:  # a tracked provenance file: only rewritten when it changes
             write_manifest(manifest_path, manifest)

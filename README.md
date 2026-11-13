@@ -62,11 +62,28 @@ cache you already have, set this in the shell or in a `.env` next to `docker-com
 HF_CACHE_DIR=C:/Users/you/.cache/huggingface
 ```
 
-### Keep to one API process
+### Runs: Redis queue and worker
 
-Use a single uvicorn worker, and do not run a host uvicorn against the same database as the
-container. Startup marks unfinished runs as failed, and the job queue lives inside that process,
-so a second API would fail the first one's running jobs.
+Compose runs the API, a Redis queue and one worker (`python -m app.workers.worker`, same image).
+The API only queues runs; the worker executes them one at a time and keeps the catalogue cache in
+memory between runs. Queued runs survive an API restart. Logs of a run: `docker compose logs
+worker`.
+
+Without Docker the default `JOB_QUEUE_BACKEND=thread` runs jobs on a thread inside the API. Then
+keep to a single uvicorn worker and do not run a host uvicorn against the container's database:
+startup marks unfinished runs failed, which would fail the other process's running jobs.
+
+### Files in Postgres (optional)
+
+PDFs live in the mounted `data/` folder by default. To keep them in the database instead (one copy
+per sha256), copy them in once and switch the store:
+
+```sh
+docker compose exec backend python -m app.cli import-files   # idempotent; YAML stays on disk
+FILE_STORE_BACKEND=postgres docker compose up -d
+```
+
+`sources.yaml` and `tender.yaml` are provenance tracked in git and are always read from disk.
 
 ## Settings
 
@@ -84,6 +101,8 @@ to change:
 | `LLM_JUDGE_LOW_SCORE_HITS` | `3` | When the right product's passages all score below `RERANK_MIN_SCORE`, this many go to the judge (0 turns it off) |
 | `RANKING_MIN_COVERAGE_PCT` | `50` | Below this, a manufacturer is listed last as low coverage |
 | `TENDER_UPLOAD_MAX_MB` | `50` | Largest `bid.pdf` the API accepts |
+| `JOB_QUEUE_BACKEND` | `thread` (Compose: `rq`) | `rq` queues runs in Redis for the worker process |
+| `FILE_STORE_BACKEND` | `local` | `postgres` reads source files from the database (after `import-files`) |
 
 Judge answers are cached in the `judge_answers` table, keyed by a hash of the prompt version,
 model and full prompt (requirement text and passage chunk ids). A rerun gives the same answers and
@@ -97,6 +116,7 @@ Read by Compose from the shell or a `.env` next to `docker-compose.yml`, not fro
 | `POSTGRES_PORT` | `5433` | Host port of the database |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `tender` / `tender` / `tender_matcher` | Database login; change them outside local use |
 | `HF_CACHE_DIR` | Docker volume | Existing Hugging Face cache folder |
+| `FILE_STORE_BACKEND` | `local` | File store of the API and worker containers |
 
 Compose sets `DATABASE_URL`, the data folders and the Tesseract paths for the container, and these
 win over `backend/.env`.
@@ -207,8 +227,6 @@ Details, the step by step results and their causes are in the [write-up](docs/wr
 - A range title naming several products in a form the ontology misses (L&T API 600 p16) leaves
   that page under the previous product heading.
 - Spec fact extraction has never run on real catalogues, so `spec_facts` is empty.
-- No Redis queue: jobs run inside the API process, so a restart fails any run in progress.
-- Files are not in Postgres; they stay in the mounted `data/` folder.
 - Docker images are not published; build them with `docker compose up --build`.
 - Duncan and Intervalve Poonawala catalogues are missing.
 

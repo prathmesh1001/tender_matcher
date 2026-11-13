@@ -422,10 +422,10 @@ The flag warns but does not fix anything. Two tenders with garbled scanned lines
 
 **Operations**
 
-- No Redis queue: jobs run in a queue inside the single API process, so a restart fails any run in
-  progress. RQ and Redis from the plan are not added.
-- Files are not in Postgres: they stay in the mounted `data/` folder, and PDFs are not in git or
-  the images, so a fresh clone must supply them.
+- Runs go through Redis to one RQ worker in Docker (`JOB_QUEUE_BACKEND=rq`); without Docker they
+  run on a thread of the API, where a restart fails a run in progress.
+- Source files can live in Postgres (`FILE_STORE_BACKEND=postgres`, filled by `import-files`), but
+  PDFs are not in git or the images, so a fresh clone must still supply them once.
 - Docker images are not published to a registry; they are built locally with `docker compose up
   --build`.
 - The Docker image is CPU only: 20 chunks took about 160 seconds to embed, so a new database should

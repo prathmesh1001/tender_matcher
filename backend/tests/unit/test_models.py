@@ -26,6 +26,8 @@ EXPECTED_TABLES = {
     "evidence",
     "line_items",
     "judge_answers",
+    "file_blobs",
+    "stored_files",
 }
 
 

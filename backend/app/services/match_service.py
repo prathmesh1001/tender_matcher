@@ -55,7 +55,7 @@ from app.schemas.report import (
 )
 from app.schemas.requirements import Requirement
 from app.schemas.sections import EvidenceSource
-from app.storage.file_store import FileStore, build_file_store
+from app.storage.file_store import FileStore, LocalFileStore, build_file_store
 from app.tender.items import ItemSource, TenderFile, TenderRequirements, parse_tender_files
 from app.tender.link_fetcher import MANIFEST_FILENAME, read_manifest
 from app.tender.ocr_flags import LowRow, flag_low_ocr, low_confidence_rows
@@ -108,6 +108,7 @@ class MatchService:
         ontologies: Sequence[Ontology],
         tender_root: Path,
         judge: ItemJudge | None = None,
+        store: FileStore | None = None,
     ) -> None:
         self._source = source
         self._tender_options = tender_options
@@ -117,6 +118,7 @@ class MatchService:
         self._ontologies = list(ontologies)
         self._tender_root = tender_root
         self._judge = judge
+        self._store = store or LocalFileStore(tender_root.parent)
 
     def parse_tender(
         self, tender: str, *, use_ontology: bool = True, unfetched: Sequence[str] = ()
@@ -148,8 +150,10 @@ class MatchService:
         quality = self._requirement_options.quality
         for entry in manifest.stored_files():
             path = tender_dir / (entry.file or "")
-            if is_supported(path) and path.is_file():
-                processed = process_file(path, self._tender_options)
+            ref = self._store.ref_for(path)
+            if is_supported(path) and self._store.exists(ref):
+                with self._store.local_path(ref) as local:
+                    processed = process_file(local, self._tender_options)
                 files.append(TenderFile(path.name, entry.role, processed.chunks))
                 low_ocr |= low_confidence_pages(
                     path.name, processed.pages, quality.ocr_min_confidence
@@ -335,4 +339,5 @@ def build_match_service(
         ontologies=ontologies,
         tender_root=settings.TENDER_DATA_DIR,
         judge=judge,
+        store=files,
     )
