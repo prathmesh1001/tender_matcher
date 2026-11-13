@@ -138,6 +138,55 @@ def test_item_category_is_the_last_source(options: RequirementOptions, ontology:
     assert not any(r.document == "buyer_spec.pdf" for r in found.general)  # used as item text
 
 
+BFV_TITLE = "Butterfly Valves (V2) as per IS 13095 (Q2)"
+
+
+def _gem_row(name: str, value: str, page: int) -> ChunkDraft:
+    header = ["Specification", "Specification Name", "Bid Requirement (Allowed Values)"]
+    cells = ["GENERIC", name, value]
+    text = "; ".join(f"{h}: {c}" for h, c in zip(header, cells, strict=True))
+    return ChunkDraft(
+        page_number=page,
+        position=0,
+        chunk_type=ChunkType.TABLE_ROW,
+        raw_text=text,  # printed like the bid's rows: "Specification Name: ...; Bid ...: ..."
+        token_count=1,
+        meta={"header": header, "cells": cells},
+    )
+
+
+def _bfv_bid(*blocks: tuple[str, str, int]) -> list[TenderFile]:
+    """A bid like 8188046: the item category, then per item its quantity line and spec table."""
+    chunks = [_row(["Column 1", "Column 2"], ["Item Category", BFV_TITLE])]
+    for quantity, size, page in blocks:
+        chunks.append(_prose(f"Butterfly Valves (V2) As Per IS 13095 ( {quantity} pieces )", page))
+        chunks.append(_gem_row("Conformity to Governing Specification (ISS)", "IS 13095", page))
+        chunks.append(_gem_row("Nominal Size (DN) (mm)", size, page))
+    return [TenderFile("bid.pdf", "bid_document", chunks)]
+
+
+def test_each_quantity_block_of_the_category_is_its_own_item(
+    options: RequirementOptions, ontology: Ontology
+) -> None:
+    found = parse_tender_files(_bfv_bid(("70", "100", 4), ("25", "150", 5)), options, [ontology])
+    assert [(e.item.item_no, e.item.quantity) for e in found.items] == [("1", "70"), ("2", "25")]
+    for entry, size, page in zip(found.items, ["100", "150"], [4, 5], strict=True):
+        specs = [r for r in leaves(entry.requirements) if r.label != ITEM_LABEL]
+        assert [r.value_text for r in specs] == ["IS 13095", size]  # the standard on both
+        assert {r.page_number for r in specs} == {page}
+        assert {r.item_no for r in entry.requirements} == {entry.item.item_no}
+        assert len({r.id for r in entry.requirements}) == len(entry.requirements)
+    assert not any("pieces" in r.raw_text for r in found.general)  # quantity lines used
+
+
+def test_one_quantity_block_stays_one_item(options: RequirementOptions, ontology: Ontology) -> None:
+    found = parse_tender_files(_bfv_bid(("70", "100", 4)), options, [ontology])
+    [entry] = found.items
+    assert (entry.item.item_no, entry.item.quantity, entry.item.unit) == ("1", "70", "pieces")
+    specs = [r.value_text for r in leaves(entry.requirements) if r.label != ITEM_LABEL]
+    assert specs == ["IS 13095", "100"]
+
+
 def test_several_products_in_the_category_are_not_guessed(
     options: RequirementOptions, ontology: Ontology
 ) -> None:

@@ -58,6 +58,10 @@ _CATEGORY_ITEM_NO: Final = "1"
 _TRAILING_NUMBER: Final = re.compile(r"(\d+)$")
 _NOT_A_FILE_NAME_CHAR: Final = re.compile(r"[^A-Za-z0-9]+")
 _DEVANAGARI: Final = re.compile("[ऀ-ॿ]")
+# GeM's quality level after a category title: "Butterfly Valves (V2) as per IS 13095 (Q2)".
+_QUALITY_TAG: Final = re.compile(r"\s*\(\s*q\d+\s*\)\s*$", re.IGNORECASE)
+# What follows the title on an item's block line: "( 70 pieces )".
+_QUANTITY: Final = re.compile(r"\s*\(\s*(?P<qty>\d+(?:\.\d+)?)\s+(?P<unit>[a-z][a-z. ]*)\)")
 
 
 class ItemSource(StrEnum):
@@ -471,7 +475,11 @@ def _general(
         if file.name in schedule:
             out.extend(tender_general_requirements(chunks, file.name, options))
         else:
-            out.extend(general_requirements(chunks, file.name, options.classifier))
+            out.extend(
+                general_requirements(
+                    chunks, file.name, options.classifier, options.spec_row_labels[0]
+                )
+            )
     return out
 
 
@@ -493,7 +501,13 @@ def spec_row_line(text: str, labels: tuple[str, str]) -> str | None:
         r"(?P<value>.+)$",
         re.IGNORECASE | re.DOTALL,
     )
-    found = pattern.search(text)
+    # A row whose value header kept only its Hindi part at a page break ("बड के िलए: IS 13095"):
+    # the one field after the name is the value.
+    headless = re.compile(
+        rf"{re.escape(name_label)}\s*:\s*(?P<name>[^;]+);[^:;]*:\s*(?P<value>[^;]+)$",
+        re.IGNORECASE | re.DOTALL,
+    )
+    found = pattern.search(text) or headless.search(text)
     if found is None:
         return None
     name, value = found["name"].strip(), " ".join(found["value"].split())
@@ -506,22 +520,67 @@ def spec_row_line(text: str, labels: tuple[str, str]) -> str | None:
     return f"{name.replace(',', '')} : {value}"
 
 
-def _with_spec_rows(
-    found: TenderRequirements, options: RequirementOptions, ontologies: Sequence[Ontology]
-) -> TenderRequirements:
-    """A single nearly empty item takes the tender's specification rows from the general list."""
-    if len(found.items) != 1:
-        return found
-    entry = found.items[0]
-    if len(leaves(entry.requirements)) > options.quality.nearly_empty_item:
-        return found
-    rows = [(r, spec_row_line(r.raw_text, options.spec_row_labels)) for r in found.general]
-    moved = [(r, line) for r, line in rows if line is not None]
-    if not moved:
-        return found
+@dataclass(frozen=True, slots=True)
+class _SpecBlock:
+    """One item's GeM specification rows, after its "<title> ( 70 pieces )" line if printed."""
+
+    header: Requirement | None
+    quantity: str | None
+    unit: str | None
+    rows: list[tuple[Requirement, str]]
+
+
+def quantity_header(text: str, title: str) -> tuple[str, str] | None:
+    """Quantity and unit if a bid line opens one item's block ("<title> ( 70 pieces )").
+
+    GeM prints each item of an item category as its title (without the "(Q2)" quality tag)
+    and its quantity, then that item's specification table.
+
+    Args:
+        text: A general requirement's printed text.
+        title: The item category title.
+
+    Returns:
+        ("70", "pieces"), or None if the line opens no block.
+    """
+    name = fold_text(_QUALITY_TAG.sub("", title)).strip()
+    first = fold_text(text.splitlines()[0] if text else "").strip()
+    if not name or not first.startswith(name):
+        return None
+    found = _QUANTITY.match(first[len(name) :])
+    return (found["qty"], found["unit"].strip()) if found else None
+
+
+def _spec_blocks(
+    general: Sequence[Requirement], title: str, labels: tuple[str, str]
+) -> list[_SpecBlock]:
+    """Specification rows grouped by the quantity line printed before them, in bid order."""
+    blocks: list[_SpecBlock] = [_SpecBlock(None, None, None, [])]
+    for requirement in general:
+        header = quantity_header(requirement.raw_text, title)
+        if header is not None:
+            blocks.append(_SpecBlock(requirement, header[0], header[1], []))
+        line = spec_row_line(requirement.raw_text, labels)
+        if line is not None:
+            blocks[-1].rows.append((requirement, line))
+    # Rows printed before the first quantity line belong to the first item.
+    if len(blocks) > 1 and blocks[0].rows:
+        blocks[1].rows[:0] = blocks[0].rows
+    return [b for b in blocks[1:] if b.rows] if len(blocks) > 1 else blocks
+
+
+def _block_item(
+    entry: ItemRequirements,
+    block: _SpecBlock,
+    options: RequirementOptions,
+    ontologies: Sequence[Ontology],
+) -> ItemRequirements:
+    """The item with one block's specification rows as requirements."""
     item = entry.item
+    if block.quantity is not None:
+        item = item.model_copy(update={"quantity": block.quantity, "unit": block.unit})
     added: list[Requirement] = []
-    for index, (row, line) in enumerate(moved):
+    for index, (row, line) in enumerate(block.rows):
         part = item.model_copy(
             update={
                 "description_lines": [line],
@@ -534,12 +593,36 @@ def _with_spec_rows(
             r.model_copy(update={"item_no": item.item_no})
             for r in item_entry(part, options, ontologies).requirements
         )
-    taken = {id(r) for r, _ in moved}
-    merged = ItemRequirements(
-        item, entry.category, [*entry.requirements, *added], entry.product_type
+    return ItemRequirements(item, entry.category, [*entry.requirements, *added], entry.product_type)
+
+
+def _with_spec_rows(
+    found: TenderRequirements, options: RequirementOptions, ontologies: Sequence[Ontology]
+) -> TenderRequirements:
+    """A single nearly empty item takes the tender's specification rows from the general list.
+
+    When the bid prints the item category's title with a quantity before each of several spec
+    tables (8188046: DN100 x 70 and DN150 x 25), each table is its own item (D5).
+    """
+    if len(found.items) != 1:
+        return found
+    entry = found.items[0]
+    if len(leaves(entry.requirements)) > options.quality.nearly_empty_item:
+        return found
+    blocks = _spec_blocks(found.general, entry.item.title, options.spec_row_labels)
+    if not any(b.rows for b in blocks):
+        return found
+    entries = (
+        [entry]
+        if len(blocks) == 1
+        else [_renumbered(entry, str(n)) for n in range(1, len(blocks) + 1)]
     )
+    items = [_block_item(e, b, options, ontologies) for e, b in zip(entries, blocks, strict=True)]
+    taken = {id(r) for b in blocks for r, _ in b.rows}
+    if len(blocks) > 1:
+        taken |= {id(b.header) for b in blocks if b.header is not None}
     general = [r for r in found.general if id(r) not in taken]
-    return TenderRequirements([merged], general, found.source)
+    return TenderRequirements(items, general, found.source)
 
 
 def parse_tender_files(

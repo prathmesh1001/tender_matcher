@@ -98,7 +98,10 @@ def _lines(chunk: ChunkDraft, abbreviations: Sequence[str]) -> list[tuple[str | 
 
 
 def general_requirements(
-    chunks: Sequence[ChunkDraft], document: str, classifier: RequirementClassifier
+    chunks: Sequence[ChunkDraft],
+    document: str,
+    classifier: RequirementClassifier,
+    item_row_label: str = "",
 ) -> list[Requirement]:
     """Requirements of the given non-schedule chunks of one tender file.
 
@@ -106,6 +109,8 @@ def general_requirements(
         chunks: The file's chunks without its schedule rows.
         document: File name, for ids and citations.
         classifier: The line classifier.
+        item_row_label: Label of an item's specification row ("Specification Name"). Such a
+            row repeated word for word belongs to the next item's table, so it is kept.
 
     Returns:
         One text requirement per readable line, repeats within the file removed.
@@ -113,10 +118,12 @@ def general_requirements(
     out: list[Requirement] = []
     seen: set[str] = set()
     abbreviations = classifier.rules.sentence_abbreviations
+    marker = fold_text(item_row_label) if item_row_label else ""
     for chunk in chunks:
         for label, value, raw in _lines(chunk, abbreviations):
             key = fold_text(f"{label or ''} {value}")
-            if key in seen or not _readable(f"{label or ''} {value}"):
+            repeated = key in seen and not (marker and marker in fold_text(raw))
+            if repeated or not _readable(f"{label or ''} {value}"):
                 continue
             seen.add(key)
             line = classifier.classify(f"{label}: {value}" if label else value, chunk.section)
