@@ -559,6 +559,23 @@ def test_optional_in_another_column_does_not_matter(valves: Ontology) -> None:
     assert _compare("BODY MOC : CI", [row], valves).status is MatchStatus.FULL_MATCH
 
 
+def test_a_hard_faced_trim_meets_a_stellite_seat_as_partial(valves: Ontology) -> None:
+    # L&T API 602 trim table (7956201): trim 02 seats are SS 304, trim 05 seats are "HF".
+    header = ["Trim No.", "Valve Type", "Seating Surfaces Disc", "Body Seat"]
+    rows = [
+        _row(header, ["02", "Gate Valves", "SS 304", "SS 304"], "Trim Materials"),
+        _row(header, ["05", "Gate, Globe and Check Valves", "HF", "HF"], "Trim Materials"),
+    ]
+    result = _compare("Seat ring : LF2 + Stellite Hard Facing", rows, valves)
+    assert result.status is MatchStatus.PARTIAL_MATCH  # facing offered, Stellite grade not printed
+
+
+@pytest.mark.parametrize("value", ["HF", "13% Cr. Steel"])
+def test_trim_materials_are_materials(valves: Ontology, value: str) -> None:
+    row = _row(["Part", "Material"], ["Seat", value])
+    assert _compare("SEAT MOC : SS316", [row], valves).status is MatchStatus.MISSING_CAPABILITY
+
+
 def test_tender_naming_only_the_material_is_met_by_its_grade_code(valves: Ontology) -> None:
     row = _row(["Part", "Material"], ["Body", "Cast Iron EN 1561 Gr. 200"])
     assert _compare("BODY MOC : CI", [row], valves).status is MatchStatus.FULL_MATCH

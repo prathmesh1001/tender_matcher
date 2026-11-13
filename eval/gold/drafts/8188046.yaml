@@ -1,0 +1,267 @@
+# DRAFT hand labels for tender GEM/2026/B/8188046 (butterfly valves as per IS 13095) - NOT YET
+# CHECKED.
+#
+# Drafted by Claude on 2026-11-13 from the bid's GeM specification tables (p4 item 1, p4-5 item 2)
+# and from the catalogue page text, never from the system's output. Lives in eval/gold/drafts/ so
+# run_eval.py does not score it; move it to eval/gold/ once the user has checked it.
+#
+# Items: 1 = 70 pieces DN 100, 2 = 25 pieces DN 150. Both: Conformity IS 13095; Application
+# "Tight Shut Off"; End connection "Flangeless Wafer Valve"; Face to Face "Wafer Short (PN 2.5)
+# Class 125/150"; Nominal Pressure 1.6 MPa (PN 16). Item 1 also has a test-report row (vendor
+# document, not labelled); item 2 has none.
+#
+# One product per manufacturer (B10):
+#   KSB:       BOAX-B centred disc valve (the only product of the booklet).
+#   Kirloskar: the resilient-seated centric WAFER / lugged wafer valve (p11-12), the product made
+#              as a wafer at DN 100/150. (The system's current evidence "Optional for Valves as per
+#              IS 13095" belongs to the double-eccentric flanged valve, another product.)
+#   Delval:    Series 50 wafer (bulletin 098).
+#
+# Choices to check (user):
+#   - KSB end connection: the wafer body is only DN 650-1000; DN 100/150 come as semi-lug (fits
+#     between flanges, no body flanges) -> partial.
+#   - Face to face "Wafer Short": ISO 5752 / EN 558-1 series 20 is the short wafer pattern -> partial
+#     for KSB, since the tender's "(PN 2.5) Class 125/150" qualifier is not stated.
+#   - Delval PN 16: rated 175 psi (12.0 barg) for DN 50-300, below 16 bar -> missing.
+#
+# Status: full_match | partial_match | missing_capability | unsupported.
+tender: GEM_2026_B_8188046
+source: Claude draft from bid.pdf p4-5 and catalogue pages, NOT yet checked by the user
+
+evaluations:
+  - item_no: "1"
+    manufacturer: KSB
+    document: ksb_boax_b_butterfly.pdf
+    requirements:
+      - id: "1.spec0.1"
+        manual_row: Conformity to IS 13095
+        status: missing_capability
+        pages: [1]
+        evidence: 'p1 "Design in accordance with EN 593 and ISO 10631"'
+        note: IS 13095 is not named; the stated design standard is another one.
+      - id: "1.spec1.1"
+        manual_row: Application tight shut off
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "Valves perfectly tight shut--off (no visible leakage at the naked eye)"'
+      - id: "1.spec2.1"
+        manual_row: End connection flangeless wafer
+        status: partial_match
+        pages: [1]
+        evidence: 'p1 "Semi lug type body (Type 2): DN 40 to 600" / "Wafer type body (Type 1): DN 650 to 1000"'
+        note: Flangeless semi-lug body at this size; a true wafer body only from DN 650.
+      - id: "1.spec3.1"
+        manual_row: Face to face wafer short
+        status: partial_match
+        pages: [1]
+        evidence: 'p1 "Face--to--face dimensions in accordance with: ISO 5752 series 20, EN 558--1 series 20."'
+        note: Series 20 is the short wafer pattern; the "(PN 2.5) Class 125/150" qualifier is not stated.
+      - id: "1.spec4.1"
+        manual_row: Nominal size DN 100
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "PS 16 bar : DN 40 to 200"'
+      - id: "1.spec5.1"
+        manual_row: Nominal pressure 1.6 MPa (PN 16)
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "Allowable pressure (PS): -- 16 bar: DN 40 to 200 at ambient temperature"'
+
+  - item_no: "2"
+    manufacturer: KSB
+    document: ksb_boax_b_butterfly.pdf
+    requirements:
+      - id: "2.spec0.1"
+        manual_row: Conformity to IS 13095
+        status: missing_capability
+        pages: [1]
+        evidence: 'p1 "Design in accordance with EN 593 and ISO 10631"'
+      - id: "2.spec1.1"
+        manual_row: Application tight shut off
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "Valves perfectly tight shut--off (no visible leakage at the naked eye)"'
+      - id: "2.spec2.1"
+        manual_row: End connection flangeless wafer
+        status: partial_match
+        pages: [1]
+        evidence: 'p1 "Semi lug type body (Type 2): DN 40 to 600" / "Wafer type body (Type 1): DN 650 to 1000"'
+      - id: "2.spec3.1"
+        manual_row: Face to face wafer short
+        status: partial_match
+        pages: [1]
+        evidence: 'p1 "ISO 5752 series 20, EN 558--1 series 20."'
+      - id: "2.spec4.1"
+        manual_row: Nominal size DN 150
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "PS 16 bar : DN 40 to 200"'
+      - id: "2.spec5.1"
+        manual_row: Nominal pressure 1.6 MPa (PN 16)
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "-- 16 bar: DN 40 to 200 at ambient temperature"'
+
+  - item_no: "1"
+    manufacturer: Kirloskar Brothers
+    document: kbl_butterfly_valve_spec.pdf
+    requirements:
+      - id: "1.spec0.1"
+        manual_row: Conformity to IS 13095
+        status: full_match
+        pages: [12]
+        evidence: 'p12 "IS : 13095 / EN 593 (BS 5155) / API 609" (Design and Manufacturing Standard)'
+      - id: "1.spec1.1"
+        manual_row: Application tight shut off
+        status: full_match
+        pages: [11]
+        evidence: 'p11 "Chemical and Petrochemical Plants, etc for tight shut off and flow control"'
+      - id: "1.spec2.1"
+        manual_row: End connection flangeless wafer
+        status: full_match
+        pages: [11]
+        evidence: 'p11 "Heavy duty one piece wafer / lugged wafer body design"'
+      - id: "1.spec3.1"
+        manual_row: Face to face wafer short
+        status: unsupported
+        evidence: no face-to-face series is stated for the centric wafer valve (p11-13)
+      - id: "1.spec4.1"
+        manual_row: Nominal size DN 100
+        status: full_match
+        pages: [12]
+        evidence: 'p12 "Size Range  40 mm to 600 mm"'
+      - id: "1.spec5.1"
+        manual_row: Nominal pressure 1.6 MPa (PN 16)
+        status: full_match
+        pages: [12]
+        evidence: 'p12 "Pressure Rating  PN 6, PN 10 and PN 16"'
+
+  - item_no: "2"
+    manufacturer: Kirloskar Brothers
+    document: kbl_butterfly_valve_spec.pdf
+    requirements:
+      - id: "2.spec0.1"
+        manual_row: Conformity to IS 13095
+        status: full_match
+        pages: [12]
+        evidence: 'p12 "IS : 13095 / EN 593 (BS 5155) / API 609"'
+      - id: "2.spec1.1"
+        manual_row: Application tight shut off
+        status: full_match
+        pages: [11]
+        evidence: 'p11 "for tight shut off and flow control"'
+      - id: "2.spec2.1"
+        manual_row: End connection flangeless wafer
+        status: full_match
+        pages: [11]
+        evidence: 'p11 "Heavy duty one piece wafer / lugged wafer body design"'
+      - id: "2.spec3.1"
+        manual_row: Face to face wafer short
+        status: unsupported
+        evidence: no face-to-face series is stated for the centric wafer valve
+      - id: "2.spec4.1"
+        manual_row: Nominal size DN 150
+        status: full_match
+        pages: [12]
+        evidence: 'p12 "Size Range  40 mm to 600 mm"'
+      - id: "2.spec5.1"
+        manual_row: Nominal pressure 1.6 MPa (PN 16)
+        status: full_match
+        pages: [12]
+        evidence: 'p12 "PN 6, PN 10 and PN 16"'
+
+  - item_no: "1"
+    manufacturer: Delval
+    document: delval_series_50_52_centric_bfv_spec.pdf
+    requirements:
+      - id: "1.spec0.1"
+        manual_row: Conformity to IS 13095
+        status: missing_capability
+        pages: [1]
+        evidence: 'p1 "Design: BS EN 593"'
+      - id: "1.spec1.1"
+        manual_row: Application tight shut off
+        status: unsupported
+        evidence: >-
+          only "maximum sealing capability" (p1); tight shut-off or a leakage class is not stated
+          ("Testing: BS EN 12266-1 & ISO 5208" names no rate).
+      - id: "1.spec2.1"
+        manual_row: End connection flangeless wafer
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "Valve Type: Series 50 Wafer or Series 52 Lugged" / "one-piece wafer or lug design"'
+      - id: "1.spec3.1"
+        manual_row: Face to face wafer short
+        status: unsupported
+        evidence: no face-to-face dimension or series is stated
+      - id: "1.spec4.1"
+        manual_row: Nominal size DN 100
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "2”-12”(DN 50 – DN 300) 175 psi (12.0 barg)"'
+      - id: "1.spec5.1"
+        manual_row: Nominal pressure 1.6 MPa (PN 16)
+        status: missing_capability
+        pages: [1]
+        evidence: 'p1 "2”-12”(DN 50 – DN 300) 175 psi (12.0 barg)"'
+        note: Rated 12 bar, below the 16 bar of PN 16.
+
+  - item_no: "2"
+    manufacturer: Delval
+    document: delval_series_50_52_centric_bfv_spec.pdf
+    requirements:
+      - id: "2.spec0.1"
+        manual_row: Conformity to IS 13095
+        status: missing_capability
+        pages: [1]
+        evidence: 'p1 "Design: BS EN 593"'
+      - id: "2.spec1.1"
+        manual_row: Application tight shut off
+        status: unsupported
+        evidence: tight shut-off or a leakage class is not stated
+      - id: "2.spec2.1"
+        manual_row: End connection flangeless wafer
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "Valve Type: Series 50 Wafer or Series 52 Lugged"'
+      - id: "2.spec3.1"
+        manual_row: Face to face wafer short
+        status: unsupported
+        evidence: no face-to-face dimension or series is stated
+      - id: "2.spec4.1"
+        manual_row: Nominal size DN 150
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "2”-12”(DN 50 – DN 300) 175 psi (12.0 barg)"'
+      - id: "2.spec5.1"
+        manual_row: Nominal pressure 1.6 MPa (PN 16)
+        status: missing_capability
+        pages: [1]
+        evidence: 'p1 "2”-12”(DN 50 – DN 300) 175 psi (12.0 barg)"'
+        note: Rated 12 bar, below the 16 bar of PN 16.
+
+products:
+  - item_no: "1"
+    manufacturer: KSB
+    document: ksb_boax_b_butterfly.pdf
+    label: partial
+  - item_no: "2"
+    manufacturer: KSB
+    document: ksb_boax_b_butterfly.pdf
+    label: partial
+  - item_no: "1"
+    manufacturer: Kirloskar Brothers
+    document: kbl_butterfly_valve_spec.pdf
+    label: full
+  - item_no: "2"
+    manufacturer: Kirloskar Brothers
+    document: kbl_butterfly_valve_spec.pdf
+    label: full
+  - item_no: "1"
+    manufacturer: Delval
+    document: delval_series_50_52_centric_bfv_spec.pdf
+    label: partial
+  - item_no: "2"
+    manufacturer: Delval
+    document: delval_series_50_52_centric_bfv_spec.pdf
+    label: partial

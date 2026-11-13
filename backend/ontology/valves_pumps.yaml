@@ -234,7 +234,7 @@ attributes:
 material_names: [cast iron, ductile iron, sg iron, cast steel, carbon steel, stainless steel,
                  alloy steel, mild steel, ss, ci, cs, ms, bronze, gun metal, gunmetal, brass,
                  noryl, aluminium, aluminum, copper, nickel, monel, inconel, hastelloy, titanium,
-                 duplex, stellite, chrome, chromium, epdm, nbr, nitrile, buna, viton, fkm, ptfe,
+                 duplex, stellite, chrome, chromium, cr steel, epdm, nbr, nitrile, buna, viton, fkm, ptfe,
                  rptfe, teflon, neoprene, hypalon, graphite, rubber, silicone, peek, nylon,
                  polypropylene, pvc, upvc, cpvc, hdpe]
 
@@ -329,6 +329,10 @@ equivalents:
   - name: ductile_iron
     terms: [ductile iron, sg iron, sgi, spheroidal graphite iron, di, A536, A395, IS1865,
             EN1563, GGG40, GGG50]
+  # Seat and disc facings. L&T trim tables print "HF" (hard-faced) for a Stellite facing; the
+  # alloy grade is not printed, so it meets "Stellite" only as partial (grade not printed).
+  - name: hard_facing
+    terms: [stellite, stellited, hard facing, hard faced, hardfaced, hf]
 
 units:
   mm: mm

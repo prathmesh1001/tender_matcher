@@ -1,0 +1,140 @@
+# DRAFT hand labels for tender GEM/2026/B/8226616 (monoblock pump, 2 pieces) - NOT YET CHECKED.
+#
+# Drafted by Claude on 2026-11-13 from the bid's GeM specification table (p3) and from the
+# catalogue page text, never from the system's output. Lives in eval/gold/drafts/ so run_eval.py
+# does not score it; move it to eval/gold/ once the user has checked it.
+#
+# Requirements (bid p3): Pump Type "Centrifugal Monoblock Pumps"; Pump Casing Material "Graded
+# Cast Iron"; Impeller Material "Brass"; Motor Body Material "High-quality aluminium die
+# casting"; Motor Power "1.5 (horsepower)". The test-report row is a vendor document and is not
+# labelled.
+#
+# One model per manufacturer (B10): the model meeting 1.5 HP is chosen where the catalogue has
+# one, and every label is read for that model's family column.
+#   Kirloskar: KDS/GMC family (GMC-1.514+*, 1.1 kW / 1.5 HP, p2 chart).
+#   Calpeda:   NM 32/16A/B (1.1 kW / 1.5 HP), NM standard construction.
+#   Crompton:  Win Dura I (largest model, 0.75 kW / 1.0 HP).
+#
+# Choices to check (user):
+#   - "Graded Cast Iron" with no grade named is read as full when the catalogue prints a grade
+#     (IS 210 FG 200, GJL 200) and partial when it prints only "Cast Iron" (as 8169451 did).
+#   - Kirloskar pump type: "MONOBLOC PUMPS" is printed, "centrifugal" is not -> partial.
+#   - Brass vs bronze is read as a different material (missing_capability).
+#
+# Status: full_match | partial_match | missing_capability | unsupported.
+tender: GEM_2026_B_8226616
+source: Claude draft from bid.pdf p3 and catalogue pages, NOT yet checked by the user
+
+evaluations:
+  - item_no: "1"
+    manufacturer: Kirloskar Brothers
+    document: kbl_monobloc_kds_ks_kdt_srf_kdi.pdf
+    requirements:
+      - id: "1.spec0.1"
+        manual_row: Pump type centrifugal monoblock
+        status: partial_match
+        pages: [2]
+        evidence: 'p2 "PERFORMANCE CHART FOR ''KDS+ / KDS++ / GMC'' SERIES, 2 POLE, MONOBLOC PUMPS"'
+        note: Monobloc is printed; centrifugal is not stated anywhere in the document.
+      - id: "1.spec1.1"
+        manual_row: Pump casing graded cast iron
+        status: partial_match
+        pages: [2]
+        evidence: 'p2 "Delivery Casing  Cast Iron" (KDS/GMC column)'
+        note: Cast iron stated, no grade printed.
+      - id: "1.spec2.1"
+        manual_row: Impeller brass
+        status: missing_capability
+        pages: [2]
+        evidence: 'p2 "Impeller  Cast Iron/ Bronze /Stainless Steel" (KDS/GMC column)'
+        note: Brass is not among the options; bronze is a different alloy.
+      - id: "1.spec3.1"
+        manual_row: Motor body aluminium die casting
+        status: missing_capability
+        pages: [2]
+        evidence: 'p2 "Motor Body  Cast Iron" (KDS/GMC column)'
+      - id: "1.spec4.1"
+        manual_row: Motor power 1.5 HP
+        status: full_match
+        pages: [2]
+        evidence: 'p2 chart "GMC-1.514+*  1.1  1.5" (kW, HP)'
+
+  - item_no: "1"
+    manufacturer: Calpeda
+    document: calpeda_nm_close_coupled.pdf
+    requirements:
+      - id: "1.spec0.1"
+        manual_row: Pump type centrifugal monoblock
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "Close-coupled centrifugal pumps; electric motor with extended shaft directly connected to the pump"'
+        note: Close-coupled is the monoblock construction (motor shaft carries the impeller).
+      - id: "1.spec1.1"
+        manual_row: Pump casing graded cast iron
+        status: full_match
+        pages: [1]
+        evidence: 'p1 Materials "Pump casing  Cast iron" with "GJL 200 EN 1561" (NM, NMS column)'
+        note: >-
+          The grade line sits under the pump casing / lantern bracket rows; read as the casing's
+          grade. Check this reading.
+      - id: "1.spec2.1"
+        manual_row: Impeller brass
+        status: full_match
+        pages: [1]
+        evidence: 'p1 "Brass CW617N EN 12165 for 32/12, 32/16, 32/20, 32L/20, 40/20"'
+        note: NM 32/16A/B (the 1.5 HP model) is one of the sizes with the brass impeller.
+      - id: "1.spec3.1"
+        manual_row: Motor body aluminium die casting
+        status: unsupported
+        evidence: motor body material not stated
+      - id: "1.spec4.1"
+        manual_row: Motor power 1.5 HP
+        status: full_match
+        pages: [3]
+        evidence: 'p3 motor table "1,1  1,5" (kW, HP)'
+
+  - item_no: "1"
+    manufacturer: Crompton
+    document: crompton_centrifugal_pump.pdf
+    requirements:
+      - id: "1.spec0.1"
+        manual_row: Pump type centrifugal monoblock
+        status: unsupported
+        evidence: neither centrifugal nor monoblock is stated (pages 1-2)
+      - id: "1.spec1.1"
+        manual_row: Pump casing graded cast iron
+        status: full_match
+        pages: [2]
+        evidence: 'p2 MOC "Volute  Cast Iron – IS 210 Grade FG 200 + CED COATED"'
+        note: The volute is the pump casing.
+      - id: "1.spec2.1"
+        manual_row: Impeller brass
+        status: full_match
+        pages: [2]
+        evidence: 'p2 MOC "Impeller  Forged Brass"'
+      - id: "1.spec3.1"
+        manual_row: Motor body aluminium die casting
+        status: partial_match
+        pages: [2]
+        evidence: 'p2 MOC "Motor body  Aluminium Extruded + POWDER COATED"'
+        note: Aluminium as asked, but extruded, not die cast.
+      - id: "1.spec4.1"
+        manual_row: Motor power 1.5 HP
+        status: missing_capability
+        pages: [2]
+        evidence: 'p2 "Power (kW/HP) 0.75/1.0" and "0.37/0.5" (WIN DURA I / II)'
+        note: The largest model is 1.0 HP.
+
+products:
+  - item_no: "1"
+    manufacturer: Kirloskar Brothers
+    document: kbl_monobloc_kds_ks_kdt_srf_kdi.pdf
+    label: partial
+  - item_no: "1"
+    manufacturer: Calpeda
+    document: calpeda_nm_close_coupled.pdf
+    label: full
+  - item_no: "1"
+    manufacturer: Crompton
+    document: crompton_centrifugal_pump.pdf
+    label: partial
