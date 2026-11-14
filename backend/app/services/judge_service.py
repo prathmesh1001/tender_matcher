@@ -5,11 +5,18 @@ never mixes documents (B10). Retrieval comes first; with no evidence hit the LLM
 A run has a call limit and stops calling after repeated failures, so an exhausted quota costs
 some `unsupported` results instead of the run. Answers are cached by prompt and model, so a rerun
 gives the same results and calls nothing; failures are never cached.
+
+Catalogue searches run one by one (they are CPU bound); LLM calls run `workers` at a time. Which
+lines get the limited calls is decided in document order before any call is made, so a run gives
+the same results with 1 worker or many.
 """
 
+import contextvars
 import logging
+import threading
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 from typing import Protocol
@@ -44,7 +51,7 @@ from app.retrieval.retriever import RetrievalParams, Retriever
 from app.retrieval.text_normalizer import SearchVocabulary
 from app.schemas.enums import MatchStatus
 from app.schemas.matching import Comparison, JudgeVerdict
-from app.schemas.report import CandidateSummary, ItemReport, ManufacturerItemReport
+from app.schemas.report import ItemReport, ManufacturerItemReport
 from app.schemas.requirements import Requirement
 from app.schemas.retrieval import RetrievalHit, RetrievalOutcome, RetrievalRequest
 from app.tender.splitter import leaves
@@ -109,6 +116,7 @@ class JudgeOptions:
     quote_threshold: float
     max_calls: int
     max_failures: int
+    workers: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +128,27 @@ class _Decision:
     note: str = ""
 
 
+type _Key = tuple[str, str, str]
+
+
+@dataclass(frozen=True, slots=True)
+class _Job:
+    """One line to judge against one chosen catalogue (repeated lines share a job)."""
+
+    requirement: Requirement
+    request: RetrievalRequest
+    heading: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class _Question:
+    """A job whose evidence was found and whose answer is not cached: it needs a call."""
+
+    prompt: str
+    key: str
+    passages: tuple[Passage, ...]
+
+
 @dataclass(slots=True)
 class _Progress:
     """One tender's calls, failures and verdicts (a repeated line is judged once)."""
@@ -128,7 +157,31 @@ class _Progress:
     cached: int = 0
     failed: int = 0
     failures_in_a_row: int = 0
-    decisions: dict[tuple[str, str, str], _Decision] = field(default_factory=dict)
+    decisions: dict[_Key, _Decision] = field(default_factory=dict)
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+
+def _run_all[T, R](work: Callable[[T], R], jobs: Sequence[T], workers: int) -> list[R]:
+    """`work` over every job, `workers` at a time, results in the order of `jobs`.
+
+    The first job runs alone, so models that load on first use load once. Each job runs in a copy
+    of the caller's context, so its log lines keep the run's fields (run_id, tender_id).
+
+    Args:
+        work: Done once per job.
+        jobs: The jobs.
+        workers: Most jobs at a time.
+
+    Returns:
+        One result per job, in order.
+    """
+    if workers <= 1 or len(jobs) <= 1:
+        return [work(job) for job in jobs]
+    first = work(jobs[0])
+    rest = jobs[1:]
+    contexts = [contextvars.copy_context() for _ in rest]
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="judge") as pool:
+        return [first, *pool.map(lambda ctx, job: ctx.run(work, job), contexts, rest)]
 
 
 def _passage(chunk: Chunk, code_only: bool, low_score: bool = False) -> Passage:
@@ -240,6 +293,7 @@ class JudgeService:
             The reports with results and scores updated, and how they were decided.
         """
         progress = _Progress()
+        self._decide_all(self._collect(inputs, reports), progress)
         judged = [
             report.model_copy(
                 update={
@@ -260,6 +314,49 @@ class JudgeService:
         summary = f"{progress.calls} calls, {progress.cached} cached, {progress.failed} failed"
         return JudgedItems(judged, f"rules + {self._llm.model_name} ({summary})")
 
+    @staticmethod
+    def _open_lines(
+        report: ItemReport, result: ManufacturerItemReport, requirements: Sequence[Requirement]
+    ) -> list[tuple[int, _Key, _Job]]:
+        """The lines rules left open for one manufacturer, with their position and job.
+
+        Only a chosen catalogue is judged, never a tie. The key is the catalogue, its product
+        heading and the line's text, so a repeated line is judged once.
+        """
+        if result.chosen is None or report.category is None or report.product_type is None:
+            return []
+        chosen = result.chosen
+        lines: list[tuple[int, _Key, _Job]] = []
+        for position, (requirement, comparison) in enumerate(
+            zip(requirements, result.results, strict=True)
+        ):
+            if comparison.status is not MatchStatus.UNSUPPORTED or not needs_judge(requirement):
+                continue
+            request = RetrievalRequest(
+                manufacturer=result.manufacturer,
+                category=report.category,
+                product_type=report.product_type,
+                text=requirement.raw_text,
+                attribute=requirement.attribute,
+                document_sha256=chosen.sha256,
+                exclude_passages=chosen.other_product_passages,
+            )
+            key = (chosen.sha256, chosen.product_heading or "", requirement.raw_text)
+            lines.append((position, key, _Job(requirement, request, chosen.product_heading)))
+        return lines
+
+    def _collect(
+        self, inputs: Sequence[ItemInput], reports: Sequence[ItemReport]
+    ) -> dict[_Key, _Job]:
+        """Every line to judge in this tender, once each, in document order."""
+        jobs: dict[_Key, _Job] = {}
+        for entry, report in zip(inputs, reports, strict=True):
+            requirements = list(leaves(entry.requirements))
+            for result in report.manufacturers:
+                for _, key, job in self._open_lines(report, result, requirements):
+                    jobs.setdefault(key, job)
+        return jobs
+
     def _manufacturer(
         self,
         entry: ItemInput,
@@ -268,24 +365,15 @@ class JudgeService:
         pages: PageTexts,
         progress: _Progress,
     ) -> ManufacturerItemReport:
-        """One manufacturer's results; only a chosen catalogue is judged, never a tie."""
-        if result.chosen is None or report.category is None or report.product_type is None:
+        """One manufacturer's results with the decided lines filled in and the score redone."""
+        lines = self._open_lines(report, result, list(leaves(entry.requirements)))
+        if not lines:
             return result
-        chosen, category, product = result.chosen, report.category, report.product_type
-        comparisons: list[Comparison] = []
-        for requirement, comparison in zip(leaves(entry.requirements), result.results, strict=True):
-            if comparison.status is MatchStatus.UNSUPPORTED and needs_judge(requirement):
-                request = RetrievalRequest(
-                    manufacturer=result.manufacturer,
-                    category=category,
-                    product_type=product,
-                    text=requirement.raw_text,
-                    attribute=requirement.attribute,
-                    document_sha256=chosen.sha256,
-                    exclude_passages=chosen.other_product_passages,
-                )
-                comparison = self._judged(entry, requirement, request, chosen, pages, progress)
-            comparisons.append(comparison)
+        comparisons: list[Comparison] = list(result.results)
+        for position, key, job in lines:
+            comparisons[position] = self._judged(
+                entry, job.requirement, progress.decisions[key], pages
+            )
         return result.model_copy(
             update={
                 "results": comparisons,
@@ -294,20 +382,9 @@ class JudgeService:
         )
 
     def _judged(
-        self,
-        entry: ItemInput,
-        requirement: Requirement,
-        request: RetrievalRequest,
-        chosen: CandidateSummary,
-        pages: PageTexts,
-        progress: _Progress,
+        self, entry: ItemInput, requirement: Requirement, decision: _Decision, pages: PageTexts
     ) -> Comparison:
-        """One requirement's result; a line seen before in this catalogue reuses its verdict."""
-        key = (chosen.sha256, chosen.product_heading or "", requirement.raw_text)
-        decision = progress.decisions.get(key)
-        if decision is None:
-            decision = self._decide(requirement, request, chosen.product_heading, progress)
-            progress.decisions[key] = decision
+        """One requirement's result from its line's decision, its quote checked on the page."""
         if decision.verdict is None:
             return undecided(requirement, decision.note)
         options = self._options
@@ -316,40 +393,78 @@ class JudgeService:
         )
         return verify_comparison(result, pages, options.quote_threshold)
 
-    def _decide(
-        self,
-        requirement: Requirement,
-        request: RetrievalRequest,
-        heading: str | None,
-        progress: _Progress,
-    ) -> _Decision:
-        """Retrieve, then ask the model; failures and limits become a note, never an error."""
-        options = self._options
-        if progress.failures_in_a_row >= options.max_failures:
+    def _decide_all(self, jobs: Mapping[_Key, _Job], progress: _Progress) -> None:
+        """Search and ask for every job; the call limit goes to the first lines in order.
+
+        Args:
+            jobs: The lines to judge, in document order.
+            progress: Receives the decisions and the counts.
+        """
+        keys = list(jobs)
+        # Searches stay one by one: the embedder and reranker already use every CPU core, and
+        # running them side by side measured 2x slower (2026-11-14). Only the calls overlap.
+        prepared = [self._prepare(jobs[key], progress) for key in keys]
+        questions: list[tuple[_Key, _Question]] = []
+        for key, outcome in zip(keys, prepared, strict=True):
+            if isinstance(outcome, _Decision):
+                progress.decisions[key] = outcome
+            elif len(questions) < self._options.max_calls:
+                questions.append((key, outcome))
+            else:
+                progress.decisions[key] = _Decision(
+                    note="LLM judge skipped: call limit for this run reached"
+                )
+        answers = _run_all(
+            lambda pair: self._ask(pair[1], progress), questions, self._options.workers
+        )
+        for (key, _), decision in zip(questions, answers, strict=True):
+            progress.decisions[key] = decision
+
+    def _prepare(self, job: _Job, progress: _Progress) -> _Question | _Decision:
+        """Search the catalogue and look the prompt up in the cache; never calls the model."""
+        if progress.failures_in_a_row >= self._options.max_failures:
             return _Decision(note="LLM judge stopped: too many failures in a row")
         try:
-            found = self._finder.find(request)
-            if not found.passages:
-                return _Decision(note=f"no evidence in this catalogue ({found.outcome.value})")
-            prompt = build_prompt(requirement, request.product_type, heading, found.passages)
-            key = cache_key(prompt, self._llm.model_name)
-            cached = self._cache.get(key) if self._cache else None
-            if cached is not None:
-                progress.cached += 1
-                return _Decision(verdict=cached, passages=found.passages)
-            if progress.calls >= options.max_calls:
-                return _Decision(note="LLM judge skipped: call limit for this run reached")
-            progress.calls += 1
-            verdict = self._llm.generate_json(prompt, JudgeVerdict)
+            found = self._finder.find(job.request)
         except ExternalServiceError as exc:
+            return self._failed(exc, progress)
+        if not found.passages:
+            return _Decision(note=f"no evidence in this catalogue ({found.outcome.value})")
+        prompt = build_prompt(
+            job.requirement, job.request.product_type, job.heading, found.passages
+        )
+        key = cache_key(prompt, self._llm.model_name)
+        cached = self._cache.get(key) if self._cache else None
+        if cached is not None:
+            with progress.lock:
+                progress.cached += 1
+            return _Decision(verdict=cached, passages=found.passages)
+        return _Question(prompt, key, found.passages)
+
+    def _ask(self, question: _Question, progress: _Progress) -> _Decision:
+        """Ask the model one question; a failure becomes a note, never an error."""
+        with progress.lock:
+            if progress.failures_in_a_row >= self._options.max_failures:
+                return _Decision(note="LLM judge stopped: too many failures in a row")
+            progress.calls += 1
+        try:
+            verdict = self._llm.generate_json(question.prompt, JudgeVerdict)
+        except ExternalServiceError as exc:
+            return self._failed(exc, progress)
+        with progress.lock:
+            progress.failures_in_a_row = 0
+        if self._cache:
+            self._cache.put(question.key, self._llm.model_name, verdict)
+        return _Decision(verdict=verdict, passages=question.passages)
+
+    @staticmethod
+    def _failed(exc: ExternalServiceError, progress: _Progress) -> _Decision:
+        """Count a failed search or call and say why the line stays open."""
+        with progress.lock:
             progress.failed += 1
             progress.failures_in_a_row += 1
-            logger.warning("judge failed", extra={"error": exc.message})
-            return _Decision(note=f"LLM judge failed: {exc.message}")
-        progress.failures_in_a_row = 0
-        if self._cache:
-            self._cache.put(key, self._llm.model_name, verdict)
-        return _Decision(verdict=verdict, passages=found.passages)
+        logger.warning("judge failed", extra={"error": exc.message})
+        return _Decision(note=f"LLM judge failed: {exc.message}")
 
 
 def build_judge_service(settings: Settings, session_factory: sessionmaker[Session]) -> JudgeService:
@@ -389,6 +504,7 @@ def build_judge_service(settings: Settings, session_factory: sessionmaker[Sessio
             quote_threshold=settings.QUOTE_MATCH_THRESHOLD,
             max_calls=settings.LLM_JUDGE_MAX_CALLS,
             max_failures=settings.LLM_JUDGE_MAX_FAILURES,
+            workers=settings.LLM_JUDGE_WORKERS,
         ),
         DbVerdictCache(session_factory),
     )

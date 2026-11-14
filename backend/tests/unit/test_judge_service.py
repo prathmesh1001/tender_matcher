@@ -1,11 +1,14 @@
 """Retrieve -> judge -> verify over one item. The LLM, retrieval and pages are fakes."""
 
+import threading
+import time
 import uuid
 from collections.abc import Sequence
 
 from pydantic import BaseModel
 
 from app.core.exceptions import ExternalServiceError
+from app.core.logging import current_log_context, log_context
 from app.db.models import Chunk
 from app.matching.comparator import ComparatorOptions, MatchContext
 from app.matching.engine import ItemInput
@@ -153,7 +156,7 @@ def _inputs(
 
 
 def _service(
-    llm: _Llm, finder: _Finder, max_calls: int = 10, max_failures: int = 2
+    llm: _Llm, finder: _Finder, max_calls: int = 10, max_failures: int = 2, workers: int = 1
 ) -> JudgeService:
     return JudgeService(
         llm,
@@ -164,6 +167,7 @@ def _service(
             quote_threshold=0.9,
             max_calls=max_calls,
             max_failures=max_failures,
+            workers=workers,
         ),
     )
 
@@ -373,3 +377,60 @@ def test_excluded_hits_are_dropped_before_the_passage_limit() -> None:
     ]
     kept = _allowed(hits, found, frozenset({(26, "Disc: IS 2062 Gr. B")}))
     assert [h.chunk_id for h in kept] == [ids[0], ids[2]]
+
+
+class _SlowLlm(_Llm):
+    """Waits a little per call, so calls really overlap; records the log context it saw."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.contexts: list[dict[str, str]] = []
+        self.threads: set[int] = set()
+        self.lock = threading.Lock()
+
+    def generate_json[T: BaseModel](self, prompt: str, schema: type[T]) -> T:
+        time.sleep(0.01)
+        with self.lock:
+            self.contexts.append(current_log_context())
+            self.threads.add(threading.get_ident())
+        return super().generate_json(prompt, schema)
+
+
+def _lines(count: int) -> list[Requirement]:
+    return [_requirement(f"10.{i}", f"Actuation: line {i}") for i in range(count)]
+
+
+def test_parallel_calls_give_the_same_results_as_one_by_one() -> None:
+    inputs, reports = _inputs(_lines(8))
+    one = _service(_Llm(), _Finder(), workers=1).judge_items(inputs, reports, _Pages())
+    llm = _SlowLlm()
+    many = _service(llm, _Finder(), workers=4).judge_items(inputs, reports, _Pages())
+    assert many.reports == one.reports
+    assert many.decided_by == one.decided_by
+    assert len(llm.threads) > 1
+
+
+def test_parallel_calls_give_the_call_limit_to_the_first_lines() -> None:
+    llm = _SlowLlm()
+    inputs, reports = _inputs(_lines(6))
+    judged = _service(llm, _Finder(), max_calls=3, workers=4).judge_items(inputs, reports, _Pages())
+    statuses = [r.status for r in _results(judged)]
+    assert len(llm.prompts) == 3
+    assert statuses[:3] == [MatchStatus.FULL_MATCH] * 3
+    assert all("call limit" in r.reason for r in _results(judged)[3:])
+
+
+def test_each_line_is_searched_once_with_parallel_calls() -> None:
+    finder = _Finder()
+    lines = [_requirement("10.1"), _requirement("10.2"), *_lines(3)]
+    inputs, reports = _inputs(lines)
+    _service(_SlowLlm(), finder, workers=4).judge_items(inputs, reports, _Pages())
+    assert len(finder.requests) == 4
+
+
+def test_parallel_calls_keep_the_runs_log_context() -> None:
+    llm = _SlowLlm()
+    inputs, reports = _inputs(_lines(5))
+    with log_context(run_id="run-1"):
+        _service(llm, _Finder(), workers=4).judge_items(inputs, reports, _Pages())
+    assert [c.get("run_id") for c in llm.contexts] == ["run-1"] * 5

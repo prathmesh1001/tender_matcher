@@ -498,6 +498,13 @@ class Settings(BaseSettings):
     LLM_JUDGE_MAX_FAILURES: int = Field(
         default=3, ge=1, description="LLM judge failures in a row before a run stops calling."
     )
+    LLM_JUDGE_WORKERS: int = Field(
+        default=4,
+        ge=1,
+        le=16,
+        description="LLM judge calls run this many at a time (1: one by one); catalogue searches "
+        "always run one by one. Results do not depend on it.",
+    )
     LLM_TEMPERATURE: float = Field(default=0.0, ge=0, le=2)
     LLM_MAX_OUTPUT_TOKENS: int = Field(default=16384, ge=1)
     LLM_TIMEOUT_SECONDS: float = Field(default=120.0, gt=0)

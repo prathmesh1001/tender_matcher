@@ -99,6 +99,7 @@ to change:
 | `LLM_JUDGE_MAX_PASSAGES` | `5` | Best catalogue passages sent to the judge per requirement |
 | `LLM_JUDGE_THINKING_LEVEL` | `low` | Gemini thinking level of judge calls; `low` adds no billed thinking tokens (empty: model default) |
 | `LLM_JUDGE_LOW_SCORE_HITS` | `3` | When the right product's passages all score below `RERANK_MIN_SCORE`, this many go to the judge (0 turns it off) |
+| `LLM_JUDGE_WORKERS` | `4` | LLM judge calls run this many at a time (1: one by one); catalogue searches stay one by one, as they already use every CPU core. The lines that get the limited calls are picked in document order first, so results do not depend on it |
 | `RANKING_MIN_COVERAGE_PCT` | `50` | Below this, a manufacturer is listed last as low coverage |
 | `TENDER_UPLOAD_MAX_MB` | `50` | Largest `bid.pdf` the API accepts |
 | `JOB_QUEUE_BACKEND` | `thread` (Compose: `rq`) | `rq` queues runs in Redis for the worker process |
