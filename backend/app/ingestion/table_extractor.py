@@ -761,7 +761,7 @@ def extract_page_tables(
     """
     repair = cleanup or TableCleanupOptions()
     tables: list[ExtractedTable] = []
-    found = page.find_tables().tables
+    found = page.find_tables(use_layout=repair.use_layout).tables
     if not found and layout is not None:
         grids = rule_grid_tables(page, key_value_pairs, layout, repair.paragraph_gap, repair.glyphs)
         return [_repaired(t, repair) for t in grids]

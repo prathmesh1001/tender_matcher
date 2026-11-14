@@ -92,6 +92,7 @@ class ProcessingOptions:
                 max_label_words=settings.TABLE_HEADER_MAX_WORDS,
                 paragraph_gap=settings.TABLE_PARAGRAPH_GAP_FACTOR,
                 glyphs=RepairOptions.from_settings(settings),
+                use_layout=settings.TABLE_USE_LAYOUT,
             ),
             layout=LayoutOptions.from_settings(settings),
             vocabulary=vocabulary,

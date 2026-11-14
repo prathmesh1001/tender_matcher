@@ -166,6 +166,13 @@ class Settings(BaseSettings):
         ge=1,
         description="Pages with more thin shapes are drawings or outlined text, not rule tables.",
     )
+    TABLE_USE_LAYOUT: bool = Field(
+        default=True,
+        description=(
+            "Let PyMuPDF's layout model gate table detection (~7 s per page). Off is about 6x "
+            "faster to parse but less accurate: gold eval 2026-11-14 decided accuracy 86% -> 78%."
+        ),
+    )
     TABLE_PARAGRAPH_GAP_FACTOR: float = Field(
         default=1.5,
         gt=1,

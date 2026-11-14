@@ -239,6 +239,7 @@ class TableCleanupOptions:
     max_label_words: int = 0  # longest column label in words; 0 = no caption detection
     paragraph_gap: float = 0.0  # line gap (x median pitch) marking a paragraph; 0 = none
     glyphs: RepairOptions | None = None  # repair shifted fonts in cell words; None = off
+    use_layout: bool = True  # PyMuPDF layout model gates table detection (slow, ~7 s/page)
 
 
 def _word_count(text: str) -> int:

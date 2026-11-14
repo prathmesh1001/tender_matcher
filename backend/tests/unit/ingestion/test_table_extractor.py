@@ -531,3 +531,31 @@ def test_split_values_are_kept_without_units(tmp_path: Path) -> None:
         [table] = extract_page_tables(doc[0])
     assert table.rows[0].cells == ["Pressure", "Up to 16", "bar"]
     assert table.rows[1].cells == ["Temperature", "-30 C to +140 C", "-30 C to +140 C"]
+
+
+class _RecordingPage:
+    """Stands in for a page: records how table detection was called and finds nothing."""
+
+    def __init__(self) -> None:
+        self.kwargs: dict[str, object] = {}
+
+    def find_tables(self, **kwargs: object) -> object:
+        self.kwargs = kwargs
+        return type("Found", (), {"tables": []})()
+
+
+@pytest.mark.parametrize("use_layout", [True, False])
+def test_use_layout_option_reaches_table_detection(use_layout: bool) -> None:
+    page = _RecordingPage()
+    options = TableCleanupOptions(use_layout=use_layout)
+
+    assert extract_page_tables(page, cleanup=options) == []  # type: ignore[arg-type]
+    assert page.kwargs == {"use_layout": use_layout}
+
+
+def test_layout_model_is_on_by_default() -> None:
+    page = _RecordingPage()
+
+    extract_page_tables(page)  # type: ignore[arg-type]
+
+    assert page.kwargs == {"use_layout": True}
