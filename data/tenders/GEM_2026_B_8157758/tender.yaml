@@ -1,0 +1,36 @@
+bid_number: GEM/2026/B/8157758
+source: Provided locally
+files:
+- file: bid.pdf
+  role: bid_document
+  url: null
+  fetched_at: '2026-11-04T09:09:47.368217Z'
+  sha256: 353e1205cd52d23dd11b7a58e403a6aa227606d68ef775349ecc2c8edc278b46
+  content_type: application/pdf
+  depth: 0
+  note: provided locally; source URL unknown
+- file: null
+  role: mii_mse_doc
+  url: https://bidplus.gem.gov.in/bidding/downloadMseMiiDoc/10031681/1791953447.pdf
+  fetched_at: '2026-11-04T09:09:48.877409Z'
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+  note: empty response; not stored
+- file: boq_spec.pdf
+  role: boq_spec
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqDocument/2026/10/14/annexure_a_2026-10-14-10-08-40_1284dd1e740bb39b85878af7d73202dc.pdf
+  fetched_at: '2026-11-04T09:09:49.986669Z'
+  sha256: 86c284ea0d6736a898c268fce6379c2e11de53e6ecfce77626ccd97da35fcb04
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1
+- file: boq_items.csv
+  role: boq_items
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqLineItemsDocument/2026/10/14/boq_item_sample_file_-2_2026-07-23-13-01-20_bbcaac7_2026-10-14-10-08-40_645ec3e41e8c3725a68982aaee8f63ca.csv
+  fetched_at: '2026-11-04T09:09:50.013653Z'
+  sha256: 11305dd12c046507eaae6500762154da3ae654195fad096811e5444ba77af1be
+  content_type: application/octet-stream
+  found_in: bid.pdf
+  depth: 1

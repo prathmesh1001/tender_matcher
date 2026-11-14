@@ -1,0 +1,35 @@
+bid_number: GEM/2026/B/8188046
+source: Provided locally
+files:
+- file: bid.pdf
+  role: bid_document
+  url: null
+  fetched_at: '2026-11-02T13:25:56.805673Z'
+  sha256: f8d8e477843958598509c9a92840afc5d9b28eaefbc38966ea4da895eae42468
+  content_type: application/pdf
+  depth: 0
+  note: provided locally; source URL unknown
+- file: gem_category_spec.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/k9wSyzaQrFow_fZW_H4wPoW_ZcMQielUUoVOB1pKcck
+  fetched_at: '2026-11-02T13:29:39.085026Z'
+  sha256: cc4593508f7010011fcc58e223b3c7d4efbd197027d34e55a8c1ce21a9085b9a
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_2.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/_xuvLJoS_0V3nfQyyHgBWIq0StWev9w6XphyXTogcH0
+  fetched_at: '2026-11-02T13:29:39.483049Z'
+  sha256: 1cb716ea8d96d4038da1a874defb62f4dd7f1b2b9c88c9db68cbe2ad12b17745
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Oct/GEM_2026_B_8188046/CLM0010/tenderhyy_150135b7-83ff-42a6-adcf1792659348709_drishtidhingra.pdf
+  fetched_at: '2026-11-02T13:29:48.955528Z'
+  sha256: 33d4fb24e48b3d8be7045814e7bf3aed9743ccda15495727ad6fe3ff1b35fd1e
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1

@@ -1,0 +1,19 @@
+bid_number: GEM/2026/B/8226616
+source: Provided locally
+files:
+- file: bid.pdf
+  role: bid_document
+  url: null
+  fetched_at: '2026-11-02T13:25:57.019327Z'
+  sha256: 406316f1de2f619a99599855fb10eaef07f91fed8fd1dfa409a663212222ad7c
+  content_type: application/pdf
+  depth: 0
+  note: provided locally; source URL unknown
+- file: gem_category_spec.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/am66aidcw2WudttIpIgXTBkkPHzsNIBHDhCAcuq0HaY
+  fetched_at: '2026-11-02T13:34:35.785581Z'
+  sha256: 0c9ead617541d2b57f0e4e5d6485c667d8cf96221e0660d36e6f4c6d07bf3e0f
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
