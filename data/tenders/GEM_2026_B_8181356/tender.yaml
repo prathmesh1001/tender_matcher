@@ -1,0 +1,35 @@
+bid_number: GEM/2026/B/8181356
+source: Provided locally
+files:
+- file: bid.pdf
+  role: bid_document
+  url: null
+  fetched_at: '2026-11-14T14:35:34.104968Z'
+  sha256: 2c4c10a515edab9e082ca5f4389d323472d790b3f37c41b258ba652dc32ce267
+  content_type: application/pdf
+  depth: 0
+  note: provided locally; source URL unknown
+- file: boq_spec.pdf
+  role: boq_spec
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqDocument/2026/10/20/scope_of_work_2026-10-20-15-45-57_60c01fe4e5d44291471aaa1dc4ef0408.pdf
+  fetched_at: '2026-11-14T14:35:36.082063Z'
+  sha256: 3452492d2d6bed15d9d208bdcc21e2ba7ae1d37ca9cac0d5de1168e5b870dd13
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1
+- file: boq_items.csv
+  role: boq_items
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqLineItemsDocument/2026/10/20/boq_item_sample_file20-10-2026_2026-10-20-15-45-57_02dba9d0de5c4b038356bfb5e57a14b4.csv
+  fetched_at: '2026-11-14T14:35:36.151841Z'
+  sha256: f24f4632119091d2e5b7cd141eaa6ad27903f5eb77ef280943b7c4c2d870d54b
+  content_type: application/octet-stream
+  found_in: bid.pdf
+  depth: 1
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Oct/GEM_2026_B_8181356/CLM0010/Technical_684ea22b-8e82-4a4f-80db1792660695062_CMSRU_BUYER_01.pdf
+  fetched_at: '2026-11-14T14:35:38.148872Z'
+  sha256: fb1c23c6c7dbc94bfbc5b02a9021d7726730a987146460bd862a52f479e0b85a
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1

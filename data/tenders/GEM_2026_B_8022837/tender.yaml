@@ -1,0 +1,27 @@
+bid_number: GEM/2026/B/8022837
+source: Provided locally
+files:
+- file: bid.pdf
+  role: bid_document
+  url: null
+  fetched_at: '2026-11-14T14:33:22.306142Z'
+  sha256: 033fdffa53391fffbe3cee3a37cae4aae98c6734b246188c65563bfd931f0608
+  content_type: application/pdf
+  depth: 0
+  note: provided locally; source URL unknown
+- file: boq_spec.pdf
+  role: boq_spec
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqDocument/2026/9/10/boq_item_sample_file_corrected_pdf_2026-09-10-15-58-22_1e54ed210159b4cb213a4afe67c6ff0c.pdf
+  fetched_at: '2026-11-14T14:33:27.150151Z'
+  sha256: edc43c71a923416dcd52e8cf33a5004f43ab980975c4aaea277e751e819027ae
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1
+- file: boq_items.csv
+  role: boq_items
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqLineItemsDocument/2026/9/10/boq_item_sample_file_corrected_2051_2026-09-10-15-58-22_1f4c223d0198379a171df440a6441b12.csv
+  fetched_at: '2026-11-14T14:33:27.223152Z'
+  sha256: 65092029d2b245b52dc5cf4568f8aa4268f5fc3e88562577aa837912e3363379
+  content_type: application/octet-stream
+  found_in: bid.pdf
+  depth: 1
