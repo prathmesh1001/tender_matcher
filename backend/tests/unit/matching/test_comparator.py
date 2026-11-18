@@ -12,7 +12,7 @@ from app.matching.chunk_source import CatalogueChunk, CatalogueDocument
 from app.matching.comparator import ComparatorOptions, MatchContext, compare
 from app.matching.fields import FieldOptions, chunk_fields, is_dimension_table, located_fields
 from app.matching.values import quantities
-from app.ontology.loader import load_ontologies
+from app.ontology.loader import load_ontology_file
 from app.ontology.schema import Ontology
 from app.schemas.chunking import ChunkDraft
 from app.schemas.enums import ChunkType, DocType, MatchStatus, ReviewFlag
@@ -41,7 +41,7 @@ BOTH = pytest.mark.parametrize("with_ontology", [True, False], ids=["ontology", 
 
 @pytest.fixture(scope="module")
 def valves() -> Ontology:
-    [ontology] = load_ontologies(ONTOLOGY_DIR)
+    ontology = load_ontology_file(ONTOLOGY_DIR / "valves_pumps.yaml")
     return ontology
 
 

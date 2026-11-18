@@ -8,7 +8,7 @@ from app.core.config import Settings
 from app.matching.comparator import MatchContext, routed
 from app.matching.engine import general_result, item_product_type
 from app.matching.scorer import score
-from app.ontology.loader import load_ontologies
+from app.ontology.loader import load_ontology_file
 from app.ontology.schema import Ontology
 from app.schemas.chunking import ChunkDraft
 from app.schemas.enums import ChunkType, DecisionSource, MatchStatus, Operator, RequirementType
@@ -51,7 +51,7 @@ def classifier(options: RequirementOptions) -> RequirementClassifier:
 
 @pytest.fixture(scope="module")
 def ontology() -> Ontology:
-    [valves] = load_ontologies(BACKEND / "ontology")
+    valves = load_ontology_file(BACKEND / "ontology" / "valves_pumps.yaml")
     return valves
 
 
@@ -602,6 +602,16 @@ def test_engine_finds_the_type_in_any_order(ontology: Ontology) -> None:
     declared = ["centrifugal_pump", "submersible_pump"]
     assert item_product_type("CENTRIFUGAL HORIZONTAL PUMP", declared, ctx) == "centrifugal_pump"
     assert item_product_type("GATE VALVE", declared, ctx) is None  # no document declares it
+
+
+def test_types_of_another_ontology_are_not_named_and_do_not_crash() -> None:
+    # Run 01a1edfd: thermocouple items (instruments ontology) while the run's manufacturers
+    # declare valve types; the lookup of `ball_valve` used to raise KeyError.
+    instruments = load_ontology_file(BACKEND / "ontology" / "instruments.yaml")
+    ctx = MatchContext.for_ontology(instruments)
+    title = "Thermocouple K-type with Thermowell"
+    assert item_product_type(title, ["ball_valve", "gate_valve"], ctx) is None
+    assert item_product_type(title, ["ball_valve", "thermocouple"], ctx) == "thermocouple"
 
 
 # ---------------------------------------------------------------- single firm

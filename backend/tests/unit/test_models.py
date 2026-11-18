@@ -28,6 +28,7 @@ EXPECTED_TABLES = {
     "judge_answers",
     "file_blobs",
     "stored_files",
+    "discovery_jobs",
 }
 
 

@@ -7,17 +7,26 @@ when an item's category has one, unless the run is told not to use any. Rules de
 optional judge then handles what they cannot read.
 """
 
+import hashlib
 import logging
-from collections.abc import Sequence
+import time
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sqlalchemy.orm import Session, sessionmaker
+
 from app.core.config import Settings
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import InvalidInputError, NotFoundError
 from app.core.logging import log_context
 from app.ingestion.ocr import build_ocr_engine
-from app.ingestion.processing import ProcessingOptions, is_supported, process_file
+from app.ingestion.processing import (
+    ProcessedDocument,
+    ProcessingOptions,
+    is_supported,
+    process_file,
+)
 from app.ingestion.product_tagger import ProductMatcher
 from app.ingestion.registry import load_registry
 from app.matching.chunk_source import (
@@ -37,6 +46,7 @@ from app.matching.engine import (
     item_for_review,
     match_item,
 )
+from app.matching.listing_source import WithListings, load_listings
 from app.matching.llm_judge import ItemJudge
 from app.matching.scorer import rank, score_explanation
 from app.ontology.loader import load_ontologies
@@ -59,11 +69,30 @@ from app.storage.file_store import FileStore, LocalFileStore, build_file_store
 from app.tender.items import ItemSource, TenderFile, TenderRequirements, parse_tender_files
 from app.tender.link_fetcher import MANIFEST_FILENAME, read_manifest
 from app.tender.ocr_flags import LowRow, flag_low_ocr, low_confidence_rows
-from app.tender.pipeline import ItemRequirements, RequirementOptions, ontology_for
+from app.tender.pipeline import (
+    ItemRequirements,
+    RequirementOptions,
+    ontology_for,
+    product_type_for,
+)
 from app.tender.quality import ItemFacts, extraction_quality, low_confidence_pages
 from app.tender.splitter import leaves
 
 logger = logging.getLogger(__name__)
+
+# Parsed tender files live next to the catalogue cache, under their own fingerprint: tender
+# processing options derive from the same settings and code (`ProcessingOptions.for_tender`).
+TENDER_CACHE_SUBDIR = "tenders"
+_HASH_BLOCK_BYTES = 1 << 20
+
+
+@dataclass(frozen=True, slots=True)
+class UncoveredType:
+    """A product type of a tender's items that no stored document declares."""
+
+    product_type: str
+    category: str
+    item_nos: list[str]
 
 
 @dataclass(slots=True)
@@ -109,8 +138,10 @@ class MatchService:
         tender_root: Path,
         judge: ItemJudge | None = None,
         store: FileStore | None = None,
+        tender_cache: ProcessedCache | None = None,
     ) -> None:
         self._source = source
+        self._tender_cache = tender_cache
         self._tender_options = tender_options
         self._requirement_options = requirement_options
         self._selection = selection
@@ -153,7 +184,7 @@ class MatchService:
             ref = self._store.ref_for(path)
             if is_supported(path) and self._store.exists(ref):
                 with self._store.local_path(ref) as local:
-                    processed = process_file(local, self._tender_options)
+                    processed = self._process_tender_file(local)
                 files.append(TenderFile(path.name, entry.role, processed.chunks))
                 low_ocr |= low_confidence_pages(
                     path.name, processed.pages, quality.ocr_min_confidence
@@ -161,8 +192,17 @@ class MatchService:
                 low_rows |= low_confidence_rows(
                     path.name, processed.chunks, quality.ocr_row_min_confidence
                 )
+        started = time.monotonic()
         found = flag_low_ocr(
             parse_tender_files(files, self._requirement_options, ontologies), low_ocr, low_rows
+        )
+        logger.info(
+            "tender requirements extracted",
+            extra={
+                "items": len(found.items),
+                "general": len(found.general),
+                "seconds": round(time.monotonic() - started, 2),
+            },
         )
         return ParsedTender(
             bid_number=manifest.bid_number,
@@ -179,6 +219,45 @@ class MatchService:
             item_source=found.source,
             extraction_quality=self._quality(found, low_ocr, unfetched, files),
         )
+
+    def _match_timed(self, entry: ItemInput, manufacturers: Sequence[str] | None) -> ItemReport:
+        """`match_item`, logging how long the item took."""
+        started = time.monotonic()
+        report = match_item(entry, self._source, self._selection, manufacturers)
+        logger.info(
+            "item matched",
+            extra={
+                "item": entry.item.item_no,
+                "requirements": len(entry.requirements),
+                "seconds": round(time.monotonic() - started, 2),
+            },
+        )
+        return report
+
+    def _process_tender_file(self, path: Path) -> ProcessedDocument:
+        """One tender file's pages and chunks: the tender cache by sha256, else processing.
+
+        Reruns, the GeM re-match and runs after an upload's background parse read the cache.
+        """
+        started = time.monotonic()
+        sha256 = _file_sha256(path)
+        cache = self._tender_cache
+        processed = cache.get(sha256) if cache else None
+        cached = processed is not None
+        if processed is None:
+            processed = process_file(path, self._tender_options)
+            if cache:
+                cache.put(sha256, processed)
+        logger.info(
+            "tender file read",
+            extra={
+                "file": path.name,
+                "pages": len(processed.pages),
+                "cached": cached,
+                "seconds": round(time.monotonic() - started, 2),
+            },
+        )
+        return processed
 
     def _item_facts(self, entry: ItemRequirements, low_ocr: set[tuple[str, int]]) -> ItemFacts:
         """What the extraction check reads about one item."""
@@ -247,18 +326,28 @@ class MatchService:
             DocumentParseError: If a tender file cannot be parsed.
         """
         with log_context(tender_id=tender):
+            self._source.refresh()
             parsed = self.parse_tender(tender, use_ontology=use_ontology, unfetched=unfetched)
-            reports = [
-                match_item(entry, self._source, self._selection, manufacturers)
-                for entry in parsed.items
-            ]
-            logger.info("tender matched", extra={"items": len(reports), "files": len(parsed.files)})
+            started = time.monotonic()
+            reports = [self._match_timed(entry, manufacturers) for entry in parsed.items]
+            logger.info(
+                "tender matched",
+                extra={
+                    "items": len(reports),
+                    "files": len(parsed.files),
+                    "seconds": round(time.monotonic() - started, 2),
+                },
+            )
             quality = parsed.extraction_quality
             decided_by = "rules"
             # Items that cannot be trusted are not worth paying to judge.
             if self._judge is not None and quality.status is not ExtractionStatus.UNRELIABLE:
+                started = time.monotonic()
                 judged = self._judge.judge_items(parsed.items, reports, self._source)
                 reports, decided_by = judged.reports, judged.decided_by
+                logger.info(
+                    "judge step done", extra={"seconds": round(time.monotonic() - started, 2)}
+                )
             reports = items_with_confidence(
                 reports, self._source, self._confidence, self._selection.status_scores
             )
@@ -289,6 +378,120 @@ class MatchService:
             item_source=parsed.item_source.value,
         )
 
+    def uncovered_types(
+        self, report: TenderReport, manufacturers: Sequence[str] | None = None
+    ) -> list[UncoveredType]:
+        """Product types of a report's items that no document of the run's makers declares.
+
+        Read from the stored report (item titles), so it needs no tender parsing. A type is
+        covered only by a document of `manufacturers`: a GeM listing stored by another run's
+        check does not hide the check from a run that never matched against it.
+
+        Args:
+            report: A run's report.
+            manufacturers: The run's manufacturers; None counts every stored document.
+
+        Returns:
+            One entry per type, in first-item order, with its category and item numbers.
+        """
+        self._source.refresh()
+        declared = self._source.product_types()
+        found: dict[str, UncoveredType] = {}
+        for item in report.items:
+            ontology = ontology_for(item.item.title, self._ontologies)
+            product_type = product_type_for(item.item.title, ontology)
+            if (
+                ontology is None
+                or product_type is None
+                or self._covered(product_type, declared, manufacturers)
+            ):
+                continue
+            uncovered = found.setdefault(
+                product_type, UncoveredType(product_type, ontology.category, [])
+            )
+            uncovered.item_nos.append(item.item.item_no)
+        return list(found.values())
+
+    def _covered(
+        self,
+        product_type: str,
+        declared: Mapping[str, frozenset[str]],
+        manufacturers: Sequence[str] | None,
+    ) -> bool:
+        """True if a stored document of one of `manufacturers` (None: any) declares the type."""
+        categories = declared.get(product_type, frozenset())
+        if manufacturers is None or not categories:
+            return bool(categories)
+        return any(
+            self._source.documents(m, c, product_type) for m in manufacturers for c in categories
+        )
+
+    def rematch_items(
+        self,
+        previous: TenderReport,
+        product_types: Sequence[str],
+        manufacturers: Sequence[str] | None,
+    ) -> TenderReport:
+        """Re-match, by rules only, the items of these product types; keep every other item.
+
+        Used after GeM listings were stored: only the affected items can change, so only they
+        are matched again (no LLM judge). The ranking is recomputed over all items.
+
+        Args:
+            previous: The run's report.
+            product_types: Product types whose items are matched again.
+            manufacturers: Only these (None: every manufacturer and listing brand).
+
+        Returns:
+            A new report.
+
+        Raises:
+            InvalidInputError: If the tender now parses into other items than the report has.
+        """
+        with log_context(tender_id=previous.tender):
+            self._source.refresh()
+            parsed = self.parse_tender(previous.tender)
+            if len(parsed.items) != len(previous.items):
+                raise InvalidInputError(
+                    "The tender no longer parses into the report's items; start a new run",
+                    details={"tender": previous.tender},
+                )
+            wanted = set(product_types)
+            quality = previous.extraction_quality
+            note = (
+                "extraction unreliable: " + ", ".join(r.code.value for r in quality.reasons)
+                if quality.status is ExtractionStatus.UNRELIABLE
+                else None
+            )
+            items = [
+                (
+                    self._rematched(entry, manufacturers, note)
+                    if product_type_for(entry.item.title, entry.ctx.ontology) in wanted
+                    else old
+                )
+                for entry, old in zip(parsed.items, previous.items, strict=True)
+            ]
+        changed = sum(new is not old for new, old in zip(items, previous.items, strict=True))
+        return previous.model_copy(
+            update={
+                "generated_at": datetime.now(UTC),
+                "decided_by": f"{previous.decided_by} + GeM listings (rules, {changed} items)",
+                "items": items,
+                "ranking": self._ranking(items),
+                "status_lists": status_lists(items),
+            }
+        )
+
+    def _rematched(
+        self, entry: ItemInput, manufacturers: Sequence[str] | None, review_note: str | None
+    ) -> ItemReport:
+        """One item matched again by rules, with confidence; all to review if the note says so."""
+        report = match_item(entry, self._source, self._selection, manufacturers)
+        report = items_with_confidence(
+            [report], self._source, self._confidence, self._selection.status_scores
+        )[0]
+        return item_for_review(report, review_note, self._selection) if review_note else report
+
     def _ranking(self, reports: Sequence[ItemReport]) -> list[RankingEntry]:
         """Tender-level ranking over all items' results."""
         by_manufacturer: dict[str, list[Comparison]] = {}
@@ -308,7 +511,10 @@ class MatchService:
 
 
 def build_match_service(
-    settings: Settings, store: FileStore | None = None, judge: ItemJudge | None = None
+    settings: Settings,
+    store: FileStore | None = None,
+    judge: ItemJudge | None = None,
+    session_factory: sessionmaker[Session] | None = None,
 ) -> MatchService:
     """Wire the in-memory match service from settings.
 
@@ -316,6 +522,8 @@ def build_match_service(
         settings: Application settings.
         store: File store (built from settings if omitted).
         judge: LLM judge for what rules leave open; None for rules only.
+        session_factory: Reads stored GeM listings; with DISCOVERY_ENABLED they are matched
+            next to the catalogues (None: catalogues only).
 
     Returns:
         A ready service.
@@ -327,13 +535,18 @@ def build_match_service(
         settings, vocabulary, matcher, build_ocr_engine(settings)
     )
     files = store or build_file_store(settings)
-    cache = ProcessedCache(
-        settings.CHUNK_CACHE_DIR,
-        processing_fingerprint(settings, Path(__file__).resolve().parents[2]),
+    catalogue_fingerprint = processing_fingerprint(settings, Path(__file__).resolve().parents[2])
+    cache = ProcessedCache(settings.CHUNK_CACHE_DIR, catalogue_fingerprint)
+    tender_cache = ProcessedCache(
+        settings.CHUNK_CACHE_DIR / TENDER_CACHE_SUBDIR,
+        hashlib.sha256(f"tender:{catalogue_fingerprint}".encode()).hexdigest(),
     )
-    source = InMemoryChunkSource(
+    source: ChunkSource = InMemoryChunkSource(
         load_registry(settings.MANUFACTURER_DATA_DIR), catalogue_processor(files, options), cache
     )
+    if settings.DISCOVERY_ENABLED and session_factory is not None:
+        factory = session_factory
+        source = WithListings(source, lambda: load_listings(factory))
     return MatchService(
         source=source,
         tender_options=options.for_tender(),
@@ -344,4 +557,14 @@ def build_match_service(
         tender_root=settings.TENDER_DATA_DIR,
         judge=judge,
         store=files,
+        tender_cache=tender_cache,
     )
+
+
+def _file_sha256(path: Path) -> str:
+    """sha256 of a file, read in blocks (tender attachments reach 60 MB)."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while block := handle.read(_HASH_BLOCK_BYTES):
+            digest.update(block)
+    return digest.hexdigest()

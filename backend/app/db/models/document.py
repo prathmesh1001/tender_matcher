@@ -47,6 +47,11 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     fetched_at: Mapped[datetime]
     publish_date: Mapped[date | None]
     page_count: Mapped[int] = mapped_column(default=0)
+    auto_sourced: Mapped[bool] = mapped_column(
+        default=False,
+        server_default="false",
+        comment="Found by the system (GeM Marketplace), not registered and checked by hand.",
+    )
 
     pages: Mapped[list[Page]] = relationship(
         back_populates="document", cascade="all, delete-orphan", order_by="Page.page_number"

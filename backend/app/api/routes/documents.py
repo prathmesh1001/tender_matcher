@@ -20,8 +20,7 @@ def get_document_file(
 ) -> Response:
     """A stored document, to open in the browser; add `#page=N` to open it at a page."""
     stored = service.get_file(sha256)
-    return Response(
-        content=stored.content,
-        media_type=stored.media_type,
-        headers={"Content-Disposition": f'inline; filename="{stored.filename}"'},
-    )
+    headers = {"Content-Disposition": f'inline; filename="{stored.filename}"'}
+    if stored.sandboxed:
+        headers["Content-Security-Policy"] = "sandbox"
+    return Response(content=stored.content, media_type=stored.media_type, headers=headers)

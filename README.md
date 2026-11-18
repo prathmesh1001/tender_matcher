@@ -216,6 +216,20 @@ Against 101 hand-labelled rows on 5 tenders ([eval/results.md](eval/results.md))
 
 Details, the step by step results and their causes are in the [write-up](docs/writeup.md).
 
+## GeM Marketplace fallback (optional, off by default)
+
+When no manufacturer document covers an item's product type (e.g. control valves), a finished
+report can offer **"Check GeM Marketplace for control valve?"**. Turn it on with
+`DISCOVERY_ENABLED=true` in `backend/.env` and restart. Categories per product type live in
+`backend/config/gem_marketplace.yaml` (GeM's keyword search needs JavaScript; category pages do not).
+
+- Limits: at most `GEM_MAX_LISTINGS` (5) product pages per check, `GEM_REQUEST_DELAY_SECONDS` (3)
+  before every request, robots.txt obeyed, `HTTP_USER_AGENT` sent, no login, no LLM.
+- Each listing's HTML is frozen under `data/gem_snapshots/` (local only, never committed) and stored
+  as an auto-sourced document; only the affected items are re-matched, by rules, into a new run.
+- **GeM specifications are typed in by sellers.** Such results show "GeM listing (seller-declared)",
+  rank below datasheets, catalogues and brochures, and always need review.
+
 ## Known limits
 
 - 6 of 19 tenders give wrong reports; the extraction warning flags 9 of 19 and sends their results

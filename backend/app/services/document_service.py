@@ -10,6 +10,8 @@ from app.db.repositories import DocumentRepository
 from app.storage.file_store import FileStore
 
 _DEFAULT_MEDIA_TYPE: Final = "application/octet-stream"
+# Saved third-party pages (GeM listing snapshots) must never run scripts on our origin.
+_SANDBOXED_TYPES: Final = frozenset({"text/html", "application/xhtml+xml"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +21,11 @@ class StoredFile:
     filename: str
     media_type: str
     content: bytes
+
+    @property
+    def sandboxed(self) -> bool:
+        """True for a saved web page: served under a CSP sandbox (no scripts, no origin)."""
+        return self.media_type in _SANDBOXED_TYPES
 
 
 class DocumentService:

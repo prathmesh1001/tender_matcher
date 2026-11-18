@@ -31,6 +31,8 @@ class JobName(StrEnum):
 
     RUN = "run"  # argument: the run id
     WARM_UP = "warm_up"  # argument: unused
+    DISCOVER = "discover"  # argument: the discovery job id (GeM Marketplace check)
+    PREPARE_TENDER = "prepare_tender"  # argument: the tender folder (parse after upload)
 
 
 type JobHandler = Callable[[JobName, str], None]

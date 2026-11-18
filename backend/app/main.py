@@ -16,7 +16,8 @@ from app.core.config import Settings, get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.db.session import create_db_engine, create_session_factory
-from app.services.run_service import build_run_service
+from app.services.discovery_service import build_discovery_service
+from app.services.run_service import build_matcher, build_run_service
 from app.workers.tasks import build_job_queue
 
 logger = logging.getLogger(__name__)
@@ -65,8 +66,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = create_db_engine(settings)
     app.state.session_factory = create_session_factory(app.state.engine)
     app.state.job_queue = build_job_queue(settings)
+    matcher = build_matcher(settings, app.state.session_factory)
     app.state.run_service = build_run_service(
-        settings, app.state.session_factory, app.state.job_queue
+        settings, app.state.session_factory, app.state.job_queue, matcher
+    )
+    app.state.discovery_service = build_discovery_service(
+        settings, app.state.session_factory, app.state.job_queue, matcher, app.state.run_service
     )
     app.add_middleware(
         CORSMiddleware,

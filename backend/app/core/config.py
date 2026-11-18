@@ -47,6 +47,7 @@ class LLMProvider(StrEnum):
     """LLM providers behind `LLMClient`."""
 
     GEMINI = "gemini"
+    GROQ = "groq"
 
 
 class EmbeddingDevice(StrEnum):
@@ -457,6 +458,13 @@ class Settings(BaseSettings):
         default=None, description="Needed by every command that calls the LLM."
     )
     GEMINI_API_BASE: str = Field(default="https://generativelanguage.googleapis.com/v1beta")
+    GROQ_API_KEY: SecretStr | None = Field(
+        default=None, description="Needed when LLM_PROVIDER=groq."
+    )
+    GROQ_API_BASE: str = Field(default="https://api.groq.com/openai/v1")
+    LLM_MAX_RETRY_AFTER_SECONDS: float = Field(
+        default=90.0, ge=0, description="Longest wait honoured from a rate-limit retry-after."
+    )
     CONFIDENCE_LLM_FACTOR: float = Field(
         default=0.7, gt=0, le=1, description="Confidence factor of an LLM decision."
     )
@@ -614,6 +622,42 @@ class Settings(BaseSettings):
         default="tender-matcher/0.1 (+document fetcher)",
         min_length=1,
         description="User-Agent sent when downloading tender attachments.",
+    )
+
+    DISCOVERY_ENABLED: bool = Field(
+        default=False,
+        description="Offer GeM Marketplace listings as evidence for item product types that no "
+        "manufacturer document covers. Off: no button, no endpoint work, no listing in matching.",
+    )
+    GEM_MARKETPLACE_FILE: Path = Field(
+        default=Path("config/gem_marketplace.yaml"),
+        description="Product type -> GeM Marketplace category pages to read listings from.",
+    )
+    GEM_BASE_URL: str = Field(
+        default="https://mkp.gem.gov.in", min_length=1, description="GeM Marketplace site."
+    )
+    GEM_MAX_LISTINGS: int = Field(
+        default=5, ge=1, le=20, description="Most listings read per product type and request."
+    )
+    GEM_REQUEST_DELAY_SECONDS: float = Field(
+        default=3.0, ge=0, description="Pause before every request to GeM Marketplace."
+    )
+    GEM_MIN_SPEC_ROWS: int = Field(
+        default=5, ge=1, description="A listing with fewer specification rows is not kept."
+    )
+    GEM_SNAPSHOT_PREFIX: str = Field(
+        default="gem_snapshots",
+        min_length=1,
+        pattern=r"^[A-Za-z0-9_-]+$",
+        description="File store folder for the frozen HTML of every listing read (local only, "
+        "never committed).",
+    )
+    CONFIDENCE_GEM_LISTING_FACTOR: float = Field(
+        default=0.6,
+        gt=0,
+        le=1,
+        description="Confidence factor when all evidence is GeM listings (seller-declared, "
+        "below brochures); such results always need review.",
     )
 
     CHUNK_TARGET_TOKENS: int = Field(

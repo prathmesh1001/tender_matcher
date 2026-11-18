@@ -12,8 +12,7 @@ ONTOLOGY_DIR = Path(__file__).resolve().parents[3] / "ontology"
 
 @pytest.fixture(scope="module")
 def ontology() -> Ontology:
-    [only] = load_ontologies(ONTOLOGY_DIR)
-    return only
+    return load_ontology_file(ONTOLOGY_DIR / "valves_pumps.yaml")
 
 
 def test_shipped_ontology_loads(ontology: Ontology) -> None:

@@ -1,5 +1,6 @@
 """ChunkSource: product filter, sha256 cache, page lookup. Documents and chunks are synthetic."""
 
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -156,6 +157,31 @@ def test_fingerprint_changes_with_file_content(tmp_path: Path) -> None:
     assert fingerprint([code], '{"X": 1}') != fingerprint([code], "{}")
 
 
+def test_fingerprint_ignores_line_endings_and_install_folder(tmp_path: Path) -> None:
+    # A git checkout rewrote one file CRLF -> LF and Docker threw every cached catalogue away.
+    windows, docker = tmp_path / "win" / "backend", tmp_path / "app"
+    for root, text in ((windows, b"A = 1\r\nB = 2\r\n"), (docker, b"A = 1\nB = 2\n")):
+        (root / "app" / "ingestion").mkdir(parents=True)
+        (root / "app" / "ingestion" / "chunker.py").write_bytes(text)
+    files = {r: [r / "app" / "ingestion" / "chunker.py"] for r in (windows, docker)}
+    assert fingerprint(files[windows], "{}", base=windows) == fingerprint(
+        files[docker], "{}", base=docker
+    )
+
+
+def test_fingerprint_tells_same_named_files_apart(tmp_path: Path) -> None:
+    files = [tmp_path / "ingestion" / "x.py", tmp_path / "schemas" / "x.py"]
+    for path in files:
+        path.parent.mkdir()
+
+    def with_contents(first: str, second: str) -> str:
+        files[0].write_text(first, encoding="utf-8")
+        files[1].write_text(second, encoding="utf-8")
+        return fingerprint(files, "{}", base=tmp_path)
+
+    assert with_contents("A = 1", "A = 2") != with_contents("A = 2", "A = 1")
+
+
 BACKEND = Path(__file__).resolve().parents[3]
 
 
@@ -195,3 +221,33 @@ def test_warm_loads_every_document_once() -> None:
     assert source.warm() == 2
     source.chunks_for_product("Acme", "valves_pumps", "gate_valve", use_tags=True)
     assert calls == [SHA_A, SHA_B]
+
+
+def test_a_run_and_the_warm_up_process_a_document_once() -> None:
+    # The warm-up runs in a background thread now; a run asking for the same catalogue
+    # meanwhile must wait for it, not process it a second time.
+    started, release = threading.Event(), threading.Event()
+    calls: list[str] = []
+
+    def slow(source: RegisteredSource) -> ProcessedDocument:
+        calls.append(source.sha256)
+        started.set()
+        release.wait(5)
+        return PROCESSED
+
+    source = InMemoryChunkSource([_source(SHA_A, ["butterfly_valve"])], slow)
+    warm = threading.Thread(target=source.warm)
+    warm.start()
+    assert started.wait(5)
+    results: list[int] = []
+    run = threading.Thread(
+        target=lambda: results.append(
+            len(source.chunks_for_product("Acme", "valves_pumps", "butterfly_valve", use_tags=True))
+        )
+    )
+    run.start()
+    release.set()
+    warm.join(5)
+    run.join(5)
+    assert calls == [SHA_A]
+    assert results == [2]

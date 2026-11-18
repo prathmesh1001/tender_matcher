@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from app.core.config import Settings
-from app.ontology.loader import load_ontologies
+from app.ontology.loader import load_ontology_file
 from app.ontology.schema import Ontology
 from app.schemas.chunking import ChunkDraft
 from app.schemas.enums import ChunkType
@@ -36,7 +36,7 @@ def options() -> RequirementOptions:
 
 @pytest.fixture(scope="module")
 def ontology() -> Ontology:
-    [valves] = load_ontologies(BACKEND / "ontology")
+    valves = load_ontology_file(BACKEND / "ontology" / "valves_pumps.yaml")
     return valves
 
 
@@ -355,4 +355,5 @@ def test_a_control_valve_is_no_globe_valve(options: RequirementOptions, ontology
     title = "Supply of Pneumatic (ATO) globe type two way control valve of size 1'' for steam"
     row = _row(["Column 1", "Column 2"], ["Item Category", title])
     found = parse_tender_files([TenderFile("bid.pdf", "bid_document", [row])], options, [ontology])
-    assert found.items[0].product_type is None
+    # Its own type since GeM discovery (2026-11-18); the exact phrase wins over globe's words.
+    assert found.items[0].product_type == "control_valve"

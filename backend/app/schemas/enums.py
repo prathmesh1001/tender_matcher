@@ -8,13 +8,29 @@ from enum import StrEnum
 
 
 class DocType(StrEnum):
-    """Kind of manufacturer document. Order of trust: datasheet > catalogue > brochure."""
+    """Kind of vendor document.
+
+    Order of trust: datasheet > catalogue > brochure > gem_listing (a GeM Marketplace product
+    page whose specifications the seller typed in).
+    """
 
     DATASHEET = "datasheet"
     CATALOGUE = "catalogue"
     BROCHURE = "brochure"
     MANUAL = "manual"
     OTHER = "other"
+    GEM_LISTING = "gem_listing"
+
+
+# Lower is trusted more (CLAUDE.md section 6: datasheet > catalogue > brochure, then GeM).
+DOC_TYPE_TRUST: dict[DocType, int] = {
+    DocType.DATASHEET: 0,
+    DocType.CATALOGUE: 1,
+    DocType.MANUAL: 2,
+    DocType.BROCHURE: 3,
+    DocType.OTHER: 4,
+    DocType.GEM_LISTING: 5,
+}
 
 
 class DocumentSource(StrEnum):
@@ -22,6 +38,16 @@ class DocumentSource(StrEnum):
 
     MANUFACTURER = "manufacturer"
     TENDER = "tender"
+    GEM_MARKETPLACE = "gem_marketplace"
+
+
+class DiscoveryStatus(StrEnum):
+    """Lifecycle of one GeM Marketplace check for a product type."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
 
 
 class ChunkType(StrEnum):
@@ -75,6 +101,7 @@ class ReviewFlag(StrEnum):
     CODE_ONLY_HIT = "code_only_hit"  # search accepted the passage only for a code it holds
     LOW_SCORE_HIT = "low_score_hit"  # no passage reached the rerank threshold
     SIBLING_PRODUCT = "sibling_product"  # stated only for another product of the same document
+    SELLER_DECLARED = "seller_declared"  # cited only from GeM listings a seller typed in
 
 
 class DecisionSource(StrEnum):

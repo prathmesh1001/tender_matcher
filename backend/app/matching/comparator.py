@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from app.core.config import Settings
+from app.matching.chunk_source import provenance
 from app.matching.fields import FieldOptions, LocatedField
 from app.matching.values import Quantity, code_tokens, quantities
 from app.ontology.schema import Attribute, Ontology
@@ -498,6 +499,7 @@ def _evidence(located: LocatedField, value: str, outcome: _Outcome) -> Evidence:
         quote_parts=list(located.field.parts),
         status=outcome.status,
         reason=outcome.reason,
+        **provenance(doc),
     )
 
 

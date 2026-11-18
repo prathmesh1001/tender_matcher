@@ -14,7 +14,8 @@ from rq import Queue, SimpleWorker
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import create_db_engine, create_session_factory
-from app.services.run_service import RunService, build_run_service
+from app.services.discovery_service import build_discovery_service
+from app.services.run_service import RunService, build_matcher, build_run_service
 from app.workers.tasks import JobName, build_job_queue
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,11 @@ def _service() -> RunService:
     settings = get_settings()
     session_factory = create_session_factory(create_db_engine(settings))
     # Jobs a run queues itself (none today) go back through Redis like the API's.
-    return build_run_service(settings, session_factory, build_job_queue(settings))
+    queue = build_job_queue(settings)
+    matcher = build_matcher(settings, session_factory)
+    runs = build_run_service(settings, session_factory, queue, matcher)
+    build_discovery_service(settings, session_factory, queue, matcher, runs)  # registers itself
+    return runs
 
 
 def perform(job: str, argument: str) -> None:

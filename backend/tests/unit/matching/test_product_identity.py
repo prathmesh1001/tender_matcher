@@ -10,7 +10,7 @@ from app.matching.chunk_source import CatalogueChunk, CatalogueDocument
 from app.matching.comparator import MatchContext
 from app.matching.documents import ItemQuery, SelectionOptions, evaluate_item
 from app.matching.product_identity import names_only_product
-from app.ontology.loader import load_ontologies
+from app.ontology.loader import load_ontology_file
 from app.ontology.schema import Ontology
 from app.schemas.chunking import ChunkDraft
 from app.schemas.enums import ChunkType, DocType, MatchStatus
@@ -26,7 +26,7 @@ LABEL_WORDS = OPTIONS.product_label_words
 
 @pytest.fixture(scope="module")
 def valves() -> Ontology:
-    [ontology] = load_ontologies(ONTOLOGY_DIR)
+    ontology = load_ontology_file(ONTOLOGY_DIR / "valves_pumps.yaml")
     return ontology
 
 

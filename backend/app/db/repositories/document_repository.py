@@ -19,6 +19,20 @@ class DocumentRepository(SqlRepository[Document]):
         """Return the document with this content hash (used for idempotent ingestion)."""
         return self._session.scalar(select(Document).where(Document.sha256 == sha256))
 
+    def get_by_url(self, url: str) -> Document | None:
+        """Return the first document read from this URL (a GeM listing is stored once)."""
+        stmt = select(Document).where(Document.url == url).order_by(Document.created_at).limit(1)
+        return self._session.scalar(stmt)
+
+    def list_auto_sourced(self) -> list[Document]:
+        """Every auto-sourced document (GeM listings), oldest first."""
+        stmt = (
+            select(Document)
+            .where(Document.auto_sourced.is_(True))
+            .order_by(Document.created_at, Document.id)
+        )
+        return list(self._session.scalars(stmt))
+
     def ids_by_sha256(self, hashes: Collection[str]) -> dict[str, uuid.UUID]:
         """Return the id of each stored document among these content hashes.
 

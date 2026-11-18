@@ -38,10 +38,15 @@ class ItemInput:
 
 
 def item_product_type(title: str, declared: Sequence[str], ctx: MatchContext) -> str | None:
-    """The one declared product type the item title names, or None (none or several)."""
+    """The one declared product type the item title names, or None (none or several).
+
+    Only declared types the item's ontology defines can be named: a run's manufacturers may
+    declare valve types while a thermocouple item uses the instruments ontology.
+    """
     if ctx.ontology is not None and ctx.vocabulary is not None:
         matcher = ProductMatcher.from_ontologies([ctx.ontology], ctx.vocabulary)
-        wanted = frozenset(declared)
+        known = {p.name for p in ctx.ontology.product_types}
+        wanted = frozenset(declared) & known
         found = matcher.types_in(normalize_for_search(title, ctx.vocabulary), wanted) or set(
             wanted.intersection(product_types_named(title, ctx.ontology))
         )

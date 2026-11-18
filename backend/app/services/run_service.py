@@ -6,6 +6,8 @@ a refused save, the run ends `failed` with the reason.
 """
 
 import logging
+import threading
+import time
 import uuid
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
@@ -27,7 +29,7 @@ from app.schemas.runs import RunResponse, StartRunRequest
 from app.services.ingestion_service import build_ingestion_service
 from app.services.judge_service import JudgeService, build_judge_service
 from app.services.manufacturer_service import ManufacturerService, build_manufacturer_service
-from app.services.match_service import build_match_service
+from app.services.match_service import MatchService, build_match_service
 from app.services.report_service import build_report_service
 from app.tender.link_fetcher import tender_folder
 from app.workers.tasks import JobName, JobQueue
@@ -49,6 +51,10 @@ class Matcher(Protocol):
         unfetched: Sequence[str] = (),
     ) -> TenderReport:
         """Match one tender folder."""
+        ...
+
+    def parse_tender(self, tender: str) -> object:
+        """Read one tender folder (fills the tender cache)."""
         ...
 
 
@@ -114,24 +120,83 @@ class RunService:
         self._fetch_links = fetch_links
         self._manufacturers = manufacturers
         self._warm_up = warm_up
+        self._warm_thread: threading.Thread | None = None
+        self._handlers: dict[JobName, Callable[[str], None]] = {}
         queue.bind(self.handle)
+
+    def register(self, job: JobName, handler: Callable[[str], None]) -> None:
+        """Let another service execute one kind of job from this queue.
+
+        Args:
+            job: The job name.
+            handler: Called with the job's argument.
+        """
+        self._handlers[job] = handler
 
     def handle(self, job: JobName, argument: str) -> None:
         """Execute one queued job, in whichever process runs the queue.
 
         Args:
             job: Which job.
-            argument: The run id for a run; unused for a warm-up.
+            argument: The run id for a run; a registered job's own argument; unused for a
+                warm-up.
         """
         if job is JobName.RUN:
             self.execute(uuid.UUID(argument))
-        elif self._warm_up is not None:
-            _warm(self._warm_up)
+        elif job in self._handlers:
+            self._handlers[job](argument)
+        elif job is JobName.WARM_UP and self._warm_up is not None:
+            self._start_warm_up(self._warm_up)
+        elif job is JobName.PREPARE_TENDER:
+            self.prepare_tender(argument)
+        else:
+            logger.warning("job has no handler", extra={"job": job.value})
+
+    def _start_warm_up(self, warm_up: Callable[[], int]) -> None:
+        """Warm in a background thread, so runs queued behind the job start at once.
+
+        A run needing a catalogue the warm-up is processing waits for that document only
+        (the chunk source locks per document); one warm-up thread at a time.
+        """
+        if self._warm_thread is not None and self._warm_thread.is_alive():
+            logger.info("catalogue warm-up already running")
+            return
+        self._warm_thread = threading.Thread(
+            target=_warm, args=(warm_up,), name="catalogue-warm-up", daemon=True
+        )
+        self._warm_thread.start()
+
+    def prepare_tender_later(self, folder: str) -> None:
+        """Queue fetching and parsing an uploaded tender, so its first run starts parsed.
+
+        Args:
+            folder: The tender revision's folder.
+        """
+        self._queue.submit(JobName.PREPARE_TENDER, folder)
+
+    def prepare_tender(self, folder: str) -> None:
+        """Queue job: fetch a tender's linked files and parse it into the tender cache.
+
+        Any failure is logged with its traceback and nothing more: it must not fail an upload
+        or stop the worker, and the run fetches and parses again and records the reason.
+
+        Args:
+            folder: The tender revision's folder.
+        """
+        with log_context(tender_id=folder):
+            started = time.monotonic()
+            try:
+                self._fetch_links(folder)
+                self._matcher().parse_tender(folder)
+            except Exception:  # logged; the run repeats the work and reports it
+                logger.exception("tender preparation failed")
+                return
+            logger.info("tender prepared", extra={"seconds": round(time.monotonic() - started, 2)})
 
     def warm_catalogues(self) -> bool:
-        """Queue reading every catalogue into the cache; runs queued after it find it ready.
+        """Queue reading every catalogue into the cache, in the process that runs jobs.
 
-        It goes through the run queue, so it never processes catalogues alongside a run.
+        The job only starts a background thread: runs queued after it do not wait for it.
 
         Returns:
             Whether a warm-up was queued (False when it is turned off).
@@ -278,8 +343,34 @@ def judge_or_none(
     return build_judge_service(settings, session_factory)
 
 
+def build_matcher(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> Callable[[], MatchService]:
+    """The process's one match service, built by its first use and then kept.
+
+    Runs and GeM discovery share it, so catalogues and models are loaded once.
+
+    Args:
+        settings: Application settings.
+        session_factory: For the judge's retrieval and the stored GeM listings.
+
+    Returns:
+        A factory returning the same service every time.
+    """
+    return cache(
+        lambda: build_match_service(
+            settings,
+            judge=judge_or_none(settings, session_factory),
+            session_factory=session_factory,
+        )
+    )
+
+
 def build_run_service(
-    settings: Settings, session_factory: sessionmaker[Session], queue: JobQueue
+    settings: Settings,
+    session_factory: sessionmaker[Session],
+    queue: JobQueue,
+    matcher: Callable[[], MatchService] | None = None,
 ) -> RunService:
     """Wire the run service; matching and link fetching are only built by the first run.
 
@@ -287,13 +378,12 @@ def build_run_service(
         settings: Application settings.
         session_factory: Opens the run's transactions.
         queue: Where runs wait.
+        matcher: Shared match service factory (`build_matcher`); built here if omitted.
 
     Returns:
         A ready service.
     """
-    matcher = cache(
-        lambda: build_match_service(settings, judge=judge_or_none(settings, session_factory))
-    )
+    matcher = matcher or build_matcher(settings, session_factory)
     ingestion = cache(lambda: build_ingestion_service(settings))
 
     def fetch_links(folder: str) -> list[str]:
@@ -302,12 +392,13 @@ def build_run_service(
         failed = [what for _, report in result.succeeded for what, _ in report.failed]
         return [*failed, *(what for what, _ in result.failed)]
 
+    shared = matcher
     return RunService(
         session_factory,
         settings,
         queue,
-        matcher,
+        shared,
         fetch_links,
         lambda: build_manufacturer_service(settings),
-        (lambda: matcher().warm_catalogues()) if settings.CATALOGUE_WARM_ON_STARTUP else None,
+        (lambda: shared().warm_catalogues()) if settings.CATALOGUE_WARM_ON_STARTUP else None,
     )

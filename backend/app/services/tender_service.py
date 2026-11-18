@@ -1,13 +1,15 @@
 """Use case: store an uploaded bid.pdf as a tender folder and a tender row.
 
-Upload only stores the file, so it answers quickly. Linked files are fetched and read when a run
-starts. It commits before returning, so a run started right after always finds the tender. A
-different bid.pdf for a known bid number becomes a new revision in its own folder: stored files
+Upload only stores the file, so it answers quickly; it can hand the folder to a background parse
+(`on_stored`). Linked files are fetched and read then, or at the latest when a run starts. It
+commits before returning, so a run started right after always finds the tender. A different
+bid.pdf for a known bid number becomes a new revision in its own folder: stored files
 are never overwritten, because past runs cite them.
 """
 
 import logging
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Final
 
@@ -45,11 +47,18 @@ class TenderService:
         store: FileStore,
         tender_root: Path,
         max_upload_mb: int,
+        on_stored: Callable[[str], None] | None = None,
     ) -> None:
+        """Store uploads in `store` under `tender_root`.
+
+        `on_stored` gets the tender folder after each upload: the API queues a background
+        parse there, so a run can start already parsed.
+        """
         self._session_factory = session_factory
         self._store = store
         self._tender_root = tender_root
         self._max_bytes = max_upload_mb * _BYTES_PER_MB
+        self._on_stored = on_stored
 
     def upload(self, filename: str, content: bytes) -> TenderUploadResponse:
         """Store one bid.pdf; uploading the same file again reuses its tender.
@@ -77,7 +86,8 @@ class TenderService:
                 if existing
                 else self._free_revision(bid_number, sha256, repo.latest_revision(bid_number) + 1)
             )
-            ref = self._store_files(tender_folder(bid_number, revision), content)
+            folder = tender_folder(bid_number, revision)
+            ref = self._store_files(folder, content)
             tender = existing or repo.add(
                 Tender(
                     filename=BID_FILENAME,
@@ -97,6 +107,8 @@ class TenderService:
                 created=existing is None,
             )
         logger.info("tender stored", extra={"tender_id": str(response.tender_id)})
+        if self._on_stored is not None:
+            self._on_stored(folder)
         return response
 
     def _check(self, content: bytes) -> None:

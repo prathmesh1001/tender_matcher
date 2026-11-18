@@ -87,6 +87,14 @@ product_types:
   - name: submersible_pump
     synonyms: [submersible pump, borewell pump]
     sub_types: []
+  # No manufacturer catalogue covers it yet; with DISCOVERY_ENABLED its evidence can come from
+  # GeM Marketplace listings (seller-declared, always reviewed). "Globe type control valve" is a
+  # control valve: the exact phrase wins over globe_valve's words.
+  - name: control_valve
+    synonyms: [control valve, control valves]
+    sub_types:
+      - name: pneumatic
+        synonyms: [pneumatic, pneumatically operated, air operated]
 
 # Words a label may have after a synonym and still name that attribute ("Body Materials", "Size
 # Range", "Ends Parameter"). Any other word means the label names something else ("Stem Length").
@@ -94,8 +102,7 @@ product_types:
 # A title naming one as a phrase is that product, never a type sharing its words in another
 # order: "PVC foot valve Ball type" is a foot valve, not a ball valve (8157758 item 21).
 other_products: [foot valve, strainer, y strainer, pressure reducing valve, safety valve,
-  relief valve, needle valve, solenoid valve, air release valve, float valve,
-  control valve]
+  relief valve, needle valve, solenoid valve, air release valve, float valve]
 
 label_generic_words: [valve, moc, material, parameter, component, part, sl, "no", number, type,
                       spec, specification, description, detail, range, dim, dimension, scope,
@@ -199,6 +206,20 @@ attributes:
     dimension: none
     material: true
     synonyms: [packing, gland packing, stem seal]
+  # Control-valve accessories (actuator, positioner, air filter regulator): their connections and
+  # feedback are other components, never the valve's own end connection (like for like). A label
+  # naming the accessory first resolves here: the candidate starting first names the most.
+  - name: accessory_connection
+    dimension: none
+    synonyms: [actuator pneumatic connection, actuator connection, actuator air connection,
+               air filter regulator connection, positioner pneumatic electric connection,
+               positioner connection, air connection, pneumatic connection]
+  - name: positioner_feedback
+    dimension: none
+    synonyms: [positioner position feedback, position feedback, position transmitter]
+  - name: positioner_type
+    dimension: none
+    synonyms: [positioner type, type of positioner]
   - name: end_connection
     dimension: none
     synonyms: [end connection, ends, end type, connection]

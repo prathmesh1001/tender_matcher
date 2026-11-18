@@ -18,7 +18,7 @@ from app.matching.documents import (
     sub_type_fit,
 )
 from app.matching.engine import manufacturer_report
-from app.ontology.loader import load_ontologies
+from app.ontology.loader import load_ontology_file
 from app.ontology.schema import Ontology
 from app.schemas.chunking import ChunkDraft
 from app.schemas.enums import ChunkType, DecisionSource, DocType, MatchStatus, ReviewFlag
@@ -36,7 +36,7 @@ BOTH = pytest.mark.parametrize("with_ontology", [True, False], ids=["ontology", 
 
 @pytest.fixture(scope="module")
 def valves() -> Ontology:
-    [ontology] = load_ontologies(ONTOLOGY_DIR)
+    ontology = load_ontology_file(ONTOLOGY_DIR / "valves_pumps.yaml")
     return ontology
 
 

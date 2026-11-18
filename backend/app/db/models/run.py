@@ -32,6 +32,10 @@ class Run(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     report: Mapped[dict[str, Any] | None] = mapped_column(
         comment="The full report as produced, so a past run reopens exactly as it was."
     )
+    parent_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("runs.id", ondelete="SET NULL"),
+        comment="The run this one re-matched (GeM listings added); the parent stays unchanged.",
+    )
 
     tender: Mapped[Tender] = relationship()
     line_items: Mapped[list[LineItem]] = relationship(

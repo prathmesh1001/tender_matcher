@@ -11,7 +11,7 @@ from app.matching.chunk_source import CatalogueChunk, CatalogueDocument
 from app.matching.comparator import MatchContext
 from app.matching.documents import ItemQuery, SelectionOptions, _names_this_type, evaluate_item
 from app.matching.headings import ProductGroups, group_by_product, other_product_passages
-from app.ontology.loader import load_ontologies
+from app.ontology.loader import load_ontology_file
 from app.ontology.schema import Ontology
 from app.retrieval.text_normalizer import SearchVocabulary
 from app.schemas.chunking import ChunkDraft
@@ -41,7 +41,7 @@ DOC = CatalogueDocument(
 
 @pytest.fixture(scope="module")
 def valves() -> Ontology:
-    [ontology] = load_ontologies(ONTOLOGY_DIR)
+    ontology = load_ontology_file(ONTOLOGY_DIR / "valves_pumps.yaml")
     return ontology
 
 

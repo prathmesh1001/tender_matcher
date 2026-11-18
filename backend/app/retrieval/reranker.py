@@ -7,6 +7,7 @@ Scores pass through a sigmoid, so they are 0-1 and the evidence threshold
 (`RERANK_MIN_SCORE`) means the same for every query.
 """
 
+import threading
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
@@ -42,6 +43,7 @@ class CrossEncoderReranker:
     batch_size: int
     max_tokens: int
     _model: CrossEncoder | None = field(default=None, init=False, repr=False)
+    _load_lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     @property
     def model_name(self) -> str:
@@ -50,19 +52,20 @@ class CrossEncoderReranker:
 
     def _load(self) -> CrossEncoder:
         """Load the model once (from the local Hugging Face cache after the first download)."""
-        if self._model is None:
-            from sentence_transformers import CrossEncoder
+        with self._load_lock:  # a run and the warm-up thread may both ask
+            if self._model is None:
+                from sentence_transformers import CrossEncoder
 
-            device = resolve_device(self.device)
-            try:
-                model = CrossEncoder(self.name, device=device, max_length=self.max_tokens)
-            except (OSError, ValueError) as exc:
-                raise ExternalServiceError(
-                    f"Cannot load reranker model {self.name}: {exc}"
-                ) from exc
-            if self.fp16 and device == "cuda":
-                model.model.half()
-            self._model = model
+                device = resolve_device(self.device)
+                try:
+                    model = CrossEncoder(self.name, device=device, max_length=self.max_tokens)
+                except (OSError, ValueError) as exc:
+                    raise ExternalServiceError(
+                        f"Cannot load reranker model {self.name}: {exc}"
+                    ) from exc
+                if self.fp16 and device == "cuda":
+                    model.model.half()
+                self._model = model
         return self._model
 
     def score(self, query: str, passages: Sequence[str]) -> list[float]:

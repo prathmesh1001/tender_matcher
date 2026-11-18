@@ -5,6 +5,7 @@ everything else (routes, services, queue, database) is real.
 """
 
 import hashlib
+import threading
 import uuid
 from collections.abc import Callable, Iterator, Sequence
 from datetime import UTC, datetime
@@ -158,6 +159,13 @@ class _Matcher:
     def __init__(self, report: TenderReport | Exception) -> None:
         self.report = report
         self.calls: list[tuple[str, Sequence[str] | None, Sequence[str]]] = []
+        self.parsed: list[str] = []
+
+    def parse_tender(self, tender: str) -> object:
+        self.parsed.append(tender)
+        if isinstance(self.report, Exception):
+            raise self.report
+        return None
 
     def match_tender(
         self,
@@ -318,11 +326,14 @@ def test_a_file_that_is_not_a_pdf_is_refused(client: TestClient) -> None:
     assert "not a PDF" in response.json()["error"]["message"]
 
 
-def test_catalogue_warm_up_goes_through_the_run_queue(app: FastAPI) -> None:
-    warmed: list[int] = []
+def test_catalogue_warm_up_goes_through_the_run_queue_without_blocking_it(
+    app: FastAPI,
+) -> None:
+    release, warmed = threading.Event(), threading.Event()
 
     def warm_up() -> int:
-        warmed.append(1)
+        release.wait(5)  # a slow warm-up: the queued job must not wait for it
+        warmed.set()
         return 7
 
     def service(warm_up: Callable[[], int] | None) -> RunService:
@@ -336,8 +347,10 @@ def test_catalogue_warm_up_goes_through_the_run_queue(app: FastAPI) -> None:
             warm_up,
         )
 
-    assert service(warm_up).warm_catalogues() is True
-    assert warmed == [1]
+    assert service(warm_up).warm_catalogues() is True  # the inline queue ran the job...
+    assert not warmed.is_set()  # ...which returned while the warm-up still works
+    release.set()
+    assert warmed.wait(5)
     assert service(None).warm_catalogues() is False
 
 
@@ -521,3 +534,19 @@ def test_a_restart_fails_runs_it_lost(app: FastAPI, client: TestClient) -> None:
         "The server restarted before this run finished",
     )
     assert service.fail_interrupted() == 0
+
+
+def test_upload_queues_a_background_parse_of_the_tender(app: FastAPI, client: TestClient) -> None:
+    matcher = _Matcher(_report())
+    _use(app, matcher)
+    _upload(client)
+    assert matcher.parsed == [BID.replace("/", "_")]
+
+
+def test_a_failing_background_parse_does_not_fail_the_upload(
+    app: FastAPI, client: TestClient
+) -> None:
+    matcher = _Matcher(RuntimeError("parser crashed"))
+    _use(app, matcher)
+    _upload(client)  # asserts 201
+    assert matcher.parsed == [BID.replace("/", "_")]

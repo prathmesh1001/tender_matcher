@@ -1,0 +1,21 @@
+# GeM Marketplace categories read when a tender item's product type has no manufacturer document
+# (DISCOVERY_ENABLED=true). Only category pages are used: GeM's keyword search lists products with
+# JavaScript, category pages list them in plain HTML (checked 2026-11-18).
+#
+#   product_type   an ontology product type (ontology/*.yaml)
+#   categories     slugs of https://mkp.gem.gov.in/<slug>/search, read in this order
+#
+# A listing is kept only if its title or its specification rows name the product type (ontology
+# synonyms) and it has at least GEM_MIN_SPEC_ROWS rows. GeM specifications are typed in by the
+# seller: they are never treated like a manufacturer's datasheet.
+
+product_types:
+  - product_type: thermocouple
+    categories:
+      - measuring-and-observing-and-testing-instruments-temperature-and-heat-measuring-instruments-mineral-insulated-thermocouple
+  - product_type: control_valve
+    categories:
+      - valves-control-valve-pneumatic
+
+# Values that state nothing; a row holding only one of these is not stored.
+empty_values: [NA, N/A, "-", Not Applicable, Not Available, None]

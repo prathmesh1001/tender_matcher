@@ -17,7 +17,7 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
 from app.ingestion.product_tagger import ProductMatcher
-from app.matching.chunk_source import CatalogueChunk
+from app.matching.chunk_source import CatalogueChunk, provenance
 from app.matching.comparator import MatchContext
 from app.matching.headings import ProductGroups
 from app.retrieval.text_normalizer import SearchVocabulary, normalize_for_search
@@ -123,6 +123,7 @@ def _evidence(item: CatalogueChunk, label: str, text: str, page: int) -> Evidenc
         quote_parts=[text],
         status=MatchStatus.FULL_MATCH,
         reason="the catalogue names the product the tender asks for",
+        **provenance(item.document),
     )
 
 

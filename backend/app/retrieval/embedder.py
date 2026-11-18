@@ -10,6 +10,7 @@ multilingual model can use; stray U+FFFD glyphs from broken PDF fonts are remove
 
 import hashlib
 import re
+import threading
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Final, Protocol
@@ -79,6 +80,7 @@ class SentenceTransformerEmbedder:
     batch_size: int
     max_tokens: int
     _model: SentenceTransformer | None = field(default=None, init=False, repr=False)
+    _load_lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     @property
     def model_name(self) -> str:
@@ -87,20 +89,21 @@ class SentenceTransformerEmbedder:
 
     def _load(self) -> SentenceTransformer:
         """Load the model once (from the local Hugging Face cache after the first download)."""
-        if self._model is None:
-            from sentence_transformers import SentenceTransformer
+        with self._load_lock:  # a run and the warm-up thread may both ask
+            if self._model is None:
+                from sentence_transformers import SentenceTransformer
 
-            device = resolve_device(self.device)
-            try:
-                model = SentenceTransformer(self.name, device=device)
-            except (OSError, ValueError) as exc:
-                raise ExternalServiceError(
-                    f"Cannot load embedding model {self.name}: {exc}"
-                ) from exc
-            if self.fp16 and device == "cuda":
-                model.half()
-            model.max_seq_length = self.max_tokens
-            self._model = model
+                device = resolve_device(self.device)
+                try:
+                    model = SentenceTransformer(self.name, device=device)
+                except (OSError, ValueError) as exc:
+                    raise ExternalServiceError(
+                        f"Cannot load embedding model {self.name}: {exc}"
+                    ) from exc
+                if self.fp16 and device == "cuda":
+                    model.half()
+                model.max_seq_length = self.max_tokens
+                self._model = model
         return self._model
 
     def embed(self, texts: Sequence[str]) -> list[list[float]]:

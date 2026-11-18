@@ -112,6 +112,13 @@ class ExternalServiceError(AppError):
     code = "external_service_error"
 
 
+class DiscoveryDisabledError(AppError):
+    """GeM Marketplace discovery is off (DISCOVERY_ENABLED=false) or not set up for a type."""
+
+    status_code = status.HTTP_409_CONFLICT
+    code = "discovery_disabled"
+
+
 def _error_response(status_code: int, body: ErrorBody) -> JSONResponse:
     """Build the JSON response shared by all error handlers."""
     return JSONResponse(

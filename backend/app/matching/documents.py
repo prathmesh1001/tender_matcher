@@ -31,7 +31,7 @@ from app.matching.fields import located_fields, option_fields
 from app.matching.headings import ProductGroups, group_by_product, other_product_passages
 from app.matching.product_identity import product_ask, product_identity
 from app.retrieval.text_normalizer import normalize_for_search, stem_token
-from app.schemas.enums import DecisionSource, MatchStatus, ReviewFlag
+from app.schemas.enums import DecisionSource, DocType, MatchStatus, ReviewFlag
 from app.schemas.matching import Comparison, DocumentResult, ManufacturerItemResult, SubTypeFit
 from app.schemas.requirements import Requirement, ValueKind
 
@@ -446,6 +446,7 @@ def evaluate_document(
         title=document.title,
         declared_sub_types=list(document.sub_types),
         sub_type_fit=fit,
+        seller_declared=document.doc_type is DocType.GEM_LISTING,
         critical_met=_fit(critical, options.status_scores)[0],
         critical_failed=sum(1 for c in critical if c.status is MatchStatus.MISSING_CAPABILITY),
         fit_score=score,
@@ -460,8 +461,11 @@ def evaluate_document(
     )
 
 
-def rank_key(result: DocumentResult) -> tuple[int, bool, float, int, int, float]:
+def rank_key(result: DocumentResult) -> tuple[int, bool, bool, float, int, int, float]:
     """Sort key, best first: identity, then coverage, then fit. Equal keys are a tie.
+
+    A GeM listing (seller-declared) comes after any hand-checked document of the same brand
+    that decides something (source priority: datasheet > catalogue > brochure > gem_listing).
 
     Identity is the product (its sub-type fit), then the critical requirements met, then the
     fewest it contradicts: a catalogue stating another standard is further from the item
@@ -472,6 +476,7 @@ def rank_key(result: DocumentResult) -> tuple[int, bool, float, int, int, float]
     return (
         -_FIT_RANK[result.sub_type_fit],
         result.decided == 0,
+        result.seller_declared,
         -result.critical_met,
         result.critical_failed,
         -result.decided,

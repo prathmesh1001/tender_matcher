@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import Settings, get_settings
 from app.db.repositories import DocumentRepository
 from app.db.session import session_scope
+from app.services.discovery_service import DiscoveryService
 from app.services.document_service import DocumentService
 from app.services.health_service import HealthService
 from app.services.manufacturer_service import (
@@ -84,11 +85,13 @@ def get_tender_service(request: Request, settings: SettingsDep) -> TenderService
     Returns:
         A tender service.
     """
+    runs: RunService = request.app.state.run_service
     return TenderService(
         request.app.state.session_factory,
         build_file_store(settings),
         settings.TENDER_DATA_DIR,
         settings.TENDER_UPLOAD_MAX_MB,
+        on_stored=runs.prepare_tender_later,
     )
 
 
@@ -109,6 +112,22 @@ def get_run_service(request: Request) -> RunService:
 
 
 RunServiceDep = Annotated[RunService, Depends(get_run_service)]
+
+
+def get_discovery_service(request: Request) -> DiscoveryService:
+    """Provide the app's one `DiscoveryService` (it queues jobs on the run queue).
+
+    Args:
+        request: The current request; its app holds the service.
+
+    Returns:
+        The discovery service.
+    """
+    service: DiscoveryService = request.app.state.discovery_service
+    return service
+
+
+DiscoveryServiceDep = Annotated[DiscoveryService, Depends(get_discovery_service)]
 
 
 def get_report_service(session: DbSessionDep, settings: SettingsDep) -> ReportService:

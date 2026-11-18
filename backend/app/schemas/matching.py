@@ -1,5 +1,6 @@
 """Result of comparing one requirement with one manufacturer's catalogue chunks."""
 
+from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -39,6 +40,13 @@ class Evidence(BaseModel):
     )
     match_score: float | None = Field(
         default=None, description="Lowest fuzzy score of the quote's pieces on the page."
+    )
+    source_url: str | None = Field(
+        default=None, description="Where the document was read (a GeM listing's page)."
+    )
+    fetched_at: datetime | None = Field(default=None, description="When it was read.")
+    seller_declared: bool = Field(
+        default=False, description="A GeM listing: specifications typed in by the seller."
     )
 
 
@@ -114,6 +122,9 @@ class DocumentResult(BaseModel):
     title: str
     declared_sub_types: list[str]
     sub_type_fit: SubTypeFit
+    seller_declared: bool = Field(
+        default=False, description="A GeM listing: specifications typed in by the seller."
+    )
     critical_met: float = Field(
         default=0.0, description="Sum of status scores over critical requirements."
     )

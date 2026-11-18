@@ -12,6 +12,7 @@ stage (plan steps 6-7).
 import logging
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy.orm import Session
@@ -37,7 +38,7 @@ from app.ingestion.registry import verify_source_file
 from app.ingestion.sections import build_sections, classify_chunks
 from app.retrieval.text_normalizer import normalize_for_search
 from app.schemas.chunking import ChunkDraft
-from app.schemas.enums import DocumentSource
+from app.schemas.enums import DocType, DocumentSource
 from app.schemas.sources import RegisteredSource
 from app.storage.file_store import FileStore
 
@@ -274,6 +275,70 @@ def ingest_manufacturer_source(
             pages=len(processed.pages),
             chunks=len(processed.chunks),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class ListingSource:
+    """A GeM listing ready to store: where it came from and its frozen snapshot."""
+
+    manufacturer: str
+    category: str
+    product_type: str
+    title: str
+    url: str
+    fetched_at: datetime
+    sha256: str
+    snapshot_ref: str
+
+
+def ingest_listing(
+    session: Session,
+    source: ListingSource,
+    processed: ProcessedDocument,
+    options: ProcessingOptions,
+) -> IngestOutcome:
+    """Store one GeM listing as an auto-sourced document, unless its URL or snapshot is stored.
+
+    Args:
+        session: Open DB session (the caller commits).
+        source: The listing's provenance.
+        processed: Its pages and tagged chunks (`app.ingestion.gem_listing.process_listing`).
+        options: Processing options (section categories).
+
+    Returns:
+        What happened.
+    """
+    repo = DocumentRepository(session)
+    existing = repo.get_by_sha256(source.sha256) or repo.get_by_url(source.url)
+    if existing is not None:
+        return IngestOutcome(source.snapshot_ref, IngestStatus.SKIPPED_EXISTING, existing.id)
+    with log_context(manufacturer=source.manufacturer):
+        document = Document(
+            source_kind=DocumentSource.GEM_MARKETPLACE,
+            manufacturer=source.manufacturer,
+            category=source.category,
+            title=source.title,
+            doc_type=DocType.GEM_LISTING,
+            url=source.url,
+            file_path=source.snapshot_ref,
+            product_types=[source.product_type],
+            sub_types=[],
+            sha256=source.sha256,
+            fetched_at=source.fetched_at,
+            publish_date=None,
+            auto_sourced=True,
+        )
+        attach_content(document, processed)
+        repo.add(document)
+        rebuild_sections(session, document, options)
+        logger.info("listing stored", extra={"url": source.url, "chunks": len(processed.chunks)})
+    return IngestOutcome(
+        source.snapshot_ref,
+        IngestStatus.INGESTED,
+        document.id,
+        pages=len(processed.pages),
+        chunks=len(processed.chunks),
+    )
 
 
 def retag_document(session: Session, document: Document, options: ProcessingOptions) -> int:

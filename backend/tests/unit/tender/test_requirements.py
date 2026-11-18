@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from app.ingestion.table_extractor import with_paragraph_breaks
-from app.ontology.loader import load_ontologies
+from app.ontology.loader import load_ontology_file
 from app.ontology.schema import Ontology
 from app.schemas.chunking import ChunkDraft
 from app.schemas.enums import ChunkType, Operator
@@ -54,7 +54,7 @@ LINES = [
 
 @pytest.fixture(scope="module")
 def ontology() -> Ontology:
-    [valves] = load_ontologies(ONTOLOGY_DIR)
+    valves = load_ontology_file(ONTOLOGY_DIR / "valves_pumps.yaml")
     return valves
 
 

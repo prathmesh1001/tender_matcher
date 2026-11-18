@@ -38,3 +38,5 @@ data/tenders/**/*
 !data/tenders/*/
 !data/tenders/README.md
 !data/tenders/*/tender.yaml
+# Frozen GeM Marketplace listing pages (DISCOVERY_ENABLED): local only
+data/gem_snapshots/

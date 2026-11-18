@@ -15,11 +15,12 @@ returned and the comparator's label rules do the narrowing.
 import hashlib
 import json
 import logging
+import threading
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Final, Protocol, cast
+from typing import Any, Final, Protocol, TypedDict, cast
 
 from app.core.config import Settings
 from app.core.exceptions import NotFoundError
@@ -60,6 +61,9 @@ class CatalogueDocument:
     product_types: tuple[str, ...]
     sub_types: tuple[str, ...] = ()
     publish_date: date | None = None
+    url: str | None = None
+    fetched_at: datetime | None = None
+    auto_sourced: bool = False  # a GeM listing: seller-declared, not checked by hand
 
     @classmethod
     def from_source(cls, source: RegisteredSource) -> CatalogueDocument:
@@ -74,7 +78,27 @@ class CatalogueDocument:
             product_types=tuple(source.product_types),
             sub_types=tuple(source.sub_types),
             publish_date=source.publish_date,
+            url=str(source.url),
+            fetched_at=source.fetched_at,
         )
+
+
+class Provenance(TypedDict):
+    """Where a cited document came from, as `Evidence` fields."""
+
+    source_url: str | None
+    fetched_at: datetime | None
+    seller_declared: bool
+
+
+def provenance(document: CatalogueDocument) -> Provenance:
+    """Evidence fields of a document's origin: a GeM listing's URL and fetch date.
+
+    Registered catalogues keep these empty: their file name and page are the citation.
+    """
+    if not document.auto_sourced:
+        return Provenance(source_url=None, fetched_at=None, seller_declared=False)
+    return Provenance(source_url=document.url, fetched_at=document.fetched_at, seller_declared=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +146,10 @@ class ChunkSource(Protocol):
 
     def warm(self) -> int:
         """Process every registered document now, so runs only read the cache."""
+        ...
+
+    def refresh(self) -> None:
+        """Re-read documents that can change while the service lives (GeM listings)."""
         ...
 
 
@@ -226,21 +254,37 @@ class ProcessedCache:
         self._path(sha256).write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
 
-def fingerprint(paths: Iterable[Path], settings_json: str) -> str:
+def fingerprint(paths: Iterable[Path], settings_json: str, base: Path | None = None) -> str:
     """sha256 over the given source files (sorted, by content) and the settings dump.
+
+    Line endings are folded (CRLF -> LF) and each file is named by its path relative to
+    `base`, so a checkout that only rewrites line endings, or the same code installed in
+    another folder (Windows checkout vs Docker image), keeps the cache.
 
     Args:
         paths: Files whose content decides the processing output (code, ontology, config).
         settings_json: The settings, serialized.
+        base: Folder the file names are taken relative to; a file outside it is named by
+            its file name alone. None names every file by its file name.
 
     Returns:
         Hex digest.
     """
     digest = hashlib.sha256(settings_json.encode("utf-8"))
-    for path in sorted(paths):
-        digest.update(path.as_posix().encode("utf-8"))
-        digest.update(path.read_bytes())
+    for name, path in sorted((_file_label(p, base), p) for p in paths):
+        digest.update(name.encode("utf-8"))
+        digest.update(path.read_bytes().replace(b"\r\n", b"\n"))
     return digest.hexdigest()
+
+
+def _file_label(path: Path, base: Path | None) -> str:
+    """A file's name for the fingerprint: relative to `base` when inside it."""
+    if base is not None:
+        try:
+            return path.resolve().relative_to(base.resolve()).as_posix()
+        except ValueError:
+            pass
+    return path.name
 
 
 Processor = Callable[[RegisteredSource], ProcessedDocument]
@@ -300,7 +344,9 @@ def processing_fingerprint(settings: Settings, backend_dir: Path) -> str:
     """
     files = [p for g in _FINGERPRINT_GLOBS for p in backend_dir.glob(g)]
     files += [*sorted(settings.ONTOLOGY_DIR.glob("*.yaml")), settings.SECTION_CATEGORIES_FILE]
-    return fingerprint(files, json.dumps(processing_settings(settings), sort_keys=True))
+    return fingerprint(
+        files, json.dumps(processing_settings(settings), sort_keys=True), base=backend_dir
+    )
 
 
 def catalogue_processor(store: FileStore, options: ProcessingOptions) -> Processor:
@@ -346,6 +392,8 @@ class InMemoryChunkSource:
     process: Processor
     cache: ProcessedCache | None = None
     _loaded: dict[str, ProcessedDocument] = field(default_factory=dict)
+    _locks: dict[str, threading.Lock] = field(default_factory=dict)
+    _locks_guard: threading.Lock = field(default_factory=threading.Lock)
 
     def manufacturers(self, category: str) -> list[str]:
         """Manufacturers with at least one document in the category, sorted."""
@@ -375,9 +423,22 @@ class InMemoryChunkSource:
         ]
 
     def _load(self, source: RegisteredSource) -> ProcessedDocument:
-        """Processed document for a source: memory, then disk cache, then processing."""
-        if source.sha256 in self._loaded:
-            return self._loaded[source.sha256]
+        """Processed document for a source: memory, then disk cache, then processing.
+
+        Thread-safe: a background warm-up and a run never process the same document twice;
+        the second caller waits for that one document only.
+        """
+        loaded = self._loaded.get(source.sha256)
+        if loaded is not None:
+            return loaded
+        with self._locks_guard:
+            lock = self._locks.setdefault(source.sha256, threading.Lock())
+        with lock:
+            loaded = self._loaded.get(source.sha256)
+            return loaded if loaded is not None else self._read_or_process(source)
+
+    def _read_or_process(self, source: RegisteredSource) -> ProcessedDocument:
+        """Disk cache, else process and cache; kept in memory. Caller holds the doc's lock."""
         processed = self.cache.get(source.sha256) if self.cache else None
         if processed is None:
             logger.info("processing catalogue", extra={"file": source.path.name})
@@ -430,6 +491,9 @@ class InMemoryChunkSource:
         for source in self.sources:
             self._load(source)
         return len(self._loaded)
+
+    def refresh(self) -> None:
+        """Nothing to re-read: registered catalogues change only with sources.yaml."""
 
     def page_ocr(self, sha256: str, page_number: int) -> bool:
         """True if a page's text came from OCR; False for an unknown document or page."""
