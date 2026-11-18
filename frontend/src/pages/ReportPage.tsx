@@ -4,6 +4,7 @@ import { reportExcelUrl, reportJsonUrl } from "../api/reports";
 import { PageBanner } from "../components/layout/PageBanner";
 import { Alert } from "../components/ui/Alert";
 import { Skeleton } from "../components/ui/Skeleton";
+import { DiscoveryPanel } from "../features/discovery/DiscoveryPanel";
 import { GeneralTable } from "../features/report/GeneralTable";
 import { ReportSummary } from "../features/report/ReportSummary";
 import { ReportWarnings } from "../features/report/ReportWarnings";
@@ -85,6 +86,7 @@ export function ReportPage() {
             Export JSON
           </a>
         </div>
+        <DiscoveryPanel runId={runId} />
         <ReportSummary report={data} />
         <RequirementTable report={data} />
         <GeneralTable report={data} />

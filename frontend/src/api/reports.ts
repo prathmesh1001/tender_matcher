@@ -18,6 +18,11 @@ export function reportExcelUrl(runId: string): string {
 }
 
 /** Address that opens a stored document at a page. */
+/** A stored document as served (a GeM listing: its saved, sandboxed snapshot). */
+export function documentFileUrl(sha256: string): string {
+  return `${API_BASE_URL}/documents/${sha256}/file`;
+}
+
 export function documentPageUrl(sha256: string, page: number): string {
   return `${API_BASE_URL}/documents/${sha256}/file#page=${String(page)}`;
 }

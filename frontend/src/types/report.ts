@@ -14,6 +14,12 @@ export interface Evidence {
   value: string;
   quote: string;
   verified: boolean | null;
+  /** Where a GeM listing was read; null for a registered catalogue. */
+  source_url?: string | null;
+  /** When the listing was read (ISO date-time). */
+  fetched_at?: string | null;
+  /** Specifications typed in by a GeM Marketplace seller, not a manufacturer document. */
+  seller_declared?: boolean;
 }
 
 export interface Comparison {

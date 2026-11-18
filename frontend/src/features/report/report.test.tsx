@@ -133,7 +133,12 @@ const REPORT: TenderReport = {
 };
 
 function serve(report: TenderReport = REPORT, run: Run = RUN) {
-  stubFetch((url) => (url.includes("/reports/") ? json(report) : json(run)));
+  stubFetch((url) => {
+    if (url.includes("/discovery/")) {
+      return json({ enabled: false, uncovered: [] });
+    }
+    return url.includes("/reports/") ? json(report) : json(run);
+  });
 }
 
 async function openReport() {

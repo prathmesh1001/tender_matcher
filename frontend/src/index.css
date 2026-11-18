@@ -26,6 +26,8 @@
   --color-status-missing: #b91c1c;
   --color-status-unsupported: #4b5563;
   --color-status-na: #64748b;
+  /* Evidence typed in by a GeM Marketplace seller, not taken from a manufacturer document. */
+  --color-source-seller: #6d28d9;
 
   --radius-card: 0.75rem;
   --shadow-card: 0 1px 2px rgb(31 36 51 / 0.06), 0 1px 8px rgb(31 36 51 / 0.04);
