@@ -10,8 +10,11 @@ from app.discovery.listing_check import ListingCheck
 from app.discovery.pipeline import (
     DiscoveryDeps,
     DiscoveryRequest,
+    candidate_urls,
     discover,
+    find_category_pages,
     page_url,
+    recheck_stored,
     snapshot_ref,
 )
 from app.ingestion.pipeline import IngestOutcome, IngestStatus, ListingSource
@@ -155,3 +158,65 @@ def test_configured_look_alike_is_not_stored(tmp_path: Path, check: ListingCheck
     assert not outcome.kept
     assert outcome.reason == "names flow control valve, not control valve"
     assert saved == []
+
+
+SEARCH = BASE + "/search?q=pneumatic%20control%20valve"
+CV_PAGE = page_url(BASE, "valves-control-valve-pneumatic")
+
+
+def _search_request(**changes: object) -> DiscoveryRequest:
+    request = replace(
+        _request(),
+        page_urls=[page_url(BASE, "hand-listed")],
+        search_urls=[SEARCH],
+        excludes=["directional control valve"],
+        base_url=BASE,
+    )
+    return replace(request, **changes)  # type: ignore[arg-type]
+
+
+def test_search_finds_the_category_of_the_type(tmp_path: Path, check: ListingCheck) -> None:
+    fetcher, _, deps = _setup(tmp_path, check, [])
+    assert isinstance(fetcher, _Pages)
+    fetcher.pages[SEARCH] = fixture_text("search_globe_control_valve.html")
+    pages = find_category_pages(_search_request(), deps)
+    assert pages.source == "search"
+    assert pages.page_urls == [CV_PAGE]
+    assert pages.names == ["Control Valve Pneumatic"]
+
+
+def test_hand_listed_categories_when_search_fits_nothing(
+    tmp_path: Path, check: ListingCheck
+) -> None:
+    fetcher, _, deps = _setup(tmp_path, check, [])
+    assert isinstance(fetcher, _Pages)
+    fetcher.pages[SEARCH] = "<html><ul><li class='bn-link'><a href='/x/search'>Gloves</a></li>"
+    pages = find_category_pages(_search_request(), deps)
+    assert pages.source == "configured"
+    assert pages.page_urls == [page_url(BASE, "hand-listed")]
+
+
+def test_unreadable_search_and_no_fallback_finds_none(tmp_path: Path, check: ListingCheck) -> None:
+    _, _, deps = _setup(tmp_path, check, [])
+    pages = find_category_pages(_search_request(page_urls=[]), deps)
+    assert pages.source == "none"
+    assert pages.page_urls == []
+
+
+def test_best_ranked_listings_are_read_first(tmp_path: Path, check: ListingCheck) -> None:
+    paths = [
+        "/cv/festo-flow-fitting/p-1-11-cat.html",
+        "/cv/pneumatic-globe-control/p-2-22-cat.html",
+    ]
+    _, _, deps = _setup(tmp_path, check, paths)
+    request = replace(_request(max_listings=1), rank_words=frozenset({"globe"}))
+    [candidate] = candidate_urls(request, deps)
+    assert candidate == BASE + paths[1]
+
+
+def test_stored_listing_is_rechecked_against_todays_rule(check: ListingCheck) -> None:
+    html = fixture_text("control_valve_listing.html")
+    url = BASE + "/cv/a/p-1-11-cat.html"
+    strict = replace(_request(), excludes=["flow control valve"])
+    assert recheck_stored(html, url, strict, check) == "names flow control valve, not control valve"
+    assert recheck_stored(html, url, _request(), check) is None

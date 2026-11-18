@@ -1,7 +1,10 @@
 """Read GeM Marketplace pages (plain HTML, no JavaScript) into typed values.
 
-Two page kinds are read, both checked by hand on 2026-11-18:
+Three page kinds are read, checked by hand on 2026-11-18 and 2026-11-19:
 
+- a keyword search page (`/search?q=<words>`) lists the categories holding those words as
+  `<li class="bn-link"><a href="/<category-slug>/search#/?q=...">Name<i>(Q3)</i></a></li>`
+  (its product list needs JavaScript; the category list does not);
 - a category page (`/<category-slug>/search`) lists products as links ending in
   `p-<id>-<variant>-cat.html`;
 - a product page has the title in `<h1 itemprop="name">` with `<div class="brand">` and
@@ -19,6 +22,7 @@ from typing import Final
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 _LISTING_LINK: Final = re.compile(r"/p-\d+-\d+-cat\.html$")
+_CATEGORY_LINK: Final = re.compile(r"^/([^/]+)/search$")
 _SPACES: Final = re.compile(r"\s+")
 
 
@@ -65,6 +69,80 @@ class _LinkCollector(HTMLParser):
             href = dict(attrs).get("href")
             if href:
                 self.hrefs.append(href)
+
+
+@dataclass(frozen=True, slots=True)
+class CategoryLink:
+    """One category offered by a keyword search."""
+
+    name: str
+    slug: str
+
+
+class _CategoryCollector(HTMLParser):
+    """Name and href of every `li.bn-link > a` (the `<i>` quarter note left out)."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.links: list[tuple[str, list[str]]] = []
+        self._in_item = False
+        self._in_link = False
+        self._in_note = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        a = dict(attrs)
+        if tag == "li":
+            self._in_item = "bn-link" in (a.get("class") or "").split()
+        elif tag == "a" and self._in_item and a.get("href"):
+            self._in_link = True
+            self.links.append((a.get("href") or "", []))
+        elif tag == "i" and self._in_link:
+            self._in_note = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "i":
+            self._in_note = False
+        elif tag == "a":
+            self._in_link = False
+        elif tag == "li":
+            self._in_item = False
+
+    def handle_data(self, data: str) -> None:
+        if self._in_link and not self._in_note and self.links:
+            self.links[-1][1].append(data)
+
+
+def search_categories(html: str) -> list[CategoryLink]:
+    """Categories a keyword search page offers, in page order, each slug once.
+
+    Args:
+        html: The search page (`/search?q=...`).
+
+    Returns:
+        The categories.
+    """
+    collector = _CategoryCollector()
+    collector.feed(html)
+    out: dict[str, CategoryLink] = {}
+    for href, parts in collector.links:
+        match = _CATEGORY_LINK.match(urlsplit(href).path)
+        name = _clean(" ".join(parts))
+        if match and name and match.group(1) not in out:
+            out[match.group(1)] = CategoryLink(name=name, slug=match.group(1))
+    return list(out.values())
+
+
+def listing_slug_words(url: str) -> str:
+    """The product-name part of a listing URL as words ("k-type-thermocouple" -> "k type ...").
+
+    Args:
+        url: A listing URL (`/<category>/<product-name>/p-<id>-<variant>-cat.html`).
+
+    Returns:
+        The words, or "" if the URL has no name part.
+    """
+    parts = [p for p in urlsplit(url).path.split("/") if p]
+    return parts[-2].replace("-", " ") if len(parts) >= 2 else ""
 
 
 def listing_urls(html: str, page_url: str) -> list[str]:

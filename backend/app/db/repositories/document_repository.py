@@ -24,14 +24,19 @@ class DocumentRepository(SqlRepository[Document]):
         stmt = select(Document).where(Document.url == url).order_by(Document.created_at).limit(1)
         return self._session.scalar(stmt)
 
-    def list_auto_sourced(self) -> list[Document]:
-        """Every auto-sourced document (GeM listings), oldest first."""
-        stmt = (
-            select(Document)
-            .where(Document.auto_sourced.is_(True))
-            .order_by(Document.created_at, Document.id)
-        )
-        return list(self._session.scalars(stmt))
+    def list_auto_sourced(self, *, include_withdrawn: bool = False) -> list[Document]:
+        """Auto-sourced documents (GeM listings), oldest first; withdrawn ones only if asked.
+
+        Args:
+            include_withdrawn: Also return listings a later check withdrew.
+
+        Returns:
+            The documents.
+        """
+        stmt = select(Document).where(Document.auto_sourced.is_(True))
+        if not include_withdrawn:
+            stmt = stmt.where(Document.withdrawn_reason.is_(None))
+        return list(self._session.scalars(stmt.order_by(Document.created_at, Document.id)))
 
     def ids_by_sha256(self, hashes: Collection[str]) -> dict[str, uuid.UUID]:
         """Return the id of each stored document among these content hashes.

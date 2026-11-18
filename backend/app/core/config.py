@@ -637,7 +637,13 @@ class Settings(BaseSettings):
         default="https://mkp.gem.gov.in", min_length=1, description="GeM Marketplace site."
     )
     GEM_MAX_LISTINGS: int = Field(
-        default=5, ge=1, le=20, description="Most listings read per product type and request."
+        default=10, ge=1, le=20, description="Most listings read per product type and request."
+    )
+    GEM_MAX_CATEGORIES: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Most GeM categories (from the keyword search) read per product type.",
     )
     GEM_REQUEST_DELAY_SECONDS: float = Field(
         default=3.0, ge=0, description="Pause before every request to GeM Marketplace."

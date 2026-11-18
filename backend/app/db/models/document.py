@@ -52,6 +52,11 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         server_default="false",
         comment="Found by the system (GeM Marketplace), not registered and checked by hand.",
     )
+    withdrawn_reason: Mapped[str | None] = mapped_column(
+        Text,
+        comment="Why an auto-sourced listing is no longer used (a later check rejected it); "
+        "kept so earlier reports still resolve their evidence.",
+    )
 
     pages: Mapped[list[Page]] = relationship(
         back_populates="document", cascade="all, delete-orphan", order_by="Page.page_number"

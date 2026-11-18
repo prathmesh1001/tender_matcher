@@ -184,3 +184,13 @@ def test_spec_facts_follow_their_chunk_after_retagging(
     assert facts.sync_products_from_chunks(doc.id) == 0
     [row] = facts.list_for_document(doc.id)
     assert (row.product_type, row.product_sub_type) == ("gate_valve", "knife_gate")
+
+
+def test_withdrawn_listings_are_left_out_unless_asked(docs: DocumentRepository) -> None:
+    kept, withdrawn = make_document(), make_document()
+    for doc in (kept, withdrawn):
+        doc.auto_sourced = True
+    withdrawn.withdrawn_reason = "names flow control valve, not control valve"
+    docs.add_all([kept, withdrawn, make_document()])
+    assert docs.list_auto_sourced() == [kept]
+    assert docs.list_auto_sourced(include_withdrawn=True) == [kept, withdrawn]

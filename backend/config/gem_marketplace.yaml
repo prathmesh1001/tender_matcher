@@ -1,9 +1,11 @@
-# GeM Marketplace categories read when a tender item's product type has no manufacturer document
-# (DISCOVERY_ENABLED=true). Only category pages are used: GeM's keyword search lists products with
-# JavaScript, category pages list them in plain HTML (checked 2026-11-18).
+# GeM Marketplace, read when a tender item's product type has no manufacturer document
+# (DISCOVERY_ENABLED=true). A check first searches GeM with the items' own words
+# (https://mkp.gem.gov.in/search?q=..., whose category list is plain HTML; checked 2026-11-19) and
+# keeps the categories whose names name the type. The categories below are read only when that
+# search finds none. Category pages list their products in plain HTML (checked 2026-11-18).
 #
 #   product_type   an ontology product type (ontology/*.yaml)
-#   categories     slugs of https://mkp.gem.gov.in/<slug>/search, read in this order
+#   categories     fallback slugs of https://mkp.gem.gov.in/<slug>/search, read in this order
 #   exclude        look-alike products sold in those categories that are not this type; a listing
 #                  whose title or model names one (and not the type outside it) is rejected.
 #                  Kept here, not in the ontology: on a tender a "flow control valve" can be a
@@ -20,7 +22,12 @@ product_types:
   - product_type: control_valve
     categories:
       - valves-control-valve-pneumatic
-    exclude: [flow control valve, throttle valve, pneumatic fitting, push in fitting]
+    exclude: [flow control valve, directional control valve, throttle valve, pneumatic fitting,
+              push in fitting]
+
+# Item title words that never tell products apart when ranking a category's listings (the
+# product type's own words are skipped anyway).
+rank_ignore_words: [with, and, for, the, of, type, make, nos, "no", as, per, "or", to, in]
 
 # Values that state nothing; a row holding only one of these is not stored.
 empty_values: [NA, N/A, "-", Not Applicable, Not Available, None]

@@ -1,7 +1,9 @@
 """Use case: check GeM Marketplace for a run's uncovered product type, then re-match by rules.
 
-Behind DISCOVERY_ENABLED (off by default). A check is a job in the run queue: it reads at most
-GEM_MAX_LISTINGS listings (robots.txt respected, a pause before every request, no login),
+Behind DISCOVERY_ENABLED (off by default). A check is a job in the run queue: it searches GeM
+with the words of the run's items of that type, keeps at most GEM_MAX_CATEGORIES fitting
+categories (the hand-listed ones of gem_marketplace.yaml only if the search finds none), reads at
+most GEM_MAX_LISTINGS listings (robots.txt respected, a pause before every request, no login),
 stores the ones that pass the checks as auto-sourced documents, and re-matches only the items
 of that product type, by rules. The result is a new run whose parent is the checked run; the
 checked run is never changed. No LLM is called.
@@ -10,7 +12,7 @@ checked run is never changed. No LLM is called.
 import logging
 import uuid
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from functools import cache
 from typing import Protocol
@@ -29,13 +31,16 @@ from app.db.repositories import (
 from app.db.session import session_scope
 from app.discovery.gem_config import GemMarketplaceConfig, load_gem_config
 from app.discovery.gem_parser import GemListing
+from app.discovery.gem_search import rank_words, search_queries, search_url
 from app.discovery.listing_check import ListingCheck, other_product_patterns
 from app.discovery.pipeline import (
     DiscoveryDeps,
     DiscoveryRequest,
     ListingOutcome,
     discover,
+    find_category_pages,
     page_url,
+    recheck_stored,
 )
 from app.discovery.polite_fetcher import PageFetcher, PoliteFetcher
 from app.ingestion.gem_listing import process_listing
@@ -163,7 +168,6 @@ class DiscoveryService:
             run = RunRepository(session).get_or_raise(run_id)
             report, manufacturers = _report(run), list(run.manufacturers)
             jobs = [_job_response(j) for j in DiscoveryJobRepository(session).list_for_run(run_id)]
-        config = self._config()
         return DiscoveryOverview(
             enabled=True,
             uncovered=[
@@ -171,7 +175,7 @@ class DiscoveryService:
                     product_type=u.product_type,
                     category=u.category,
                     item_nos=u.item_nos,
-                    gem_configured=bool(config.categories_for(u.product_type)),
+                    gem_configured=True,  # GeM is searched by the items' words
                     jobs=[j for j in jobs if j.product_type == u.product_type],
                 )
                 for u in self._matcher().uncovered_types(report, manufacturers)
@@ -189,16 +193,11 @@ class DiscoveryService:
             The queued job.
 
         Raises:
-            DiscoveryDisabledError: If discovery is off or the type has no GeM categories.
+            DiscoveryDisabledError: If discovery is off.
             NotFoundError: If the run does not exist.
             InvalidInputError: If the run has no report or the type is not uncovered in it.
         """
         self._require_enabled()
-        if not self._config().categories_for(product_type):
-            raise DiscoveryDisabledError(
-                f"No GeM Marketplace categories configured for {product_type}",
-                details={"file": str(self._settings.GEM_MARKETPLACE_FILE)},
-            )
         with session_scope(self._session_factory) as session:
             run = RunRepository(session).get_or_raise(run_id)
             report, manufacturers = _report(run), list(run.manufacturers)
@@ -259,11 +258,30 @@ class DiscoveryService:
             run = RunRepository(session).get_or_raise(job.run_id)
             product_type, category, run_id = job.product_type, job.category, run.id
             manufacturers, report = list(run.manufacturers), _report(run)
-        outcomes = self._read(product_type, category)
-        with session_scope(self._session_factory) as session:
-            DiscoveryJobRepository(session).get_or_raise(job_id).listings = [
-                o.as_json() for o in outcomes
-            ]
+        uncovered = self._matcher().uncovered_types(report, manufacturers)
+        request = self._request(
+            product_type, category, _item_titles(report, product_type, uncovered)
+        )
+        withdrawn = self._withdraw_stale(request)
+        pages = find_category_pages(request, self._deps())
+        logger.info(
+            "gem categories",
+            extra={"source": pages.source, "categories": pages.names, "type": product_type},
+        )
+        if not pages.page_urls:
+            self._record(job_id, withdrawn)
+            label = product_type.replace("_", " ")
+            self._finish(
+                job_id, DiscoveryStatus.DONE, error=f"GeM search found no category for {label}"
+            )
+            return
+        gone = {o.url for o in withdrawn}  # reported once, as withdrawn
+        outcomes = [
+            o
+            for o in discover(replace(request, page_urls=pages.page_urls), self._deps())
+            if o.url not in gone
+        ]
+        self._record(job_id, [*withdrawn, *outcomes])
         brands = self._listing_brands(product_type)
         if not brands:
             self._finish(job_id, DiscoveryStatus.DONE, error="No listing was kept")
@@ -274,28 +292,79 @@ class DiscoveryService:
         result_run = self._save_run(run_id, new_report, brands)
         self._finish(job_id, DiscoveryStatus.DONE, result_run=result_run)
 
-    def _read(self, product_type: str, category: str) -> list[ListingOutcome]:
-        """Read and store listings for the type."""
-        settings, config, tools = self._settings, self._config(), self._tools()
-        request = DiscoveryRequest(
+    def _request(self, product_type: str, category: str, titles: list[str]) -> DiscoveryRequest:
+        """What to look for: search pages from the item titles, hand-listed pages as fallback."""
+        settings, config, check = self._settings, self._config(), self._tools().check
+        base = settings.GEM_BASE_URL
+        queries = search_queries(product_type, titles, check)
+        return DiscoveryRequest(
             product_type=product_type,
             category=category,
-            page_urls=[
-                page_url(settings.GEM_BASE_URL, s) for s in config.categories_for(product_type)
-            ],
+            page_urls=[page_url(base, s) for s in config.categories_for(product_type)],
             max_listings=settings.GEM_MAX_LISTINGS,
             snapshot_prefix=settings.GEM_SNAPSHOT_PREFIX,
             empty_values=config.empty_values,
             excludes=config.excludes_for(product_type),
+            search_urls=[search_url(base, q) for q in queries],
+            max_categories=settings.GEM_MAX_CATEGORIES,
+            rank_words=rank_words(product_type, titles, check, config.rank_ignore_words),
+            base_url=base,
         )
-        deps = DiscoveryDeps(
+
+    def _record(self, job_id: uuid.UUID, outcomes: Sequence[ListingOutcome]) -> None:
+        """Store what happened to each listing on the job."""
+        with session_scope(self._session_factory) as session:
+            DiscoveryJobRepository(session).get_or_raise(job_id).listings = [
+                o.as_json() for o in outcomes
+            ]
+
+    def _withdraw_stale(self, request: DiscoveryRequest) -> list[ListingOutcome]:
+        """Withdraw stored listings of the type that today's check rejects (never deleted).
+
+        A listing stored by an earlier, looser check (or before a look-alike was configured)
+        must not stay evidence. Its frozen HTML is checked again; a rejected one gets
+        `withdrawn_reason` and is left out of matching from now on.
+
+        Args:
+            request: The product type, empty values and look-alikes of this check.
+
+        Returns:
+            One outcome per withdrawn listing.
+        """
+        tools = self._tools()
+        out: list[ListingOutcome] = []
+        with session_scope(self._session_factory) as session:
+            for doc in DocumentRepository(session).list_auto_sourced():
+                if request.product_type not in doc.product_types or not doc.url:
+                    continue
+                with tools.store.local_path(doc.file_path) as path:
+                    html = path.read_text(encoding="utf-8", errors="replace")
+                reason = recheck_stored(html, doc.url, request, tools.check)
+                if reason is None:
+                    continue
+                doc.withdrawn_reason = reason
+                out.append(
+                    ListingOutcome(
+                        doc.url,
+                        kept=False,
+                        reason=f"withdrawn (stored earlier): {reason}",
+                        title=doc.title,
+                        brand=doc.manufacturer,
+                    )
+                )
+                logger.info("gem listing withdrawn", extra={"url": doc.url, "reason": reason})
+        return out
+
+    def _deps(self) -> DiscoveryDeps:
+        """Fetcher, store, check, stored-URL check and ingestion."""
+        tools = self._tools()
+        return DiscoveryDeps(
             fetcher=tools.fetcher,
             store=tools.store,
             check=tools.check,
             known=self._known,
             save=lambda source, listing: self._save(source, listing, tools.processing),
         )
-        return discover(request, deps)
 
     def _known(self, url: str) -> bool:
         with session_scope(self._session_factory) as session:
@@ -355,6 +424,15 @@ class DiscoveryService:
             job.error = error
             job.result_run_id = result_run
             job.finished_at = datetime.now(UTC)
+
+
+def _item_titles(
+    report: TenderReport, product_type: str, uncovered: Sequence[UncoveredType]
+) -> list[str]:
+    """Titles of the report's items of an uncovered product type, each once."""
+    item_nos = {n for u in uncovered if u.product_type == product_type for n in u.item_nos}
+    titles = [i.item.title for i in report.items if i.item.item_no in item_nos]
+    return list(dict.fromkeys(titles))
 
 
 def build_discovery_tools(settings: Settings) -> DiscoveryTools:

@@ -220,11 +220,26 @@ Details, the step by step results and their causes are in the [write-up](docs/wr
 
 When no manufacturer document covers an item's product type (e.g. control valves), a finished
 report can offer **"Check GeM Marketplace for control valve?"**. Turn it on with
-`DISCOVERY_ENABLED=true` in `backend/.env` and restart. Categories per product type live in
-`backend/config/gem_marketplace.yaml` (GeM's keyword search needs JavaScript; category pages do not).
+`DISCOVERY_ENABLED=true` in `backend/.env` and restart.
 
-- Limits: at most `GEM_MAX_LISTINGS` (5) product pages per check, `GEM_REQUEST_DELAY_SECONDS` (3)
-  before every request, robots.txt obeyed, `HTTP_USER_AGENT` sent, no login, no LLM.
+A check works from the tender's own items:
+
+1. **Search GeM** with the items' words (`/search?q=pneumatic control valve`, then `control valve`).
+   GeM's search page lists matching categories in plain HTML.
+2. **Keep the categories of that type:** a category name must name the product type and no other
+   product ("Solenoid Valve", "Directional Control Valve" are dropped). The categories in
+   `backend/config/gem_marketplace.yaml` are read only when the search finds none.
+3. **Rank the products** of those categories by how many of the items' title words their name
+   holds, and open the best ones.
+4. **Check each listing:** a title or model naming another product (another type, or a look-alike
+   in the type's `exclude` list) is rejected. Listings stored by an earlier check are checked again
+   from their frozen HTML; one that fails today's rule is withdrawn (kept for old reports, never
+   used again).
+5. **Re-match** the items of that type against the kept listings, by rules, into a new run.
+
+- Limits: at most `GEM_MAX_CATEGORIES` (3) categories and `GEM_MAX_LISTINGS` (10) product pages
+  per check, `GEM_REQUEST_DELAY_SECONDS` (3) before every request, robots.txt obeyed,
+  `HTTP_USER_AGENT` sent, no login, no LLM.
 - Each listing's HTML is frozen under `data/gem_snapshots/` (local only, never committed) and stored
   as an auto-sourced document; only the affected items are re-matched, by rules, into a new run.
 - **GeM specifications are typed in by sellers.** Such results show "GeM listing (seller-declared)",

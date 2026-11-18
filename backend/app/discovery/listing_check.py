@@ -82,18 +82,45 @@ class ListingCheck:
         Returns:
             The foreign product's name, or None.
         """
-        foreign = self._foreign_patterns(product_type, excludes)
         for part in (listing.title, listing.model or ""):
-            text = normalize_for_search(part, self.vocabulary)
-            named = [name for name, pats in foreign.items() if any(p.search(text) for p in pats)]
-            if not named:
-                continue
-            rest = text
-            for pattern in (p for name in named for p in foreign[name]):
-                rest = pattern.sub(" ", rest)
-            if not self._names(rest, product_type):
-                return named[0]
+            other = self.foreign_in(part, product_type, excludes)
+            if other:
+                return other
         return None
+
+    def foreign_in(self, text: str, product_type: str, excludes: Sequence[str] = ()) -> str | None:
+        """The other product a text names instead of the wanted type, if any.
+
+        Args:
+            text: Printed text (a title, a model, a GeM category name).
+            product_type: The ontology product type looked for.
+            excludes: GeM look-alike phrases configured for this type.
+
+        Returns:
+            The foreign product's name, or None (no foreign name, or the wanted type is still
+            named once the foreign names are taken out).
+        """
+        foreign = self._foreign_patterns(product_type, excludes)
+        normalized = normalize_for_search(text, self.vocabulary)
+        named = [n for n, pats in foreign.items() if any(p.search(normalized) for p in pats)]
+        if not named:
+            return None
+        rest = normalized
+        for pattern in (p for name in named for p in foreign[name]):
+            rest = pattern.sub(" ", rest)
+        return None if self._names(rest, product_type) else named[0]
+
+    def names_type_in(self, text: str, product_type: str) -> bool:
+        """True if printed text names the product type (ontology synonyms).
+
+        Args:
+            text: Printed text.
+            product_type: The ontology product type.
+
+        Returns:
+            Whether it is named.
+        """
+        return self._names(normalize_for_search(text, self.vocabulary), product_type)
 
     def rejection(
         self, listing: GemListing, product_type: str, excludes: Sequence[str] = ()

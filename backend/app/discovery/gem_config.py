@@ -29,6 +29,10 @@ class GemMarketplaceConfig(BaseModel):
 
     product_types: list[GemCategories] = Field(default_factory=list)
     empty_values: list[str] = Field(default_factory=list)
+    rank_ignore_words: list[str] = Field(
+        default_factory=list,
+        description="Item title words that never tell products apart when ranking listings.",
+    )
 
     def categories_for(self, product_type: str) -> list[str]:
         """Category slugs configured for a product type (empty if none).
