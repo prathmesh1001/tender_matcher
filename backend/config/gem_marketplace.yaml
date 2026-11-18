@@ -4,6 +4,10 @@
 #
 #   product_type   an ontology product type (ontology/*.yaml)
 #   categories     slugs of https://mkp.gem.gov.in/<slug>/search, read in this order
+#   exclude        look-alike products sold in those categories that are not this type; a listing
+#                  whose title or model names one (and not the type outside it) is rejected.
+#                  Kept here, not in the ontology: on a tender a "flow control valve" can be a
+#                  real control valve, on GeM it is a pneumatic fitting (Festo GRLA, 2026-11-18).
 #
 # A listing is kept only if its title or its specification rows name the product type (ontology
 # synonyms) and it has at least GEM_MIN_SPEC_ROWS rows. GeM specifications are typed in by the
@@ -16,6 +20,7 @@ product_types:
   - product_type: control_valve
     categories:
       - valves-control-valve-pneumatic
+    exclude: [flow control valve, throttle valve, pneumatic fitting, push in fitting]
 
 # Values that state nothing; a row holding only one of these is not stored.
 empty_values: [NA, N/A, "-", Not Applicable, Not Available, None]

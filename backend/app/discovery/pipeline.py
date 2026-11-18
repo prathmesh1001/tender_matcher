@@ -62,6 +62,7 @@ class DiscoveryRequest:
     max_listings: int
     snapshot_prefix: str
     empty_values: Sequence[str] = ()
+    excludes: Sequence[str] = ()  # GeM look-alikes that are not the type
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,7 +133,7 @@ def read_listing(
         fetched.content.decode("utf-8", errors="replace"), url, request.empty_values
     )
     base = ListingOutcome(url, False, "", listing.title, listing.brand, listing.model)
-    rejected = deps.check.rejection(listing, request.product_type)
+    rejected = deps.check.rejection(listing, request.product_type, request.excludes)
     if rejected:
         return replace(base, reason=rejected)
     name = listing_name(listing).casefold()

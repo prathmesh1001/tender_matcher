@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -118,7 +118,7 @@ def test_wrong_product_is_not_stored(tmp_path: Path, check: ListingCheck) -> Non
     _, saved, deps = _setup(tmp_path, check, ["/cv/a/p-1-11-cat.html"])
     [outcome] = discover(_request(product_type="thermocouple"), deps)
     assert not outcome.kept
-    assert "does not name thermocouple" in outcome.reason
+    assert outcome.reason == "names control valve, not thermocouple"
     assert saved == []
 
 
@@ -146,3 +146,12 @@ def test_unreadable_category_page_fails_the_check(tmp_path: Path, check: Listing
     deps.fetcher.pages.clear()
     with pytest.raises(LinkFetchError):
         discover(_request(), deps)
+
+
+def test_configured_look_alike_is_not_stored(tmp_path: Path, check: ListingCheck) -> None:
+    _, saved, deps = _setup(tmp_path, check, ["/cv/a/p-1-11-cat.html"])
+    request = replace(_request(), excludes=["flow control valve"])
+    [outcome] = discover(request, deps)
+    assert not outcome.kept
+    assert outcome.reason == "names flow control valve, not control valve"
+    assert saved == []

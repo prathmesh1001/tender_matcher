@@ -15,6 +15,11 @@ class GemCategories(BaseModel):
 
     product_type: str = Field(pattern=r"^[a-z0-9_]+$")
     categories: list[str] = Field(min_length=1)
+    exclude: list[str] = Field(
+        default_factory=list,
+        description="Look-alike products listed in these categories that are not this type "
+        "(a title or model naming one is rejected).",
+    )
 
 
 class GemMarketplaceConfig(BaseModel):
@@ -37,6 +42,17 @@ class GemMarketplaceConfig(BaseModel):
         return next(
             (p.categories for p in self.product_types if p.product_type == product_type), []
         )
+
+    def excludes_for(self, product_type: str) -> list[str]:
+        """Look-alike product phrases configured for a product type (empty if none).
+
+        Args:
+            product_type: An ontology product type.
+
+        Returns:
+            The phrases.
+        """
+        return next((p.exclude for p in self.product_types if p.product_type == product_type), [])
 
 
 def load_gem_config(path: Path) -> GemMarketplaceConfig:

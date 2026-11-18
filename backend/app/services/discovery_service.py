@@ -29,7 +29,7 @@ from app.db.repositories import (
 from app.db.session import session_scope
 from app.discovery.gem_config import GemMarketplaceConfig, load_gem_config
 from app.discovery.gem_parser import GemListing
-from app.discovery.listing_check import ListingCheck
+from app.discovery.listing_check import ListingCheck, other_product_patterns
 from app.discovery.pipeline import (
     DiscoveryDeps,
     DiscoveryRequest,
@@ -286,6 +286,7 @@ class DiscoveryService:
             max_listings=settings.GEM_MAX_LISTINGS,
             snapshot_prefix=settings.GEM_SNAPSHOT_PREFIX,
             empty_values=config.empty_values,
+            excludes=config.excludes_for(product_type),
         )
         deps = DiscoveryDeps(
             fetcher=tools.fetcher,
@@ -370,7 +371,12 @@ def build_discovery_tools(settings: Settings) -> DiscoveryTools:
             max_bytes=settings.HTTP_MAX_DOWNLOAD_MB * 1024 * 1024,
         ),
         store=build_file_store(settings),
-        check=ListingCheck(matcher, vocabulary, settings.GEM_MIN_SPEC_ROWS),
+        check=ListingCheck(
+            matcher,
+            vocabulary,
+            settings.GEM_MIN_SPEC_ROWS,
+            other_product_patterns(ontologies, vocabulary),
+        ),
         processing=ProcessingOptions.from_settings(
             settings, vocabulary, matcher, build_ocr_engine(settings)
         ),
