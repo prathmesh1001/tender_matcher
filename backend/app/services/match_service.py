@@ -210,13 +210,17 @@ class MatchService:
         )
 
     def warm_catalogues(self) -> int:
-        """Read every registered catalogue into the cache now, so runs do not wait for it.
+        """Read every registered catalogue into the cache now, and load the judge's models.
+
+        Runs queued after it wait for neither.
 
         Returns:
             How many catalogues are loaded.
         """
         loaded = self._source.warm()
         logger.info("catalogues warm", extra={"documents": loaded})
+        if self._judge is not None:
+            self._judge.warm_up()
         return loaded
 
     def match_tender(

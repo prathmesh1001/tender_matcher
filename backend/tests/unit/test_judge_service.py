@@ -14,6 +14,9 @@ from app.matching.comparator import ComparatorOptions, MatchContext
 from app.matching.engine import ItemInput
 from app.matching.llm_judge import JudgedItems, Passage
 from app.matching.scorer import score
+from app.retrieval.query_builder import QueryVocabulary
+from app.retrieval.retriever import RetrievalParams
+from app.retrieval.text_normalizer import SearchVocabulary
 from app.schemas.enums import (
     DecisionSource,
     MatchStatus,
@@ -26,7 +29,13 @@ from app.schemas.report import CandidateSummary, ItemReport, ManufacturerItemRep
 from app.schemas.requirements import LineItem, Requirement, ValueKind
 from app.schemas.retrieval import RetrievalHit, RetrievalOutcome, RetrievalRequest
 from app.schemas.sections import EvidenceSource
-from app.services.judge_service import FoundEvidence, JudgeOptions, JudgeService, _allowed
+from app.services.judge_service import (
+    DbEvidenceFinder,
+    FoundEvidence,
+    JudgeOptions,
+    JudgeService,
+    _allowed,
+)
 from tests.conftest import make_test_settings
 
 SHA = "a" * 64
@@ -58,6 +67,10 @@ class _Finder:
     def __init__(self, found: FoundEvidence | Exception | None = None) -> None:
         self.found = found or FoundEvidence(RetrievalOutcome.EVIDENCE, (PASSAGE,))
         self.requests: list[RetrievalRequest] = []
+        self.warm_calls: list[int] = []
+
+    def warm_up(self, calls: int) -> None:
+        self.warm_calls.append(calls)
 
     def find(self, request: RetrievalRequest) -> FoundEvidence:
         self.requests.append(request)
@@ -156,7 +169,12 @@ def _inputs(
 
 
 def _service(
-    llm: _Llm, finder: _Finder, max_calls: int = 10, max_failures: int = 2, workers: int = 1
+    llm: _Llm,
+    finder: _Finder,
+    max_calls: int = 10,
+    max_failures: int = 2,
+    workers: int = 1,
+    warm_up_calls: int = 0,
 ) -> JudgeService:
     return JudgeService(
         llm,
@@ -168,6 +186,7 @@ def _service(
             max_calls=max_calls,
             max_failures=max_failures,
             workers=workers,
+            warm_up_calls=warm_up_calls,
         ),
     )
 
@@ -434,3 +453,50 @@ def test_parallel_calls_keep_the_runs_log_context() -> None:
     with log_context(run_id="run-1"):
         _service(llm, _Finder(), workers=4).judge_items(inputs, reports, _Pages())
     assert [c.get("run_id") for c in llm.contexts] == ["run-1"] * 5
+
+
+def test_warm_up_runs_the_configured_dummy_queries_once() -> None:
+    finder = _Finder()
+    _service(_Llm(), finder, warm_up_calls=3).warm_up()
+    assert finder.warm_calls == [3]
+    assert finder.requests == []
+
+
+class _Embedder:
+    model_name = "fake-embedder"
+
+    def __init__(self) -> None:
+        self.texts: list[str] = []
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        self.texts.extend(texts)
+        return [[0.0] for _ in texts]
+
+
+class _Reranker:
+    model_name = "fake-reranker"
+
+    def __init__(self) -> None:
+        self.queries: list[str] = []
+
+    def score(self, query: str, passages: Sequence[str]) -> list[float]:
+        self.queries.append(query)
+        return [0.0 for _ in passages]
+
+
+def test_db_finder_warm_up_calls_both_models_without_the_database() -> None:
+    embedder, reranker = _Embedder(), _Reranker()
+    finder = DbEvidenceFinder(
+        None,  # type: ignore[arg-type]  # warm-up never opens a session
+        embedder,
+        reranker,
+        QueryVocabulary.from_ontologies(
+            [], SearchVocabulary.from_ontologies([]), max_distance=0, min_length=0
+        ),
+        RetrievalParams.from_settings(make_test_settings()),
+    )
+    finder.warm_up(2)
+    assert len(embedder.texts) == 2
+    assert len(reranker.queries) == 2
+    finder.warm_up(0)
+    assert len(embedder.texts) == 2

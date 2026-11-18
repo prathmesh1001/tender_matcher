@@ -77,6 +77,10 @@ _TITLE_SIZE: Final = re.compile(
     rf"|(?:{_INCH_NUMBER})\s*{_INCH_UNIT})"
     r"|(?:\bsize\s*:?\s*|,\s*)(?P<mm>\d+(?:\.\d+)?\s*mm\b)"
 )
+# Distinct printed labels per process (catalogue labels repeat on every table row).
+_LABEL_CACHE_SIZE: Final = 65536
+# Distinct label words stemmed per process.
+_STEM_CACHE_SIZE: Final = 65536
 
 # A temperature: "-40 Deg. C", "(-196 DEG C)", "80° C"; a range joins two with "to" or a dash.
 _DEGREES: Final = r"(?:deg(?:ree)?s?\.?\s*c(?:elsius)?\b|°\s*c\b)"
@@ -177,6 +181,10 @@ def words(text: str) -> list[str]:
     return _WORD.findall(fold_text(text))
 
 
+# Cached here, not in `text_normalizer`: that module is part of the catalogue cache fingerprint.
+_stem = lru_cache(maxsize=_STEM_CACHE_SIZE)(stem_token)
+
+
 @lru_cache(maxsize=_STEMS_CACHE_SIZE)
 def stems(text: str) -> tuple[str, ...]:
     """Stemmed folded label words ("Body Materials" -> "bodi", "materi").
@@ -184,7 +192,7 @@ def stems(text: str) -> tuple[str, ...]:
     A hyphenated compound stays one word ("Dead-End" -> "deadend"), so its parts never
     match on their own: "Dead-End Service" is not an end connection.
     """
-    return tuple(stem_token(w.replace("-", "")) for w in _COMPOUND.findall(fold_text(text)))
+    return tuple(_stem(w.replace("-", "")) for w in _COMPOUND.findall(fold_text(text)))
 
 
 def has_code(text: str) -> bool:
@@ -419,7 +427,7 @@ def _rest_is_ignorable(label: str, end: int, ontology: Ontology) -> bool:
     printed = _COMPOUND.findall(fold_text(label))
     generic = {s for word in ontology.label_generic_words for s in stems(word)}
     for word in printed[end:]:
-        if stem_token(word.replace("-", "")) in generic or any(ch.isdigit() for ch in word):
+        if _stem(word.replace("-", "")) in generic or any(ch.isdigit() for ch in word):
             continue
         if word in ontology.units:
             continue
@@ -459,17 +467,53 @@ def resolve_attribute(
     """
     if label is None or ontology is None:
         return None
-    label_words = _label_stems(label, ontology)
+    word_count, candidates = _label_candidates(_SameOntology(ontology), label)
     best: tuple[int, int, int, str] | None = None
-    for attribute in ontology.attributes:
+    for attribute, end, length in candidates:
         if not _fits(attribute, value):
             continue
-        for end, length in _synonym_spans(label_words, attribute):
-            if not _rest_is_ignorable(label, end, ontology):
-                continue
-            # Only generic words follow any candidate, so the one starting first names the
-            # most: "Motor Body Material" is the motor body, not the body.
-            rank = (length - end, int(end == len(label_words)), length, attribute.name)
-            if best is None or rank[:3] > best[:3]:
-                best = rank
+        # Only generic words follow any candidate, so the one starting first names the
+        # most: "Motor Body Material" is the motor body, not the body.
+        rank = (length - end, int(end == word_count), length, attribute.name)
+        if best is None or rank[:3] > best[:3]:
+            best = rank
     return best[3] if best else None
+
+
+class _SameOntology:
+    """Cache key: one loaded ontology by identity (its dicts make it unhashable by value).
+
+    The cache holds the key, so the ontology stays alive and its id is never reused.
+    """
+
+    __slots__ = ("ontology",)
+
+    def __init__(self, ontology: Ontology) -> None:
+        self.ontology = ontology
+
+    def __hash__(self) -> int:
+        return id(self.ontology)
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, _SameOntology) and other.ontology is self.ontology
+
+
+@lru_cache(maxsize=_LABEL_CACHE_SIZE)
+def _label_candidates(
+    key: _SameOntology, label: str
+) -> tuple[int, tuple[tuple[Attribute, int, int], ...]]:
+    """The label's word count and every (attribute, end, length) synonym span it allows.
+
+    Depends on the label only, not on the value, so catalogue labels seen on many rows are
+    stemmed and scanned once; `resolve_attribute` then keeps the spans whose value fits.
+    Attribute and span order is kept, so ties break as before.
+    """
+    ontology = key.ontology
+    label_words = _label_stems(label, ontology)
+    candidates = tuple(
+        (attribute, end, length)
+        for attribute in ontology.attributes
+        for end, length in _synonym_spans(label_words, attribute)
+        if _rest_is_ignorable(label, end, ontology)
+    )
+    return len(label_words), candidates

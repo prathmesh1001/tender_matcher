@@ -8,6 +8,7 @@ designation systems and are mapped only through the EN 1759-1 table, never via b
 import re
 from dataclasses import dataclass
 from fractions import Fraction
+from functools import lru_cache
 from typing import Final
 
 import pint
@@ -16,6 +17,8 @@ from app.core.exceptions import UnitConversionError
 from app.ontology.schema import Attribute, Ontology
 
 _REGISTRY: Final = pint.UnitRegistry()
+# Distinct unit pairs seen in a process; matching asks the same few pairs millions of times.
+_UNIT_PAIR_CACHE_SIZE: Final = 4096
 # Fraction characters as written fractions; NFKC would turn one and a half into "11/2" (11 halves).
 _VULGAR: Final = {
     "\u00bc": "1/4",
@@ -192,6 +195,7 @@ def pn_to_class(ontology: Ontology, pn: int) -> int | None:
     return next((cls for cls, value in ontology.class_to_pn.items() if value == pn), None)
 
 
+@lru_cache(maxsize=_UNIT_PAIR_CACHE_SIZE)
 def units_compatible(unit: str, other: str) -> bool:
     """True if two pint unit expressions measure the same dimension ("m**3/h" and "L/s").
 

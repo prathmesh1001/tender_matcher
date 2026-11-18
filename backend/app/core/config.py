@@ -131,6 +131,13 @@ class Settings(BaseSettings):
         default=True,
         description="The API reads every catalogue into the cache when it starts, not in a run.",
     )
+    MODEL_WARM_UP_CALLS: int = Field(
+        default=3,
+        ge=0,
+        le=20,
+        description="Dummy embed + rerank calls in the startup warm-up, so the first run does not "
+        "pay for loading the models (0: load them in the first run).",
+    )
 
     PRODUCT_PAGE_MIN_TAGGED: int = Field(
         default=2,

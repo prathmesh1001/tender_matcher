@@ -14,6 +14,7 @@ the same results with 1 worker or many.
 import contextvars
 import logging
 import threading
+import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -106,6 +107,10 @@ class EvidenceFinder(Protocol):
         """Search the catalogue the request names."""
         ...
 
+    def warm_up(self, calls: int) -> None:
+        """Load the search models with this many dummy queries."""
+        ...
+
 
 @dataclass(frozen=True, slots=True)
 class JudgeOptions:
@@ -117,6 +122,7 @@ class JudgeOptions:
     max_calls: int
     max_failures: int
     workers: int = 1
+    warm_up_calls: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -225,6 +231,23 @@ class DbEvidenceFinder:
     low_score_hits: int = 0
     max_passages: int | None = None
 
+    def warm_up(self, calls: int) -> None:
+        """Load the embedder and reranker and run a few dummy queries through them.
+
+        The first calls after loading are much slower than later ones (measured on CPU: 125 s,
+        12 s, 5 s, then 0.6 s per query embedding), so a few are made before any run.
+
+        Args:
+            calls: How many dummy queries (0 does nothing).
+
+        Raises:
+            ExternalServiceError: If the embedder or reranker fails.
+        """
+        for i in range(calls):
+            query = f"warm up query {i}"
+            self.embedder.embed([query])
+            self.reranker.score(query, [f"warm up passage {i}"])
+
     def find(self, request: RetrievalRequest) -> FoundEvidence:
         """Search one catalogue; the best hits that count as evidence, else the best few below it.
 
@@ -278,6 +301,15 @@ class JudgeService:
         self._finder = finder
         self._options = options
         self._cache = cache
+
+    def warm_up(self) -> None:
+        """Load the search models now, so the first run does not wait for them."""
+        started = time.monotonic()
+        self._finder.warm_up(self._options.warm_up_calls)
+        logger.info(
+            "judge models warm",
+            extra={"calls": self._options.warm_up_calls, "seconds": time.monotonic() - started},
+        )
 
     def judge_items(
         self, inputs: Sequence[ItemInput], reports: Sequence[ItemReport], pages: PageTexts
@@ -505,6 +537,7 @@ def build_judge_service(settings: Settings, session_factory: sessionmaker[Sessio
             max_calls=settings.LLM_JUDGE_MAX_CALLS,
             max_failures=settings.LLM_JUDGE_MAX_FAILURES,
             workers=settings.LLM_JUDGE_WORKERS,
+            warm_up_calls=settings.MODEL_WARM_UP_CALLS,
         ),
         DbVerdictCache(session_factory),
     )

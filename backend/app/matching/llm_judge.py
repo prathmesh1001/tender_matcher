@@ -90,6 +90,10 @@ class ItemJudge(Protocol):
         """Judge what rules left open in one tender's items."""
         ...
 
+    def warm_up(self) -> None:
+        """Load whatever the judge needs (models) before the first run."""
+        ...
+
 
 def build_prompt(
     requirement: Requirement, product: str, heading: str | None, passages: Sequence[Passage]
