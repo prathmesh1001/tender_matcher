@@ -1,8 +1,8 @@
-# DRAFT hand labels for tender GEM/2026/B/8226616 (monoblock pump, 2 pieces) - NOT YET CHECKED.
+# Hand labels for tender GEM/2026/B/8226616, drafted by Claude, checked by the user 2026-11-19.
 #
 # Drafted by Claude on 2026-11-13 from the bid's GeM specification table (p3) and from the
-# catalogue page text, never from the system's output. Lives in eval/gold/drafts/ so run_eval.py
-# does not score it; move it to eval/gold/ once the user has checked it.
+# catalogue page text, never from the system's output. Checked by the user on
+# 2026-11-19 (every choice below kept as drafted).
 #
 # Requirements (bid p3): Pump Type "Centrifugal Monoblock Pumps"; Pump Casing Material "Graded
 # Cast Iron"; Impeller Material "Brass"; Motor Body Material "High-quality aluminium die
@@ -15,7 +15,7 @@
 #   Calpeda:   NM 32/16A/B (1.1 kW / 1.5 HP), NM standard construction.
 #   Crompton:  Win Dura I (largest model, 0.75 kW / 1.0 HP).
 #
-# Choices to check (user):
+# Choices the user confirmed on 2026-11-19:
 #   - "Graded Cast Iron" with no grade named is read as full when the catalogue prints a grade
 #     (IS 210 FG 200, GJL 200) and partial when it prints only "Cast Iron" (as 8169451 did).
 #   - Kirloskar pump type: "MONOBLOC PUMPS" is printed, "centrifugal" is not -> partial.
@@ -23,7 +23,7 @@
 #
 # Status: full_match | partial_match | missing_capability | unsupported.
 tender: GEM_2026_B_8226616
-source: Claude draft from bid.pdf p3 and catalogue pages, NOT yet checked by the user
+source: Claude draft from bid.pdf p3 and catalogue pages, checked by the user 2026-11-19
 
 evaluations:
   - item_no: "1"

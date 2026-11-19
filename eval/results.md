@@ -108,7 +108,18 @@ full_match precision 93% (40/43). The judge decides 6 rows the rules leave open:
 (Gasket graphite, dual plate check valve, torque seated, valve size 450 mm), 1 weaker (Ball &
 Stem A 182), 1 stronger (Spring). All 33 new pump calls answered no evidence.
 
-The sections below are the output of that final run.
+Two more gold files (2026-11-19, rules only, no Gemini calls): 8188046 (butterfly valves as
+per IS 13095, 36 labels) and 8226616 (monoblock pump, 15 labels), drafted by Claude from the
+bid and catalogue pages, checked by the user with every drafted choice kept. Before adding
+them, the 5 older files gave rules 56% (57/101) / 86% (49/57) / 4 stronger / citations 71%
+(35/49), unchanged by the parse cache (234b4f7). Over all 7 files, 152 rows: rules 49%
+(74/152) / 89% (66/74) / 4 stronger / citations 70% (46/66). The new files add 17 decided rows,
+all agreeing with the labels; the other 34 stay unsupported (8 of them labelled unsupported
+too; most of the rest are free-text lines that need the judge), and 6 rows on 8188046 agree in status but cite another page (Kirloskar cites its
+double-eccentric valve p9, the labels its centric wafer valve p11-12). Their row-by-row diffs
+are in `eval/diffs/` (rules only); the judge was not run on them.
+
+The sections below are the output of the 2026-11-11 final run (5 gold files).
 
 | Run | Labelled | Other catalogue | Coverage | Decided accuracy | Stronger | Citations |
 |---|---|---|---|---|---|---|

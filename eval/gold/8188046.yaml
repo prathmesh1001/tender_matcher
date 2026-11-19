@@ -1,9 +1,8 @@
-# DRAFT hand labels for tender GEM/2026/B/8188046 (butterfly valves as per IS 13095) - NOT YET
-# CHECKED.
+# Hand labels for tender GEM/2026/B/8188046, drafted by Claude, checked by the user 2026-11-19.
 #
 # Drafted by Claude on 2026-11-13 from the bid's GeM specification tables (p4 item 1, p4-5 item 2)
-# and from the catalogue page text, never from the system's output. Lives in eval/gold/drafts/ so
-# run_eval.py does not score it; move it to eval/gold/ once the user has checked it.
+# and from the catalogue page text, never from the system's output. Checked by the user on 2026-11-19
+# (every choice below kept as drafted).
 #
 # Items: 1 = 70 pieces DN 100, 2 = 25 pieces DN 150. Both: Conformity IS 13095; Application
 # "Tight Shut Off"; End connection "Flangeless Wafer Valve"; Face to Face "Wafer Short (PN 2.5)
@@ -17,7 +16,7 @@
 #              IS 13095" belongs to the double-eccentric flanged valve, another product.)
 #   Delval:    Series 50 wafer (bulletin 098).
 #
-# Choices to check (user):
+# Choices the user confirmed on 2026-11-19:
 #   - KSB end connection: the wafer body is only DN 650-1000; DN 100/150 come as semi-lug (fits
 #     between flanges, no body flanges) -> partial.
 #   - Face to face "Wafer Short": ISO 5752 / EN 558-1 series 20 is the short wafer pattern -> partial
@@ -26,7 +25,7 @@
 #
 # Status: full_match | partial_match | missing_capability | unsupported.
 tender: GEM_2026_B_8188046
-source: Claude draft from bid.pdf p4-5 and catalogue pages, NOT yet checked by the user
+source: Claude draft from bid.pdf p4-5 and catalogue pages, checked by the user 2026-11-19
 
 evaluations:
   - item_no: "1"
