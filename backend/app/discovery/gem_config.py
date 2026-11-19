@@ -33,6 +33,10 @@ class GemMarketplaceConfig(BaseModel):
         default_factory=list,
         description="Item title words that never tell products apart when ranking listings.",
     )
+    seller_rank: list[str] = Field(
+        default_factory=list,
+        description="How a product is sold (card 'sold_as' classes), best first.",
+    )
 
     def categories_for(self, product_type: str) -> list[str]:
         """Category slugs configured for a product type (empty if none).

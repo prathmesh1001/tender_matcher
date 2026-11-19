@@ -1,10 +1,11 @@
 """Searching GeM by a tender's items: search page parsing, category filter, product ranking."""
 
+from app.discovery.gem_cards import ListingCard
 from app.discovery.gem_config import load_gem_config
 from app.discovery.gem_parser import CategoryLink, listing_slug_words, search_categories
 from app.discovery.gem_search import (
     fitting_categories,
-    rank_listings,
+    rank_cards,
     rank_words,
     search_queries,
     search_url,
@@ -69,8 +70,8 @@ def test_listings_naming_more_item_words_go_first(check: ListingCheck) -> None:
         f"{base}/pneumatic-control-valve/p-3-3-cat.html",
     ]
     words = rank_words("control_valve", [TENDER_TITLE], check, CONFIG.rank_ignore_words)
-    ranked = rank_listings(urls, words, check)
-    assert ranked == [urls[1], urls[2], urls[0]]
+    ranked = rank_cards([ListingCard(u) for u in urls], words, check)  # no title: URL name
+    assert [c.url for c in ranked] == [urls[1], urls[2], urls[0]]
 
 
 def test_listing_slug_words_are_the_product_name() -> None:

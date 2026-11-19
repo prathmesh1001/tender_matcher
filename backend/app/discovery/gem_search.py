@@ -7,13 +7,17 @@ Pure functions; fetching is the pipeline's job.
 - A category from the search is kept only if its name names the product type and no other
   product instead (the listing check's rule): "Solenoid Valve" and "Directional Control Valve"
   are not control valves.
-- Products of the kept categories are ranked by how many of the items' title words their URL
-  name holds ("k-type-thermocouple"), so the closest fits are opened first.
+- Products of the kept categories are ranked from their category-page cards: item title words
+  in the product title first (product fit), then how it is sold (config `seller_rank`: OEM
+  before authorised reseller), the seller rating and the vendor assessment. Listings are then
+  picked best first with at most a few per brand, so one brand cannot fill every slot. Pages
+  without cards fall back to ranking by the URL name ("k-type-thermocouple").
 """
 
 from collections.abc import Iterable, Sequence
 from urllib.parse import quote
 
+from app.discovery.gem_cards import ListingCard
 from app.discovery.gem_parser import CategoryLink, listing_slug_words
 from app.discovery.listing_check import ListingCheck
 from app.retrieval.text_normalizer import normalize_for_search
@@ -95,20 +99,69 @@ def fitting_categories(
     ]
 
 
-def rank_listings(urls: Sequence[str], words: frozenset[str], check: ListingCheck) -> list[str]:
-    """Listing URLs, most item words in their URL name first; ties keep page order.
+def _fit(card: ListingCard, words: frozenset[str], check: ListingCheck) -> int:
+    """How many item title words the card's product title (else its URL name) holds."""
+    text = card.title or listing_slug_words(card.url)
+    return len(words.intersection(normalize_for_search(text, check.vocabulary).split()))
+
+
+def _seller_rank(card: ListingCard, seller_rank: Sequence[str]) -> int:
+    """Position of the card's best "sold as" class in the configured order; unknown last."""
+    order = [s.casefold() for s in seller_rank]
+    return min((order.index(s) for s in card.sold_as if s in order), default=len(order))
+
+
+def rank_cards(
+    cards: Sequence[ListingCard],
+    words: frozenset[str],
+    check: ListingCheck,
+    seller_rank: Sequence[str] = (),
+) -> list[ListingCard]:
+    """Cards best first: product fit, then how it is sold, seller rating, vendor assessment.
+
+    Ties keep page order.
 
     Args:
-        urls: Listing URLs in page order.
+        cards: Category-page cards in page order.
         words: Normalized item title words (`rank_words`).
         check: Gives the vocabulary.
+        seller_rank: "Sold as" classes, best first (config `seller_rank`).
 
     Returns:
-        The URLs, re-ordered.
+        The cards, re-ordered.
     """
+    return sorted(
+        cards,
+        key=lambda c: (
+            -_fit(c, words, check),
+            _seller_rank(c, seller_rank),
+            -(c.rating or 0.0),
+            c.assessed is not True,
+        ),
+    )
 
-    def score(url: str) -> int:
-        name = normalize_for_search(listing_slug_words(url), check.vocabulary).split()
-        return len(words.intersection(name))
 
-    return sorted(urls, key=score, reverse=True)
+def pick_cards(
+    ranked: Sequence[ListingCard], max_listings: int, max_per_brand: int
+) -> list[ListingCard]:
+    """The best cards to open, at most `max_per_brand` per brand (a card without one is free).
+
+    Args:
+        ranked: Cards best first (`rank_cards`).
+        max_listings: How many to pick.
+        max_per_brand: Most picked per brand (brand compared case-insensitively).
+
+    Returns:
+        The picked cards, best first.
+    """
+    picked: list[ListingCard] = []
+    per_brand: dict[str, int] = {}
+    for card in ranked:
+        if len(picked) >= max_listings:
+            break
+        brand = (card.brand or "").casefold()
+        if brand and per_brand.get(brand, 0) >= max_per_brand:
+            continue
+        per_brand[brand] = per_brand.get(brand, 0) + 1
+        picked.append(card)
+    return picked

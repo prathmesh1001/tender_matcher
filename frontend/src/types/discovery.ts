@@ -11,6 +11,12 @@ export interface ListingResult {
   brand: string | null;
   model: string | null;
   snapshot_ref: string | null;
+  /** How the product is sold, from its GeM card: "oem", "resellers authorized". */
+  sold_as?: string | null;
+  /** Lower end of the seller's GeM rating band (4.0 for "4.0 - 4.49"). */
+  seller_rating?: number | null;
+  /** GeM vendor assessment badge. */
+  assessed?: boolean | null;
 }
 
 export interface DiscoveryJob {

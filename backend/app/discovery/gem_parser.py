@@ -6,10 +6,11 @@ Three page kinds are read, checked by hand on 2026-11-18 and 2026-11-19:
   `<li class="bn-link"><a href="/<category-slug>/search#/?q=...">Name<i>(Q3)</i></a></li>`
   (its product list needs JavaScript; the category list does not);
 - a category page (`/<category-slug>/search`) lists products as links ending in
-  `p-<id>-<variant>-cat.html`;
+  `p-<id>-<variant>-cat.html` (their cards are read by `gem_cards`);
 - a product page has the title in `<h1 itemprop="name">` with `<div class="brand">` and
-  `<span class="model">` inside it, and the seller's specification in `<div id="feature_groups">`:
-  an `<h4>` per group, then rows `<td class="feature_name">Label</td><td>Value</td>`.
+  `<span class="model">` inside it (the brand's `<sup>R</sup>` mark is left out), and the
+  seller's specification in `<div id="feature_groups">`: an `<h4>` per group, then rows
+  `<td class="feature_name">Label</td><td>Value</td>`.
 
 Only the standard library's `html.parser` is used. Every function here is pure.
 """
@@ -20,6 +21,8 @@ from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from typing import Final
 from urllib.parse import urljoin, urlsplit, urlunsplit
+
+from app.discovery.gem_cards import clean_brand
 
 _LISTING_LINK: Final = re.compile(r"/p-\d+-\d+-cat\.html$")
 _CATEGORY_LINK: Final = re.compile(r"^/([^/]+)/search$")
@@ -190,10 +193,13 @@ class _ProductParser(HTMLParser):
         self._in_features = 0  # depth inside <div id="feature_groups">
         self._in_cell = False
         self._in_h4 = False
+        self._in_mark = False  # inside the brand's <sup> trade mark ("AAVAD<sup>R</sup>")
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         a = dict(attrs)
         classes = (a.get("class") or "").split()
+        if tag == "sup" and self._target is self.state.brand_parts:
+            self._in_mark = True
         if tag == "h1" and a.get("itemprop") == "name":
             self._in_title = 1
             self._target = self.state.title_parts
@@ -224,6 +230,8 @@ class _ProductParser(HTMLParser):
             self.state.cells.append([])
 
     def handle_endtag(self, tag: str) -> None:
+        if tag == "sup":
+            self._in_mark = False
         if self.state.item_model == "" and tag == "span" and self._target is not None:
             self.state.item_model = _clean(" ".join(self._target)) or None
             self._target = None
@@ -246,7 +254,7 @@ class _ProductParser(HTMLParser):
                 self.state.rows.append(SpecRow(self.state.group, cells[0], cells[1]))
 
     def handle_data(self, data: str) -> None:
-        if self._target is not None:
+        if self._target is not None and not self._in_mark:
             self._target.append(data)
         if self._in_h4:
             self.state.group_parts.append(data)
@@ -278,7 +286,7 @@ def parse_listing(html: str, url: str, empty_values: Sequence[str] = ()) -> GemL
     return GemListing(
         url=_without_fragment(url),
         title=_clean(" ".join(state.title_parts)),
-        brand=_clean(" ".join(state.brand_parts)) or None,
+        brand=clean_brand(" ".join(state.brand_parts)),
         model=_clean(model) if model else None,
         specs=specs,
     )

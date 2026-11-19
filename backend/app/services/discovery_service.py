@@ -309,6 +309,9 @@ class DiscoveryService:
             max_categories=settings.GEM_MAX_CATEGORIES,
             rank_words=rank_words(product_type, titles, check, config.rank_ignore_words),
             base_url=base,
+            max_pages=settings.GEM_MAX_CATEGORY_PAGES,
+            max_per_brand=settings.GEM_MAX_LISTINGS_PER_BRAND,
+            seller_rank=config.seller_rank,
         )
 
     def _record(self, job_id: uuid.UUID, outcomes: Sequence[ListingOutcome]) -> None:

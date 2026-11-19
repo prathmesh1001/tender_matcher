@@ -4,6 +4,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { useDiscovery, useStartGemCheck } from "../../hooks/queries";
+import { sellerSummary } from "../../lib/seller";
 import type { DiscoveryJob, UncoveredType } from "../../types/discovery";
 
 function typeName(productType: string): string {
@@ -49,6 +50,9 @@ function JobResult({ job }: { job: DiscoveryJob }) {
                 {l.title || l.url}
               </a>{" "}
               — {l.kept ? "kept" : l.reason}
+              {sellerSummary(l) && (
+                <span className="block text-xs text-ink-600">{sellerSummary(l)}</span>
+              )}
             </li>
           ))}
         </ul>

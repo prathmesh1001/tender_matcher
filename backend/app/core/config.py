@@ -657,6 +657,20 @@ class Settings(BaseSettings):
         le=10,
         description="Most GeM categories (from the keyword search) read per product type.",
     )
+    GEM_MAX_CATEGORY_PAGES: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Most result pages (12 products each) read per GeM category; the listings "
+        "to open are chosen from all of them.",
+    )
+    GEM_MAX_LISTINGS_PER_BRAND: int = Field(
+        default=2,
+        ge=1,
+        le=20,
+        description="Most listings opened per brand in one check, so one brand cannot fill "
+        "every slot (a category page often shows one brand in many sizes).",
+    )
     GEM_REQUEST_DELAY_SECONDS: float = Field(
         default=3.0, ge=0, description="Pause before every request to GeM Marketplace."
     )

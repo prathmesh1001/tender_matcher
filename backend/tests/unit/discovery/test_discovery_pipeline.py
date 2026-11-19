@@ -5,12 +5,13 @@ from pathlib import Path
 import pytest
 
 from app.core.exceptions import LinkFetchError
+from app.discovery.gem_cards import ListingCard
 from app.discovery.gem_parser import GemListing
 from app.discovery.listing_check import ListingCheck
 from app.discovery.pipeline import (
     DiscoveryDeps,
     DiscoveryRequest,
-    candidate_urls,
+    candidate_cards,
     discover,
     find_category_pages,
     page_url,
@@ -210,8 +211,9 @@ def test_best_ranked_listings_are_read_first(tmp_path: Path, check: ListingCheck
     ]
     _, _, deps = _setup(tmp_path, check, paths)
     request = replace(_request(max_listings=1), rank_words=frozenset({"globe"}))
-    [candidate] = candidate_urls(request, deps)
-    assert candidate == BASE + paths[1]
+    [candidate] = candidate_cards(request, deps)
+    assert isinstance(candidate, ListingCard)
+    assert candidate.url == BASE + paths[1]
 
 
 def test_stored_listing_is_rechecked_against_todays_rule(check: ListingCheck) -> None:

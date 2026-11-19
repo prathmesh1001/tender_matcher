@@ -50,6 +50,9 @@ const JOB: DiscoveryJob = {
       brand: "Example",
       model: "M1",
       snapshot_ref: "gem_snapshots/control_valve/x.html",
+      sold_as: "oem",
+      seller_rating: 4.5,
+      assessed: true,
     },
   ],
   result_run_id: "run-2",
@@ -130,5 +133,8 @@ describe("DiscoveryPanel", () => {
       "/reports/run-2",
     );
     expect(screen.getByText(/1 of 1 listings kept/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Example · sold by the maker (OEM) · seller rating 4.5+ · vendor assessed"),
+    ).toBeInTheDocument();
   });
 });

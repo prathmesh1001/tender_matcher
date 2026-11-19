@@ -22,6 +22,13 @@ class ListingResult(BaseModel):
     snapshot_ref: str | None = Field(
         default=None, description="File store reference of the frozen HTML, if it was saved."
     )
+    sold_as: str | None = Field(
+        default=None, description='How the product is sold, from its GeM card ("oem").'
+    )
+    seller_rating: float | None = Field(
+        default=None, description="Lower end of the seller's GeM rating band (4.0 for 4.0-4.49)."
+    )
+    assessed: bool | None = Field(default=None, description="GeM vendor assessment badge.")
 
 
 class DiscoveryJobResponse(BaseModel):

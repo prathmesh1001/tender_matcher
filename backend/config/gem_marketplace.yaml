@@ -30,4 +30,9 @@ product_types:
 rank_ignore_words: [with, and, for, the, of, type, make, nos, "no", as, per, "or", to, in]
 
 # Values that state nothing; a row holding only one of these is not stored.
+# How a product is sold on GeM (the "sold_as" classes of a product card), best first: the maker
+# itself, then a reseller the maker authorised, then any reseller. Ranks listings to open after
+# product fit; a card naming none of these goes last.
+seller_rank: [oem, authorized, resellers]
+
 empty_values: [NA, N/A, "-", Not Applicable, Not Available, None]
