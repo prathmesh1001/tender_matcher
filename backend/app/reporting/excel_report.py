@@ -15,7 +15,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
-from app.schemas.enums import ExtractionStatus, MatchStatus
+from app.schemas.enums import ExtractionStatus, MatchStatus, VendorSource
 from app.schemas.matching import Comparison
 from app.schemas.report import ManufacturerItemReport, TenderReport
 from app.schemas.requirements import Requirement
@@ -58,6 +58,19 @@ _BY_STATUS_COLUMNS: Final = (
     ("Item", 10),
     ("Requirement", 70),
     ("Needs review", 12),
+)
+_TOP_VENDOR_COLUMNS: Final = (
+    ("Item", 10),
+    ("Item title", 40),
+    ("Rank", 7),
+    ("Vendor", 22),
+    ("Source", 18),
+    ("Compatibility %", 15),
+    ("Coverage %", 12),
+    ("Decided", 9),
+    ("Low coverage", 13),
+    ("Document", 36),
+    ("GeM listing", 50),
 )
 _GENERAL_COLUMNS: Final = (
     ("Category", 22),
@@ -280,6 +293,32 @@ def _by_status_sheet(sheet: Worksheet, report: TenderReport) -> None:
     _finish_table(sheet)
 
 
+def _top_vendors_sheet(sheet: Worksheet, report: TenderReport) -> None:
+    """Each item's best vendors (catalogue makers and GeM sellers), best first."""
+    sheet.title = "Top vendors"
+    _table(sheet, _TOP_VENDOR_COLUMNS)
+    for item in report.items:
+        for v in item.top_vendors:
+            source = "GeM listing (seller)" if v.source is VendorSource.GEM_LISTING else "catalogue"
+            _write_row(
+                sheet,
+                [
+                    item.item.item_no,
+                    item.item.title,
+                    v.rank,
+                    v.manufacturer,
+                    source,
+                    _pct(v.score.compatibility_pct),
+                    _pct(v.score.coverage_pct),
+                    f"{v.score.decided}/{v.score.total}",
+                    "yes" if v.low_coverage else "no",
+                    v.document,
+                    v.source_url or "",
+                ],
+            )
+    _finish_table(sheet)
+
+
 def _general_sheet(sheet: Worksheet, report: TenderReport) -> None:
     sheet.title = "General"
     _table(sheet, _GENERAL_COLUMNS)
@@ -317,6 +356,7 @@ def excel_report(report: TenderReport) -> bytes:
     assert isinstance(summary, Worksheet)  # noqa: S101 - a new workbook has one normal sheet
     _summary_sheet(summary, report)
     _requirements_sheet(book.create_sheet(), report)
+    _top_vendors_sheet(book.create_sheet(), report)
     _by_status_sheet(book.create_sheet(), report)
     _general_sheet(book.create_sheet(), report)
     output = BytesIO()

@@ -15,6 +15,7 @@ from app.schemas.enums import (
     ExtractionStatus,
     MatchStatus,
     Operator,
+    VendorSource,
 )
 from app.schemas.matching import Comparison, Evidence, LabelBasis, SubTypeFit
 from app.schemas.report import (
@@ -23,6 +24,7 @@ from app.schemas.report import (
     ExtractionIssue,
     ExtractionQuality,
     ItemReport,
+    ItemVendor,
     ManufacturerItemReport,
     RankingEntry,
     Score,
@@ -161,9 +163,9 @@ def _flat(sheet: Worksheet) -> str:
     return " | ".join(str(v) for row in _rows(sheet) for v in row if v is not None)
 
 
-def test_the_workbook_has_the_four_sheets() -> None:
+def test_the_workbook_has_the_five_sheets() -> None:
     book = load_workbook(BytesIO(excel_report(_report())))
-    assert book.sheetnames == ["Summary", "Requirements", "By status", "General"]
+    assert book.sheetnames == ["Summary", "Requirements", "Top vendors", "By status", "General"]
 
 
 def test_summary_shows_revision_ranking_and_the_formula_in_words() -> None:
@@ -320,3 +322,32 @@ def test_status_lists_group_and_keep_status_order() -> None:
     assert block.manufacturer == "Acme"
     assert list(block.lists) == [MatchStatus.FULL_MATCH, MatchStatus.UNSUPPORTED]
     assert block.lists[MatchStatus.FULL_MATCH][0].requirement == "BODY : WCB"
+
+
+def test_top_vendors_sheet_lists_each_items_best_vendors() -> None:
+    report = _report()
+    vendors = [
+        ItemVendor(
+            rank=1,
+            manufacturer="Acme",
+            score=SCORE,
+            low_coverage=True,
+            source=VendorSource.CATALOGUE,
+            document="alpha.pdf",
+        ),
+        ItemVendor(
+            rank=2,
+            manufacturer="ZOLOTO",
+            score=SCORE,
+            low_coverage=True,
+            source=VendorSource.GEM_LISTING,
+            document="ZOLOTO Butterfly Valves 100",
+            source_url="https://mkp.gem.gov.in/x/p-1-1-cat.html",
+        ),
+    ]
+    item = report.items[0].model_copy(update={"top_vendors": vendors})
+    rows = _rows(_sheet(report.model_copy(update={"items": [item]}), "Top vendors"))
+    assert rows[0][:5] == ["Item", "Item title", "Rank", "Vendor", "Source"]
+    assert rows[1][:5] == ["10", "VALVE", 1, "Acme", "catalogue"]
+    assert rows[2][3:5] == ["ZOLOTO", "GeM listing (seller)"]
+    assert rows[2][-1] == "https://mkp.gem.gov.in/x/p-1-1-cat.html"

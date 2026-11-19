@@ -61,6 +61,7 @@ def _summary(result: DocumentResult) -> CandidateSummary:
         sha256=result.sha256,
         title=result.title,
         sub_type_fit=result.sub_type_fit,
+        seller_declared=result.seller_declared,
         critical_met=result.critical_met,
         critical_failed=result.critical_failed,
         product_heading=result.product_heading,

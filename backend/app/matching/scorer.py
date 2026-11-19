@@ -6,14 +6,15 @@ show up in coverage % = decided / all atomic requirements instead (not_applicabl
 count at all). Every requirement weighs
 1 for now (no weights are printed in tenders yet). Ranking: manufacturers below the minimum
 coverage are marked and listed after the others, so a high score on little evidence never
-leads; within each group by compatibility, then coverage, with nothing decided last.
+leads; within each group by compatibility, then coverage, with nothing decided last. The same
+order picks each item's top vendors (`top_vendors`), on that item's results alone.
 """
 
 from collections.abc import Mapping, Sequence
 
-from app.schemas.enums import MatchStatus
+from app.schemas.enums import MatchStatus, VendorSource
 from app.schemas.matching import Comparison
-from app.schemas.report import RankingEntry, Score
+from app.schemas.report import ItemVendor, ManufacturerItemReport, RankingEntry, Score
 
 _PERCENT = 100.0
 
@@ -87,15 +88,7 @@ def rank(
         Entries best first: enough coverage, compatibility (None last), coverage, then name.
     """
     scored = [(m, score(cs, status_scores)) for m, cs in by_manufacturer.items()]
-    scored.sort(
-        key=lambda ms: (
-            ms[1].coverage_pct < min_coverage_pct,
-            ms[1].compatibility_pct is None,
-            -(ms[1].compatibility_pct or 0.0),
-            -ms[1].coverage_pct,
-            ms[0],
-        )
-    )
+    scored.sort(key=lambda ms: _order(ms[0], ms[1], min_coverage_pct))
     return [
         RankingEntry(
             rank=i,
@@ -106,3 +99,61 @@ def rank(
         )
         for i, (m, s) in enumerate(scored, start=1)
     ]
+
+
+def _order(name: str, s: Score, min_coverage_pct: float) -> tuple[bool, bool, float, float, str]:
+    """Sort key shared by the tender ranking and the per-item top vendors."""
+    return (
+        s.coverage_pct < min_coverage_pct,
+        s.compatibility_pct is None,
+        -(s.compatibility_pct or 0.0),
+        -s.coverage_pct,
+        name,
+    )
+
+
+def _source_url(report: ManufacturerItemReport) -> str | None:
+    """The GeM listing page cited by the vendor's results, if any."""
+    return next(
+        (e.source_url for c in report.results for e in c.evidence if e.source_url), None
+    )
+
+
+def top_vendors(
+    manufacturers: Sequence[ManufacturerItemReport], min_coverage_pct: float, limit: int
+) -> list[ItemVendor]:
+    """The best vendors for one item: a document chosen for it and at least one decision.
+
+    Ordered like the tender ranking (enough coverage first, then compatibility, coverage,
+    name), on the item's results alone. A vendor whose only evidence is a GeM listing is
+    marked as such, with the listing page.
+
+    Args:
+        manufacturers: The item's per-manufacturer reports (scores already worked out).
+        min_coverage_pct: Coverage below this marks the vendor `low_coverage`.
+        limit: How many to keep.
+
+    Returns:
+        At most `limit` vendors, best first.
+    """
+    eligible = [
+        m
+        for m in manufacturers
+        if (m.chosen or m.tied_documents) and m.score.compatibility_pct is not None
+    ]
+    eligible.sort(key=lambda m: _order(m.manufacturer, m.score, min_coverage_pct))
+    out: list[ItemVendor] = []
+    for i, m in enumerate(eligible[:limit], start=1):
+        gem = m.chosen is not None and m.chosen.seller_declared
+        out.append(
+            ItemVendor(
+                rank=i,
+                manufacturer=m.manufacturer,
+                score=m.score,
+                low_coverage=m.score.coverage_pct < min_coverage_pct,
+                source=VendorSource.GEM_LISTING if gem else VendorSource.CATALOGUE,
+                document=m.chosen.title if m.chosen else ", ".join(m.tied_documents),
+                source_url=_source_url(m) if gem else None,
+            )
+        )
+    return out

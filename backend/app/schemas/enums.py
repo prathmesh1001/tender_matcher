@@ -138,3 +138,10 @@ class RunStatus(StrEnum):
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
+
+
+class VendorSource(StrEnum):
+    """Where a vendor's evidence for an item comes from."""
+
+    CATALOGUE = "catalogue"  # a manufacturer catalogue or datasheet
+    GEM_LISTING = "gem_listing"  # a GeM Marketplace listing (seller-declared)

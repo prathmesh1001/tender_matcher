@@ -188,6 +188,57 @@ describe("ReportPage", () => {
     expect(screen.queryAllByText(/^Confidence/)).toHaveLength(1);
   });
 
+  it("lists each item's best vendors and marks a GeM seller", async () => {
+    const [item] = REPORT.items;
+    if (item === undefined) throw new Error("fixture has an item");
+    serve({
+      ...REPORT,
+      items: [
+        {
+          ...item,
+          top_vendors: [
+            {
+              rank: 1,
+              manufacturer: "Acme",
+              score: SCORE,
+              low_coverage: false,
+              source: "catalogue",
+              document: "alpha.pdf",
+              source_url: null,
+            },
+            {
+              rank: 2,
+              manufacturer: "ZOLOTO",
+              score: SCORE,
+              low_coverage: true,
+              source: "gem_listing",
+              document: "ZOLOTO Butterfly Valves 100",
+              source_url: "https://mkp.gem.gov.in/x/p-1-1-cat.html",
+            },
+          ],
+        },
+      ],
+    });
+    await openReport();
+    const card = screen.getByRole("heading", { name: "Best vendors per item" }).closest("section");
+    if (card === null) throw new Error("card section");
+    const box = within(card);
+    expect(box.getByText("Item 10: BALL VALVE")).toBeInTheDocument();
+    expect(box.getByText("#1 Acme")).toBeInTheDocument();
+    expect(box.getByText("Catalogue: alpha.pdf")).toBeInTheDocument();
+    expect(box.getByRole("link", { name: "ZOLOTO Butterfly Valves 100" })).toHaveAttribute(
+      "href",
+      "https://mkp.gem.gov.in/x/p-1-1-cat.html",
+    );
+    expect(box.getByText("GeM listing (seller-declared)")).toBeInTheDocument();
+  });
+
+  it("says when no vendor decided anything for an item", async () => {
+    serve();
+    await openReport();
+    expect(screen.getByText("No vendor has a decided requirement yet.")).toBeInTheDocument();
+  });
+
   it("shows the revision, ranking, formula and export links", async () => {
     serve();
     await openReport();

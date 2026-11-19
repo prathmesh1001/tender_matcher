@@ -457,6 +457,12 @@ class Settings(BaseSettings):
         le=1,
         description="Tender is unreliable if this share of item requirements cite such pages.",
     )
+    REPORT_TOP_VENDORS_PER_ITEM: int = Field(
+        default=3,
+        ge=1,
+        le=20,
+        description="Vendors listed per item as its best (catalogue makers and GeM sellers).",
+    )
     RANKING_MIN_COVERAGE_PCT: float = Field(
         default=50.0,
         ge=0,

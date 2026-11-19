@@ -51,6 +51,7 @@ class SelectionOptions:
     status_scores: dict[MatchStatus, float]
     quote_threshold: float
     min_coverage_pct: float
+    top_vendors_per_item: int = 3
     overview_min_headings: int = 3
     page_title_max_words: int = 5
     product_label_words: frozenset[str] = frozenset()
@@ -63,6 +64,7 @@ class SelectionOptions:
             status_scores={MatchStatus(k): v for k, v in settings.STATUS_SCORES.items()},
             quote_threshold=settings.QUOTE_MATCH_THRESHOLD,
             min_coverage_pct=settings.RANKING_MIN_COVERAGE_PCT,
+            top_vendors_per_item=settings.REPORT_TOP_VENDORS_PER_ITEM,
             overview_min_headings=settings.CATALOGUE_OVERVIEW_MIN_HEADINGS,
             page_title_max_words=settings.CATALOGUE_PAGE_TITLE_MAX_WORDS,
             product_label_words=frozenset(stem_token(w) for w in settings.PRODUCT_TYPE_LABEL_WORDS),

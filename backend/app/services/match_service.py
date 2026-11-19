@@ -48,7 +48,7 @@ from app.matching.engine import (
 )
 from app.matching.listing_source import WithListings, load_listings
 from app.matching.llm_judge import ItemJudge
-from app.matching.scorer import rank, score_explanation
+from app.matching.scorer import rank, score_explanation, top_vendors
 from app.ontology.loader import load_ontologies
 from app.ontology.schema import Ontology
 from app.reporting.status_lists import status_lists
@@ -356,6 +356,7 @@ class MatchService:
             note = "extraction unreliable: " + ", ".join(r.code.value for r in quality.reasons)
             reports = [item_for_review(r, note, self._selection) for r in reports]
             general = for_review(general, note)
+        reports = [self._with_top_vendors(r) for r in reports]
         return TenderReport(
             tender=tender,
             bid_number=parsed.bid_number,
@@ -491,6 +492,15 @@ class MatchService:
             [report], self._source, self._confidence, self._selection.status_scores
         )[0]
         return item_for_review(report, review_note, self._selection) if review_note else report
+
+    def _with_top_vendors(self, report: ItemReport) -> ItemReport:
+        """The item with its best vendors listed (after review notes changed the scores)."""
+        best = top_vendors(
+            report.manufacturers,
+            self._selection.min_coverage_pct,
+            self._selection.top_vendors_per_item,
+        )
+        return report.model_copy(update={"top_vendors": best})
 
     def _ranking(self, reports: Sequence[ItemReport]) -> list[RankingEntry]:
         """Tender-level ranking over all items' results."""

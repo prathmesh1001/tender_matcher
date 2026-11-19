@@ -2,9 +2,10 @@
 
 import pytest
 
-from app.matching.scorer import rank, score
-from app.schemas.enums import DecisionSource, MatchStatus
-from app.schemas.matching import Comparison, LabelBasis
+from app.matching.scorer import rank, score, top_vendors
+from app.schemas.enums import DecisionSource, MatchStatus, VendorSource
+from app.schemas.matching import Comparison, Evidence, LabelBasis, SubTypeFit
+from app.schemas.report import CandidateSummary, ManufacturerItemReport
 
 SCORES = {
     MatchStatus.FULL_MATCH: 1.0,
@@ -85,3 +86,80 @@ def test_everyone_below_the_minimum_still_ranks_by_compatibility() -> None:
         75.0,
     )
     assert [(r.manufacturer, r.low_coverage) for r in ranking] == [("High", True), ("Low", True)]
+
+
+# ---------------------------------------------------------------- top vendors per item
+
+
+def _vendor(
+    name: str, statuses: list[MatchStatus], gem: bool = False, document: bool = True
+) -> ManufacturerItemReport:
+    results = [_c(s) for s in statuses]
+    if gem:
+        results = [
+            r.model_copy(update={"evidence": [_gem_evidence()]}) if i == 0 else r
+            for i, r in enumerate(results)
+        ]
+    chosen = CandidateSummary(
+        document=f"{name}.pdf",
+        sha256="0" * 64,
+        title=f"{name} listing" if gem else f"{name} catalogue",
+        sub_type_fit=SubTypeFit.UNKNOWN,
+        seller_declared=gem,
+        fit_score=0.0,
+        decided=0,
+    )
+    return ManufacturerItemReport(
+        manufacturer=name,
+        chosen=chosen if document else None,
+        candidates=[chosen] if document else [],
+        results=results,
+        score=score(results, SCORES),
+    )
+
+
+def _gem_evidence() -> Evidence:
+    return Evidence(
+        document="x.html",
+        sha256="0" * 64,
+        title="GeM listing",
+        page_number=1,
+        label="Material",
+        value="SS316",
+        quote="Material SS316",
+        quote_parts=["Material", "SS316"],
+        source_url="https://mkp.gem.gov.in/x/p-1-1-cat.html",
+        seller_declared=True,
+    )
+
+
+def test_top_vendors_are_the_best_three_for_the_item() -> None:
+    vendors = [
+        _vendor("KSB", [FULL, FULL, PARTIAL]),  # 83 %, coverage 100
+        _vendor("Kirloskar", [FULL, FULL]),  # 100 %
+        _vendor("ZOLOTO", [FULL, MISSING], gem=True),  # 50 %, from a GeM listing
+        _vendor("Lowara", [MISSING, MISSING]),  # 0 %
+        _vendor("DAB", [UNSUPPORTED, UNSUPPORTED]),  # nothing decided: never listed
+    ]
+    top = top_vendors(vendors, min_coverage_pct=50.0, limit=3)
+    assert [(v.rank, v.manufacturer) for v in top] == [(1, "Kirloskar"), (2, "KSB"), (3, "ZOLOTO")]
+    gem = top[2]
+    assert gem.source is VendorSource.GEM_LISTING
+    assert gem.source_url == "https://mkp.gem.gov.in/x/p-1-1-cat.html"
+    assert top[0].source is VendorSource.CATALOGUE
+    assert top[0].source_url is None
+
+
+def test_low_coverage_vendors_come_after_well_covered_ones() -> None:
+    vendors = [
+        _vendor("Narrow", [FULL, UNSUPPORTED, UNSUPPORTED, UNSUPPORTED]),  # 100 %, 25 % covered
+        _vendor("Broad", [FULL, PARTIAL, MISSING, FULL]),  # 62.5 %, 100 % covered
+    ]
+    top = top_vendors(vendors, min_coverage_pct=50.0, limit=3)
+    assert [v.manufacturer for v in top] == ["Broad", "Narrow"]
+    assert top[1].low_coverage is True
+
+
+def test_a_vendor_without_a_document_for_the_item_is_not_listed() -> None:
+    vendors = [_vendor("NoDoc", [FULL], document=False), _vendor("KSB", [PARTIAL])]
+    assert [v.manufacturer for v in top_vendors(vendors, 50.0, 3)] == ["KSB"]

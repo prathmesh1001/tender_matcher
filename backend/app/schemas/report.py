@@ -4,7 +4,12 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.enums import ExtractionIssueCode, ExtractionStatus, MatchStatus
+from app.schemas.enums import (
+    ExtractionIssueCode,
+    ExtractionStatus,
+    MatchStatus,
+    VendorSource,
+)
 from app.schemas.matching import Comparison, SubTypeFit
 from app.schemas.requirements import LineItem, Requirement
 
@@ -35,6 +40,9 @@ class CandidateSummary(BaseModel):
     sha256: str
     title: str
     sub_type_fit: SubTypeFit
+    seller_declared: bool = Field(
+        default=False, description="A GeM listing: specifications typed in by the seller."
+    )
     critical_met: float = 0.0
     critical_failed: int = 0
     product_heading: str | None = None
@@ -81,6 +89,24 @@ class ManufacturerItemReport(BaseModel):
     score: Score
 
 
+class ItemVendor(BaseModel):
+    """One of the best vendors for one item, with its score on that item alone."""
+
+    model_config = ConfigDict(frozen=True)
+
+    rank: int = Field(ge=1)
+    manufacturer: str
+    score: Score
+    low_coverage: bool = Field(
+        description="Coverage on this item is below the configured minimum; listed after others."
+    )
+    source: VendorSource
+    document: str = Field(description="Title of the document the score rests on.")
+    source_url: str | None = Field(
+        default=None, description="The GeM listing page, for a GeM vendor."
+    )
+
+
 class ItemReport(BaseModel):
     """One tender line item and how each manufacturer meets it."""
 
@@ -94,6 +120,11 @@ class ItemReport(BaseModel):
     )
     requirements: list[Requirement] = Field(description="All requirements, parents included.")
     manufacturers: list[ManufacturerItemReport]
+    top_vendors: list[ItemVendor] = Field(
+        default_factory=list,
+        description="The best vendors for this item alone (catalogue makers and GeM sellers), "
+        "ranked like the tender ranking; only vendors with a document and a decision.",
+    )
 
 
 class RankingEntry(BaseModel):

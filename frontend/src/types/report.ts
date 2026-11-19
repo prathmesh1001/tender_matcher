@@ -73,11 +73,29 @@ export interface ManufacturerItemReport {
   score: Score;
 }
 
+/** Where a vendor's evidence for an item comes from. */
+export type VendorSource = "catalogue" | "gem_listing";
+
+/** One of the best vendors for one item, scored on that item alone. */
+export interface ItemVendor {
+  rank: number;
+  manufacturer: string;
+  score: Score;
+  low_coverage: boolean;
+  source: VendorSource;
+  /** Title of the document the score rests on. */
+  document: string;
+  /** The GeM listing page, for a GeM vendor. */
+  source_url: string | null;
+}
+
 export interface ItemReport {
   item: { item_no: string; title: string; quantity: string | null; unit: string | null };
   product_type: string | null;
   requirements: Requirement[];
   manufacturers: ManufacturerItemReport[];
+  /** The best vendors for this item (absent in reports made before it existed). */
+  top_vendors?: ItemVendor[];
 }
 
 export interface RankingEntry {

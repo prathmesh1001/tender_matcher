@@ -9,6 +9,7 @@ import { GeneralTable } from "../features/report/GeneralTable";
 import { ReportSummary } from "../features/report/ReportSummary";
 import { ReportWarnings } from "../features/report/ReportWarnings";
 import { RequirementTable } from "../features/report/RequirementTable";
+import { TopVendors } from "../features/report/TopVendors";
 import { useReport, useRun } from "../hooks/queries";
 
 const EXPORT_LINK =
@@ -88,6 +89,7 @@ export function ReportPage() {
         </div>
         <DiscoveryPanel runId={runId} />
         <ReportSummary report={data} />
+        <TopVendors report={data} />
         <RequirementTable report={data} />
         <GeneralTable report={data} />
       </div>
