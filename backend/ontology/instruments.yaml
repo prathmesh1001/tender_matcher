@@ -54,8 +54,15 @@ attributes:
   - name: insertion_length
     dimension: length
     canonical_unit: mm
-    synonyms: [insertion length, immersion length, thermowell immersion length,
-               tw immersion length, length of thermocouple, length]
+    synonyms: [insertion length, immersion length, length of thermocouple, length]
+  # The thermowell's own length (U), never the sensor's insertion length: a "Thermocouple
+  # with Thermowell" item asks both, and a sensor catalogue's 30 mm says nothing about a
+  # 280 mm thermowell (like-for-like: same component).
+  - name: thermowell_length
+    dimension: length
+    canonical_unit: mm
+    synonyms: [thermowell immersion length, thermowell insertion length, thermowell length,
+               tw immersion length, tw insertion length, tw length]
   - name: max_temperature
     dimension: temperature
     canonical_unit: degC

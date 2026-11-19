@@ -884,3 +884,31 @@ def test_another_products_row_or_a_missing_code_is_no_evidence(valves: Ontology)
     untagged = located_fields([_several_product_row(None)], OPTIONS.fields)
     other = compare(_butterfly("Testing Standard : ISO 5208", valves), untagged, ctx, OPTIONS)
     assert other.status is UNSUPPORTED
+
+
+# ---------------------------------------------------------------- one component per attribute
+
+
+@pytest.fixture(scope="module")
+def instruments() -> Ontology:
+    return load_ontology_file(ONTOLOGY_DIR / "instruments.yaml")
+
+
+def test_a_thermowell_length_is_never_the_sensor_length(instruments: Ontology) -> None:
+    # 7865644: "Thermocouple with Thermowell"; the sensor catalogue prints only its own length.
+    sensor = _prose("Insertion length: 30 mm")
+    result = _compare("Thermowell immersion length : 280 MM", [sensor], instruments)
+    assert result.status is MatchStatus.UNSUPPORTED
+
+
+def test_a_thermowell_length_meets_a_printed_thermowell_length(instruments: Ontology) -> None:
+    well = _prose("Thermowell length: 100 to 500 mm")
+    result = _compare("Thermowell immersion length : 280 MM", [well], instruments)
+    assert result.status is MatchStatus.FULL_MATCH
+
+
+def test_a_plain_immersion_length_is_still_the_insertion_length(instruments: Ontology) -> None:
+    sensor = _prose("Insertion length: 100 to 500 mm")
+    assert _compare("Immersion length : 280 MM", [sensor], instruments).status is (
+        MatchStatus.FULL_MATCH
+    )
