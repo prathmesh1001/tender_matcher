@@ -73,6 +73,21 @@ Without Docker the default `JOB_QUEUE_BACKEND=thread` runs jobs on a thread insi
 keep to a single uvicorn worker and do not run a host uvicorn against the container's database:
 startup marks unfinished runs failed, which would fail the other process's running jobs.
 
+### Worker on the host (small machines)
+
+On a PC with little RAM, Docker gets about half of it, and the worker (embedding model about
+2.2 GB plus every catalogue) starts swapping: searches became up to 30 times slower on a 7.3 GB PC.
+Run the worker on the host instead; it then also uses an NVIDIA GPU if there is one. The API,
+database, Redis and web page stay in Docker:
+
+```powershell
+docker compose stop worker
+docker compose -f docker-compose.yml -f docker-compose.host-worker.yml up -d
+powershell -File scripts/host_worker.ps1   # leave this window open
+```
+
+Back to the Docker worker: stop the script, then `docker compose up -d`.
+
 ### Files in Postgres (optional)
 
 PDFs live in the mounted `data/` folder by default. To keep them in the database instead (one copy

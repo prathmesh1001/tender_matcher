@@ -1,0 +1,15 @@
+# Run the worker on the host (with its GPU and all of its RAM) instead of in Docker.
+#
+# A machine with little memory gives Docker about half of it; the worker holds the embedding
+# model (~2.2 GB) and every catalogue, and swapping made searches up to 30x slower (measured on
+# a 7.3 GB PC: 3.5 GB for Docker). The API, database, Redis and web page stay in Docker.
+#
+#   docker compose stop worker
+#   docker compose -f docker-compose.yml -f docker-compose.host-worker.yml up -d
+#   powershell -File scripts/host_worker.ps1
+services:
+  redis:
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"  # localhost only: the host worker reads the queue
+  worker:
+    profiles: ["docker-worker"]  # not started; `--profile docker-worker` brings it back
