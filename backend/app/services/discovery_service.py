@@ -14,6 +14,7 @@ checked run is never changed. No LLM is called.
 """
 
 import logging
+import multiprocessing
 import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
@@ -25,7 +26,11 @@ from typing import Protocol
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
-from app.core.exceptions import DiscoveryDisabledError, InvalidInputError
+from app.core.exceptions import (
+    DiscoveryDisabledError,
+    ExternalServiceError,
+    InvalidInputError,
+)
 from app.core.logging import log_context
 from app.db.models import DiscoveryJob, Run
 from app.db.repositories import (
@@ -337,7 +342,9 @@ class DiscoveryService:
         if not (settings.DISCOVERY_ENABLED and settings.GEM_IN_RUN):
             return None
         started = time.monotonic()
-        types = self._matcher().item_types(tender)
+        # Only ontology product types: a title key of an item naming none is often a mis-read
+        # line ("transportation" found GeM ventilators); those keep the check asked by hand.
+        types = [t for t in self._matcher().item_types(tender) if not t.by_title]
         if not types:
             return None
         with session_scope(self._session_factory) as session:
@@ -361,15 +368,50 @@ class DiscoveryService:
             run_id=str(run_id),
             jobs=queued,
             deadline=started + settings.GEM_RUN_BUDGET_SECONDS,
-            check=self._check_in_run,
+            check=self._check_in_process if settings.GEM_CHECK_IN_PROCESS else self.check_in_run,
             late=lambda late: self._late_types(run_id, late, [j for j, _ in queued]),
         )
         branch.start()
         logger.info("gem branch started", extra={"types": [t.product_type for t in types]})
         return branch
 
-    def _check_in_run(self, job_id: uuid.UUID, item_type: UncoveredType) -> list[str]:
-        """One type of a run's GeM branch; the job is finished here, even on failure."""
+    def _check_in_process(self, job_id: uuid.UUID, item_type: UncoveredType) -> list[str]:
+        """`check_in_run` in a spawned child process; the brands are read from its job.
+
+        Raises:
+            ExternalServiceError: If the child process failed (its job is marked failed).
+        """
+        from app.workers.gem_check import run_gem_check  # the child imports it again
+
+        process = multiprocessing.get_context("spawn").Process(
+            target=run_gem_check,
+            args=(str(job_id), item_type.product_type, item_type.category, item_type.titles),
+            name=f"gem-{item_type.product_type}",
+            daemon=True,
+        )
+        process.start()
+        process.join()
+        with session_scope(self._session_factory) as session:
+            job = DiscoveryJobRepository(session).get_or_raise(job_id)
+            status, error = job.status, job.error
+        if process.exitcode != 0 and status is not DiscoveryStatus.FAILED:
+            reason = f"GeM check process ended with exit code {process.exitcode}"
+            self._finish(job_id, DiscoveryStatus.FAILED, error=reason)
+            raise ExternalServiceError(reason, details={"type": item_type.product_type})
+        if status is DiscoveryStatus.DONE and error is None:
+            return self._listing_brands(item_type.product_type)
+        return []
+
+    def check_in_run(self, job_id: uuid.UUID, item_type: UncoveredType) -> list[str]:
+        """One type of a run's GeM branch; the job is finished here, even on failure.
+
+        Args:
+            job_id: The type's discovery job.
+            item_type: The product type, category and item titles.
+
+        Returns:
+            Brands of every stored listing of the type; empty when none is kept.
+        """
         with session_scope(self._session_factory) as session:
             DiscoveryJobRepository(session).get_or_raise(job_id).status = DiscoveryStatus.RUNNING
         try:

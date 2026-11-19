@@ -674,6 +674,11 @@ class Settings(BaseSettings):
         "product types, in parallel with the catalogue matching, and adds the listing vendors "
         "to the same report.",
     )
+    GEM_CHECK_IN_PROCESS: bool = Field(
+        default=True,
+        description="Run each GeM check of a run's GeM branch in a child process, so storing "
+        "listings never slows the catalogue matching (they share one interpreter lock).",
+    )
     GEM_RUN_BUDGET_SECONDS: float = Field(
         default=120.0,
         ge=0,
