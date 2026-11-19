@@ -35,7 +35,7 @@ product_types:
       - name: trunnion_mounted
         synonyms: [trunnion mounted, trunnion]
   - name: butterfly_valve
-    synonyms: [butterfly valve, butterfly, bfv, hpbfv, tobv]
+    synonyms: [butterfly valve, butterfly, btrfly, bfly, bfv, hpbfv, tobv]  # btrfly: "BTRFLY VAL-100" (8278923)
     sub_types:
       - name: concentric
         synonyms: [concentric, centric, zero offset, resilient seated, rubber lined]
@@ -348,6 +348,8 @@ codes:
 abbreviations:
   nrv: check valve
   bfv: butterfly valve
+  btrfly: butterfly
+  bfly: butterfly
   tobv: triple offset butterfly valve
   ci: cast iron
   sg iron: ductile iron

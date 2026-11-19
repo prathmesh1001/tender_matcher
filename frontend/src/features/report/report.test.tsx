@@ -220,23 +220,26 @@ describe("ReportPage", () => {
       ],
     });
     await openReport();
-    const card = screen.getByRole("heading", { name: "Best vendors per item" }).closest("section");
+    const card = screen.getByRole("heading", { name: "Vendors per item" }).closest("section");
     if (card === null) throw new Error("card section");
-    const box = within(card);
-    expect(box.getByText("Item 10: BALL VALVE")).toBeInTheDocument();
-    expect(box.getByText("#1 Acme")).toBeInTheDocument();
-    expect(box.getByText("Catalogue: alpha.pdf")).toBeInTheDocument();
-    expect(box.getByRole("link", { name: "ZOLOTO Butterfly Valves 100" })).toHaveAttribute(
+    expect(within(card).getByText("Item 10: BALL VALVE")).toBeInTheDocument();
+    const database = within(screen.getByRole("region", { name: "From database (catalogues)" }));
+    expect(database.getByText("1. Acme")).toBeInTheDocument();
+    expect(database.getByText("alpha.pdf")).toBeInTheDocument();
+    const gem = within(screen.getByRole("region", { name: "From GeM" }));
+    expect(gem.getByRole("link", { name: "ZOLOTO Butterfly Valves 100" })).toHaveAttribute(
       "href",
       "https://mkp.gem.gov.in/x/p-1-1-cat.html",
     );
-    expect(box.getByText("GeM listing (seller-declared)")).toBeInTheDocument();
+    expect(gem.getByText("GeM listing (seller-declared)")).toBeInTheDocument();
+    expect(gem.getByText("Few checked")).toBeInTheDocument();
   });
 
-  it("says when no vendor decided anything for an item", async () => {
+  it("says when an item has no vendor from a source", async () => {
     serve();
     await openReport();
-    expect(screen.getByText("No vendor has a decided requirement yet.")).toBeInTheDocument();
+    expect(screen.getByText("No catalogue vendor.")).toBeInTheDocument();
+    expect(screen.getByText("No GeM vendor.")).toBeInTheDocument();
   });
 
   it("shows the revision, ranking, formula and export links", async () => {

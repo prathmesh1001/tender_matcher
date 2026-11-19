@@ -127,36 +127,42 @@ def _gem(report: ManufacturerItemReport) -> bool:
 def top_vendors(
     manufacturers: Sequence[ManufacturerItemReport], min_coverage_pct: float, limit: int
 ) -> list[ItemVendor]:
-    """The best vendors for one item: a document chosen for it and at least one decision.
+    """The best vendors for one item, per source: catalogues (database) and GeM listings.
 
-    Ordered like the tender ranking (enough coverage first, then compatibility, coverage,
-    name), on the item's results alone; at an equal score a catalogue vendor comes before a
-    GeM listing vendor (a datasheet is stronger evidence than a seller's declaration). A vendor
-    whose only evidence is a GeM listing is marked as such, with the listing page.
+    Only vendors with a document chosen for the item and at least one decision. Each source is
+    ranked on its own, like the tender ranking (enough coverage first, then compatibility,
+    coverage, name), on the item's results alone; catalogue vendors come first in the list. A
+    GeM vendor is marked as such, with the listing page.
 
     Args:
         manufacturers: The item's per-manufacturer reports (scores already worked out).
         min_coverage_pct: Coverage below this marks the vendor `low_coverage`.
-        limit: How many to keep.
+        limit: How many to keep from each source.
 
     Returns:
-        At most `limit` vendors, best first.
+        At most `limit` catalogue vendors, then at most `limit` GeM vendors; ranks start at 1
+        in each source.
     """
     eligible = [
         m
         for m in manufacturers
         if (m.chosen or m.tied_documents) and m.score.compatibility_pct is not None
     ]
-    eligible.sort(
-        key=lambda m: (
-            *_order(m.manufacturer, m.score, min_coverage_pct)[:-1],
-            _gem(m),
-            m.manufacturer,
-        )
-    )
+    eligible.sort(key=lambda m: _order(m.manufacturer, m.score, min_coverage_pct))
+    catalogue = [m for m in eligible if not _gem(m)][:limit]
+    gem_listings = [m for m in eligible if _gem(m)][:limit]
+    return [
+        *_vendors(catalogue, min_coverage_pct, gem=False),
+        *_vendors(gem_listings, min_coverage_pct, gem=True),
+    ]
+
+
+def _vendors(
+    ranked: Sequence[ManufacturerItemReport], min_coverage_pct: float, gem: bool
+) -> list[ItemVendor]:
+    """Ranked vendors of one source as `ItemVendor`s, ranks from 1."""
     out: list[ItemVendor] = []
-    for i, m in enumerate(eligible[:limit], start=1):
-        gem = _gem(m)
+    for i, m in enumerate(ranked, start=1):
         out.append(
             ItemVendor(
                 rank=i,

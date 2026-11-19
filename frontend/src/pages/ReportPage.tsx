@@ -75,7 +75,7 @@ export function ReportPage() {
     <>
       <PageBanner
         title={`Tender ${data.bid_number}`}
-        subtitle={`bid.pdf ${revision}. Read from ${data.tender_files.join(", ")}. Decided by ${data.decided_by}.`}
+        subtitle="Vendors from the database and from GeM"
       />
       <div className="space-y-6">
         <ReportWarnings report={data} />
@@ -87,11 +87,22 @@ export function ReportPage() {
             Export JSON
           </a>
         </div>
-        <DiscoveryPanel runId={runId} />
-        <ReportSummary report={data} />
         <TopVendors report={data} />
-        <RequirementTable report={data} />
-        <GeneralTable report={data} />
+        <details className="rounded-xl border border-line bg-white p-4">
+          <summary className="cursor-pointer font-semibold">
+            Details: scores, every requirement with its evidence, GeM checks
+          </summary>
+          <div className="mt-4 space-y-6">
+            <p className="text-sm text-ink-600">
+              bid.pdf {revision}. Read from {data.tender_files.join(", ")}. Decided by{" "}
+              {data.decided_by}.
+            </p>
+            <DiscoveryPanel runId={runId} />
+            <ReportSummary report={data} />
+            <RequirementTable report={data} />
+            <GeneralTable report={data} />
+          </div>
+        </details>
       </div>
     </>
   );

@@ -142,8 +142,13 @@ def test_top_vendors_are_the_best_three_for_the_item() -> None:
         _vendor("DAB", [UNSUPPORTED, UNSUPPORTED]),  # nothing decided: never listed
     ]
     top = top_vendors(vendors, min_coverage_pct=50.0, limit=3)
-    assert [(v.rank, v.manufacturer) for v in top] == [(1, "Kirloskar"), (2, "KSB"), (3, "ZOLOTO")]
-    gem = top[2]
+    assert [(v.rank, v.manufacturer) for v in top] == [
+        (1, "Kirloskar"),
+        (2, "KSB"),
+        (3, "Lowara"),
+        (1, "ZOLOTO"),  # GeM vendors are ranked on their own, after the catalogue ones
+    ]
+    gem = top[3]
     assert gem.source is VendorSource.GEM_LISTING
     assert gem.source_url == "https://mkp.gem.gov.in/x/p-1-1-cat.html"
     assert top[0].source is VendorSource.CATALOGUE
@@ -165,13 +170,16 @@ def test_a_vendor_without_a_document_for_the_item_is_not_listed() -> None:
     assert [v.manufacturer for v in top_vendors(vendors, 50.0, 3)] == ["KSB"]
 
 
-def test_at_an_equal_score_a_catalogue_vendor_comes_before_a_gem_listing() -> None:
+def test_each_source_keeps_its_own_best_vendors() -> None:
     vendors = [
-        _vendor("Alpha", [FULL, FULL], gem=True),  # name first, but seller-declared
-        _vendor("Zeta", [FULL, FULL]),
+        _vendor("Alpha", [FULL, FULL], gem=True),
+        _vendor("Beta", [FULL, PARTIAL], gem=True),
+        _vendor("Gamma", [PARTIAL, PARTIAL], gem=True),
+        _vendor("Zeta", [MISSING, PARTIAL]),
     ]
-    top = top_vendors(vendors, min_coverage_pct=50.0, limit=3)
-    assert [(v.manufacturer, v.source) for v in top] == [
-        ("Zeta", VendorSource.CATALOGUE),
-        ("Alpha", VendorSource.GEM_LISTING),
+    top = top_vendors(vendors, min_coverage_pct=50.0, limit=2)
+    assert [(v.rank, v.manufacturer, v.source) for v in top] == [
+        (1, "Zeta", VendorSource.CATALOGUE),  # a weaker catalogue vendor is still listed
+        (1, "Alpha", VendorSource.GEM_LISTING),
+        (2, "Beta", VendorSource.GEM_LISTING),
     ]
