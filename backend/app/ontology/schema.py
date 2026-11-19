@@ -137,6 +137,12 @@ class Ontology(BaseModel):
         "types, the one named before the first such word is the item ('Thermocouple with "
         "Thermowell' is a thermocouple). Empty: a title naming several types has none.",
     )
+    part_words: list[str] = Field(
+        default_factory=list,
+        description="Words that, printed after a product name, make the name a part, tool or "
+        "service for that product, not the product ('Valve Repair Kit', 'Thermocouple "
+        "Calibration Furnace'). Used on GeM category names and listing titles.",
+    )
     material_names: list[str] = Field(
         default_factory=list,
         description='Words that start a material value: they end a merged key ("Shaft Bronze").',

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from app.discovery.gem_parser import GemListing, parse_listing
-from app.discovery.listing_check import ListingCheck, other_product_patterns
+from app.discovery.listing_check import ListingCheck
 from app.ingestion.processing import ProcessingOptions
 from app.ingestion.product_tagger import ProductMatcher
 from app.ontology.loader import load_ontologies
@@ -55,8 +55,8 @@ def tools() -> tuple[SearchVocabulary, ProductMatcher]:
 @pytest.fixture(scope="session")
 def check(tools: tuple[SearchVocabulary, ProductMatcher]) -> ListingCheck:
     vocabulary, matcher = tools
-    others = other_product_patterns(load_ontologies(BACKEND / "ontology"), vocabulary)
-    return ListingCheck(matcher, vocabulary, min_spec_rows=5, other_products=others)
+    ontologies = load_ontologies(BACKEND / "ontology")
+    return ListingCheck.from_ontologies(ontologies, vocabulary, matcher, min_spec_rows=5)
 
 
 @pytest.fixture(scope="session")

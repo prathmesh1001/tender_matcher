@@ -23,7 +23,12 @@ product_types:
 
 other_products: [pressure gauge, temperature gauge, pressure transmitter, temperature transmitter]
 
-accessory_words: [with, along with, including, complete with]
+accessory_words: [with, along with, including, complete with, for]
+
+# After a product name, these make the name a part, tool or service for it, not the product
+# ("Thermocouple Calibration Furnace", "RTD Simulator", "Thermowell Spare Parts").
+part_words: [spare, spares, spare parts, repair, kit, tool, tools, machine, tester,
+  calibrator, calibration, furnace, simulator, trainer]
 
 label_generic_words: [moc, material, parameter, type, spec, specification, description, detail,
                       range, of, to, and, for, at, the, max, maximum, min, minimum]

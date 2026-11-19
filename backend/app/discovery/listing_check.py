@@ -13,6 +13,12 @@ product of the category with no type (`other_products`), or a GeM look-alike con
 type (`exclude` in config/gem_marketplace.yaml). A part naming one is rejected unless it still
 names the wanted type once the foreign names are taken out: "Thermocouple with Thermowell" is a
 thermocouple, "Flow Control Valve" is not a control valve.
+
+A name counts for the wanted type only where it names the product itself (ontology
+`accessory_words`, `part_words`): before "with" ("Temperature Gauge with Thermowell" is no
+thermowell) and not followed by a part, tool or service word ("Thermocouple Calibration
+Furnace", "Valve Repair Kit"). A name may also hold a synonym's words apart or in another
+order ("Submersible Sewerage Pump", "Centrifugal Cooling Water Pump"), as tender titles do.
 """
 
 from collections.abc import Mapping, Sequence
@@ -45,6 +51,42 @@ def other_product_patterns(
     return {p: phrase_patterns([p], vocabulary) for p in phrases}
 
 
+def main_name_patterns(
+    ontologies: Sequence[Ontology], vocabulary: SearchVocabulary
+) -> tuple[PhrasePatterns, PhrasePatterns]:
+    """Patterns of the ontologies' accessory words and part words.
+
+    Args:
+        ontologies: The loaded ontologies.
+        vocabulary: Compiled ontology code rules.
+
+    Returns:
+        (accessory word patterns, part word patterns) over normalized text.
+    """
+    accessory = phrase_patterns([w for o in ontologies for w in o.accessory_words], vocabulary)
+    parts = phrase_patterns([w for o in ontologies for w in o.part_words], vocabulary)
+    return accessory, parts
+
+
+def synonym_words(
+    ontologies: Sequence[Ontology], vocabulary: SearchVocabulary
+) -> dict[str, tuple[tuple[str, ...], ...]]:
+    """Normalized words of every multi-word product type synonym, by type.
+
+    Args:
+        ontologies: The loaded ontologies.
+        vocabulary: Compiled ontology code rules.
+
+    Returns:
+        Product type -> word tuples ("submersible pump" -> ("submers", "pump")).
+    """
+    found: dict[str, tuple[tuple[str, ...], ...]] = {}
+    for product in (p for o in ontologies for p in o.product_types):
+        normalized = (tuple(normalize_for_search(s, vocabulary).split()) for s in product.synonyms)
+        found[product.name] = tuple(w for w in normalized if len(w) > 1)
+    return found
+
+
 @dataclass(frozen=True, slots=True)
 class ListingCheck:
     """What a kept listing must show."""
@@ -53,6 +95,40 @@ class ListingCheck:
     vocabulary: SearchVocabulary
     min_spec_rows: int
     other_products: Mapping[str, PhrasePatterns] = field(default_factory=dict)
+    accessory_words: PhrasePatterns = ()
+    part_words: PhrasePatterns = ()
+    # Product type -> the normalized words of each of its multi-word synonyms.
+    type_words: Mapping[str, tuple[tuple[str, ...], ...]] = field(default_factory=dict)
+
+    @classmethod
+    def from_ontologies(
+        cls,
+        ontologies: Sequence[Ontology],
+        vocabulary: SearchVocabulary,
+        matcher: ProductMatcher,
+        min_spec_rows: int,
+    ) -> ListingCheck:
+        """A check with every ontology word list.
+
+        Args:
+            ontologies: The loaded ontologies.
+            vocabulary: Compiled ontology code rules.
+            matcher: Product type matcher.
+            min_spec_rows: Fewest specification rows a kept listing has.
+
+        Returns:
+            The check.
+        """
+        accessory, parts = main_name_patterns(ontologies, vocabulary)
+        return cls(
+            matcher,
+            vocabulary,
+            min_spec_rows,
+            other_product_patterns(ontologies, vocabulary),
+            accessory,
+            parts,
+            synonym_words(ontologies, vocabulary),
+        )
 
     def names_type(self, listing: GemListing, product_type: str) -> bool:
         """True if the title or a specification row names the product type.
@@ -86,6 +162,10 @@ class ListingCheck:
             other = self.foreign_in(part, product_type, excludes)
             if other:
                 return other
+            if self._names(self._normalized(part), product_type) and not self.names_type_in(
+                part, product_type
+            ):
+                return f"{product_type} accessory or part"
         return None
 
     def foreign_in(self, text: str, product_type: str, excludes: Sequence[str] = ()) -> str | None:
@@ -111,16 +191,55 @@ class ListingCheck:
         return None if self._names(rest, product_type) else named[0]
 
     def names_type_in(self, text: str, product_type: str) -> bool:
-        """True if printed text names the product type (ontology synonyms).
+        """True if printed text names the product type as the product itself.
+
+        The type must be named before any accessory word ("with") and not be followed by a
+        part word: "Ball Valve with Gear Operator" names a ball valve, "Gear Operator with
+        Ball Valve" and "Ball Valve Repair Kit" do not.
 
         Args:
-            text: Printed text.
+            text: Printed text (a GeM category name, a listing title or model).
             product_type: The ontology product type.
 
         Returns:
             Whether it is named.
         """
-        return self._names(normalize_for_search(text, self.vocabulary), product_type)
+        head = self._before_accessory(self._normalized(text))
+        if not self._names(head, product_type):
+            return self._names_words_apart(head, product_type)
+        named_at = [
+            m.end() for pattern in self.matcher.types[product_type] for m in pattern.finditer(head)
+        ]
+        # Named only inside a list ("gate and globe valves"): no single name to look after.
+        return not named_at or any(not self._part_follows(head[end:]) for end in named_at)
+
+    def _names_words_apart(self, head: str, product_type: str) -> bool:
+        """True if every word of a multi-word synonym is in `head`, apart or in another order.
+
+        "submersible sewerage pump" names a submersible pump; the words after the last synonym
+        word must not be a part word ("submersible pump cable starter").
+        """
+        tokens = head.split()
+        for synonym in self.type_words.get(product_type, ()):
+            if not set(synonym) <= set(tokens):
+                continue
+            last = max(i for i, token in enumerate(tokens) if token in synonym)
+            if not self._part_follows(" ".join(tokens[last + 1 :])):
+                return True
+        return False
+
+    def _part_follows(self, tail: str) -> bool:
+        """True if normalized text after a product name holds a part word ("repair kit")."""
+        return any(p.search(tail) for p in self.part_words)
+
+    def _normalized(self, text: str) -> str:
+        """Normalized (`search_text`) form of printed text."""
+        return normalize_for_search(text, self.vocabulary)
+
+    def _before_accessory(self, normalized: str) -> str:
+        """The text before its first accessory word; all of it if it has none."""
+        starts = [m.start() for p in self.accessory_words if (m := p.search(normalized))]
+        return normalized[: min(starts)] if starts else normalized
 
     def rejection(
         self, listing: GemListing, product_type: str, excludes: Sequence[str] = ()

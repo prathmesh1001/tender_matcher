@@ -77,3 +77,77 @@ def test_listing_slug_words_are_the_product_name() -> None:
     url = "https://mkp.gem.gov.in/mineral-insulated-thermocouple/k-type-thermocouple/p-1-2-cat.html"
     assert listing_slug_words(url) == "k type thermocouple"
     assert listing_slug_words("https://mkp.gem.gov.in/p-1-2-cat.html") == ""
+
+
+def _names(*names: str) -> list[CategoryLink]:
+    return [CategoryLink(n, n.lower().replace(" ", "-")) for n in names]
+
+
+def test_a_category_names_the_product_before_with(check: ListingCheck) -> None:
+    links = _names(
+        "Ball Valve with Gear Operator",  # the valve, with an accessory
+        "Gear Operator with Ball Valve",  # the operator
+        "Temperature Gauge with Thermowell",  # 7865644: a gauge, not a thermowell
+    )
+    assert [c.name for c in fitting_categories(links, "ball_valve", check)] == [
+        "Ball Valve with Gear Operator"
+    ]
+    assert fitting_categories(links, "thermowell", check) == []
+
+
+def test_a_part_tool_or_service_category_is_not_the_product(check: ListingCheck) -> None:
+    links = _names(
+        "Ball Valve Repair Kit",
+        "Centrifugal Pump Spare Parts",
+        "Thermocouple Calibration Furnace",  # 7865644
+        "Control Valve Pneumatic",  # a qualifier after the type is fine
+        "Centrifugal Pump for Water",
+    )
+    assert fitting_categories(links, "ball_valve", check) == []
+    assert [c.name for c in fitting_categories(links, "centrifugal_pump", check)] == [
+        "Centrifugal Pump for Water"
+    ]
+    assert fitting_categories(links, "thermocouple", check) == []
+    assert [c.name for c in fitting_categories(links, "control_valve", check)] == [
+        "Control Valve Pneumatic"
+    ]
+
+
+def test_a_list_of_types_still_names_each(check: ListingCheck) -> None:
+    # The main-name rule keeps lists; the category is still dropped as naming globe valve too.
+    assert check.names_type_in("Gate and Globe Valves", "gate_valve")
+
+
+def test_a_product_for_the_type_is_not_the_type(check: ListingCheck) -> None:
+    links = _names(
+        "Submersible Pump Starters (Motor starter controls)",
+        "PVC Insulated Cable For Submersible Pumps ISI Marked To IS 694",
+        "Submersible Pumps for Slurry Application",
+    )
+    assert [c.name for c in fitting_categories(links, "submersible_pump", check)] == [
+        "Submersible Pumps for Slurry Application"
+    ]
+
+
+def test_type_words_apart_or_reordered_still_name_the_type(check: ListingCheck) -> None:
+    links = _names(
+        "Submersible Sewerage Pump",
+        "Submersible Pumpsets (Three Phase) Conforming To IS 8034 (V2)",
+        "Centrifugal Cooling Water Pump (IOCL)",
+        "Pump Centrifugal Horizontal",
+        "Submersible Pump Cable Starter",  # a part after the type words
+    )
+    assert [c.name for c in fitting_categories(links, "submersible_pump", check)] == [
+        "Submersible Sewerage Pump",
+        "Submersible Pumpsets (Three Phase) Conforming To IS 8034 (V2)",
+    ]
+    assert [c.name for c in fitting_categories(links, "centrifugal_pump", check)] == [
+        "Centrifugal Cooling Water Pump (IOCL)",
+        "Pump Centrifugal Horizontal",
+    ]
+
+
+def test_type_words_apart_never_beat_another_type_named_whole(check: ListingCheck) -> None:
+    # "ball" and "valve" are both here, but the name is a gate valve with ball-type words.
+    links = _names("Ball Type Gate Valve")
+    assert fitting_categories(links, "ball_valve", check) == []

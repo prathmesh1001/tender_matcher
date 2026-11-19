@@ -69,3 +69,19 @@ def test_thermowell_alone_is_not_a_thermocouple(check: ListingCheck, listing: Ge
         listing, title="Unbranded Mineral Insulated Thermocouple", model="SS316 Thermowell"
     )
     assert check.foreign_product(well, "thermocouple") == "thermowell"
+
+
+def test_a_listing_naming_the_type_only_as_a_part_is_rejected(
+    check: ListingCheck, listing: GemListing
+) -> None:
+    kit = replace(listing, model="Control Valve Repair Kit 25 mm")
+    assert check.rejection(kit, "control_valve") == (
+        "names control valve accessory or part, not control valve"
+    )
+
+
+def test_a_listing_naming_the_type_only_after_with_is_rejected(
+    check: ListingCheck, listing: GemListing
+) -> None:
+    actuator = replace(listing, model="Pneumatic Actuator with Control Valve")
+    assert check.rejection(actuator, "control_valve") is not None
