@@ -93,17 +93,30 @@ def _decimal_inches(match: re.Match[str]) -> str:
     return f"{whole + int(match.group('top')) / int(match.group('bottom')):g}"
 
 
-def quantities(text: str, prefixes: Sequence[str]) -> list[Quantity]:
+def _joined_units(text: str, unit_phrases: Sequence[str]) -> str:
+    """Multi-word unit spellings right after a number written as one word ("degc")."""
+    for phrase in sorted(unit_phrases, key=len, reverse=True):
+        pattern = rf"(?<=\d)(\s*){re.escape(phrase)}(?![a-z0-9])"
+        joined = phrase.replace(" ", "").replace("\\", "\\\\")
+        text = re.sub(pattern, rf"\g<1>{joined}", text)
+    return text
+
+
+def quantities(
+    text: str, prefixes: Sequence[str], unit_phrases: Sequence[str] = ()
+) -> list[Quantity]:
     """Every quantity printed in `text`, in order (designations first).
 
     Args:
         text: A field value as printed.
         prefixes: Designations written before their number ("pn", "class", "dn").
+        unit_phrases: Folded multi-word unit spellings ("degree celsius", "deg c"); after a
+            number they become one unit word with the spaces removed ("degreecelsius").
 
     Returns:
         The quantities. A range's unit is the unit printed with either end.
     """
-    spelled = fold_text(spell_fractions(text))
+    spelled = _joined_units(fold_text(spell_fractions(text)), unit_phrases)
     folded = _INCH_FRACTION.sub(_decimal_inches, _THOUSANDS.sub("", spelled))
     folded = _INCH_THEN_MM.sub(r"\1", _MM_THEN_INCH.sub(r"\1", folded))
     found, rest = _prefixed(folded, tuple(p.lower() for p in prefixes))

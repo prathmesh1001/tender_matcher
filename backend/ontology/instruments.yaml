@@ -90,8 +90,16 @@ material_names: [stainless steel, ss, inconel, incoloy, carbon steel, alloy stee
 
 units:
   mm: mm
+  millimeter: mm
+  millimeters: mm
+  millimetre: mm
+  millimetres: mm
   cm: cm
   m: m
+  meter: m
+  meters: m
+  metre: m
+  metres: m
   in: inch
   inch: inch
   inches: inch
@@ -102,3 +110,8 @@ units:
   degc: degC
   c: degC
   oc: degC
+  # Spelled out on GeM listings ("400 degree Celsius", "0-600 deg Celsius"): read as one unit.
+  degree celsius: degC
+  degrees celsius: degC
+  deg celsius: degC
+  degree c: degC

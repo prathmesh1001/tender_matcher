@@ -158,6 +158,23 @@ def nps_to_dn(ontology: Ontology, nps: str) -> int:
     return table[wanted]
 
 
+def known_unit(ontology: Ontology, unit: str) -> str | None:
+    """The pint unit of a folded spelling; a multi-word one may be joined ("degreecelsius").
+
+    Args:
+        ontology: Unit spellings.
+        unit: A folded spelling as printed.
+
+    Returns:
+        The pint expression, or None if the spelling is not known.
+    """
+    expr = ontology.units.get(unit) or ontology.prefix_units.get(unit)
+    if expr is not None:
+        return expr
+    joined = {k.replace(" ", ""): v for k, v in ontology.units.items() if " " in k}
+    return joined.get(unit)
+
+
 def canonical_number(
     number: float, unit: str | None, attribute: Attribute, ontology: Ontology
 ) -> float | None:
@@ -174,7 +191,7 @@ def canonical_number(
     """
     if unit is None or attribute.canonical_unit is None:
         return None
-    expr = ontology.units.get(unit) or ontology.prefix_units.get(unit)
+    expr = known_unit(ontology, unit)
     if expr is None:
         return None
     try:

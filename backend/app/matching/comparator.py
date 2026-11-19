@@ -30,7 +30,7 @@ category has one and is never required.
 import math
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Final
 
 from app.core.config import Settings
@@ -38,7 +38,7 @@ from app.matching.chunk_source import provenance
 from app.matching.fields import FieldOptions, LocatedField
 from app.matching.values import Quantity, code_tokens, quantities
 from app.ontology.schema import Attribute, Ontology
-from app.ontology.units import canonical_number, class_to_pn
+from app.ontology.units import canonical_number, class_to_pn, known_unit
 from app.retrieval.text_normalizer import SearchVocabulary, fold_text, is_code, stem_token
 from app.schemas.enums import (
     ChunkType,
@@ -118,6 +118,8 @@ class MatchContext:
 
 
 _UNREADABLE: Final = "printed value is impossible, so it was misread: ignored"
+# A unit stated once at the end of a field label: "Sheath OD (in mm)", "Motor Rating (kW)".
+_LABEL_UNIT: Final = re.compile(r"\(\s*(?:in\s+)?([^()]{1,20}?)\s*\)\s*$")
 _GLUED_DEGREE: Final = "number ending in 0 right before C may be a misread degree sign: ignored"
 _MISREADS: Final = frozenset({_UNREADABLE, _GLUED_DEGREE})
 _NEAR_MISS: Final = "near miss: only part of the code found"
@@ -341,14 +343,61 @@ def _impossible(printed: Sequence[tuple[float, float]], attribute: Attribute) ->
     return any(math.isfinite(end) and end < floor for pair in printed for end in pair)
 
 
+def _unit_phrases(ctx: MatchContext) -> tuple[str, ...]:
+    """The ontology's multi-word unit spellings ("degree celsius")."""
+    if ctx.ontology is None:
+        return ()
+    return tuple(k for k in ctx.ontology.units if " " in k)
+
+
+def label_unit(label: str, requirement: Requirement, ctx: MatchContext) -> str | None:
+    """The unit a field label states in brackets at its end ("Sheath OD (in mm)" -> "mm").
+
+    GeM listings and catalogue tables print the unit once in the label and bare numbers as
+    values. Only a known unit counts: an ontology spelling, or without an ontology the
+    tender's own unit. Anything else in brackets ("(Temperature Range of Application)") is
+    no unit.
+
+    Args:
+        label: The field label as printed.
+        requirement: Gives the tender's unit.
+        ctx: Gives the ontology's unit spellings.
+
+    Returns:
+        The folded unit, spaces removed ("degc"), or None.
+    """
+    match = _LABEL_UNIT.search(fold_text(label))
+    if match is None:
+        return None
+    unit = "".join(match.group(1).split())
+    if ctx.ontology is not None:
+        return unit if known_unit(ctx.ontology, unit) is not None else None
+    return unit if unit == requirement.unit else None
+
+
+def _printed(
+    value: str, unit: str | None, ctx: MatchContext, options: ComparatorOptions
+) -> list[Quantity]:
+    """Quantities of a value; bare numbers take the label's unit when the label states one."""
+    found = quantities(value, options.designation_prefixes, _unit_phrases(ctx))
+    if unit is None or not found or any(q.unit is not None for q in found):
+        return found
+    return [replace(q, unit=unit) for q in found]
+
+
 def judge_numeric(
     requirement: Requirement,
     value: str,
     in_dimension_table: bool,
     ctx: MatchContext,
     options: ComparatorOptions,
+    label: str = "",
 ) -> _Outcome:
-    """What one field's value decides for a numeric requirement (rules 2 and 3)."""
+    """What one field's value decides for a numeric requirement (rules 2 and 3).
+
+    A bare number counts only with a unit: printed with it, or stated once in the field
+    label ("Valve Size (mm)": "100"); a number with no unit anywhere decides nothing (B4).
+    """
     want = _wanted(requirement, ctx)
     if in_dimension_table:
         return _Outcome(None, "dimension table: its numbers do not state the attribute")
@@ -357,8 +406,10 @@ def judge_numeric(
     attr = ctx.attribute(requirement)
     op = _effective_operator(requirement, attr)
     exact = attr is not None or requirement.unit in _DESIGNATIONS
-    tol = options.rel_tolerance * max(abs(want[0]), abs(want[1]), 1.0)
-    printed = _comparable(quantities(value, options.designation_prefixes), requirement, ctx)
+    rel = attr.rel_tolerance if attr is not None and attr.rel_tolerance is not None else None
+    tol = (options.rel_tolerance if rel is None else rel) * max(abs(want[0]), abs(want[1]), 1.0)
+    unit = label_unit(label, requirement, ctx) if label else None
+    printed = _comparable(_printed(value, unit, ctx, options), requirement, ctx)
     temperature = attr is not None and attr.dimension == "temperature"
     if temperature and _ZERO_BEFORE_C.search(fold_text(value)):
         return _Outcome(None, _GLUED_DEGREE)
@@ -642,7 +693,12 @@ def compare(
             continue
         if requirement.kind is ValueKind.NUMERIC:
             outcome = judge_numeric(
-                requirement, value, located.field.in_dimension_table, ctx, options
+                requirement,
+                value,
+                located.field.in_dimension_table,
+                ctx,
+                options,
+                located.field.label,
             )
         else:
             outcome = judge_code(requirement, value, ctx, options)

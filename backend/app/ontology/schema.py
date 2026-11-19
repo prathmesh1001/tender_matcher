@@ -53,6 +53,14 @@ class Attribute(BaseModel):
         default=None,
         description="Lowest possible value in the canonical unit; below it a value was misread.",
     )
+    rel_tolerance: float | None = Field(
+        default=None,
+        ge=0,
+        le=0.1,
+        description="Relative tolerance for this attribute's numbers after unit conversion, "
+        "where values are nominal ratings rounded per unit system (a 5 hp motor is sold as "
+        "3.7 kW). None: the comparator's default.",
+    )
     critical: bool = Field(
         default=False, description="Identifies the product: decides which catalogue is chosen."
     )
