@@ -24,8 +24,10 @@ from app.schemas.report import (
     TiedDocumentRows,
 )
 from app.schemas.requirements import LineItem, Requirement
+from app.tender.normalizer import words
 from app.tender.pipeline import product_types_named
 from app.tender.splitter import leaves
+from app.tender.title_key import key_phrase, named_as
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +55,14 @@ def item_product_type(title: str, declared: Sequence[str], ctx: MatchContext) ->
         if not found and not product_types_named(title, ctx.ontology):
             # A product of the ontology without a type ("foot valve"): GeM listings declare
             # it under a title key the title names.
-            found = declared_types_named(title, [d for d in declared if d not in known])
+            # "Brass foot valve nipple" names a part, so `foot_valve` is not its type.
+            title_words = words(title)
+            keys = {d: words(key_phrase(d)) for d in declared if d not in known}
+            found = {
+                d
+                for d in declared_types_named(title, list(keys))
+                if named_as(title_words, keys[d], [ctx.ontology]) == keys[d]
+            }
     else:
         found = declared_types_named(title, declared)
     return next(iter(found)) if len(found) == 1 else None

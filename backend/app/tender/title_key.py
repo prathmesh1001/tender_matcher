@@ -6,7 +6,8 @@ it again in the title without an ontology (`declared_types_named`: the key's wor
 order in the title):
 
 1. a product of the ontology's category that has no type (`other_products`, longest phrase
-   first): "PVC foot valve Ball type" -> `foot_valve`;
+   first): "PVC foot valve Ball type" -> `foot_valve`; a part word after it keys the part
+   ("Brass foot valve nipple set" -> `foot_valve_nipple`, see `named_as`);
 2. else the first run of up to `max_words` product words of the title, before any accessory
    word ("with"), skipping filler words ("supply", "of") and anything holding a digit (sizes,
    codes, "(V2)"): "Supply of Hydraulic Hose Pipe 1/2 inch" -> `hydraulic_hose_pipe`.
@@ -35,17 +36,55 @@ def key_phrase(key: str) -> str:
     return key.replace("_", " ")
 
 
-def _contains(title_words: list[str], phrase: list[str]) -> bool:
+def _at(title_words: list[str], phrase: list[str], start: int = 0) -> int | None:
+    """Where the phrase first starts in the title words, or None."""
     n = len(phrase)
-    return n > 0 and any(title_words[i : i + n] == phrase for i in range(len(title_words)))
+    return next(
+        (i for i in range(start, len(title_words) - n + 1) if title_words[i : i + n] == phrase),
+        None,
+    )
+
+
+def named_as(
+    title_words: list[str], phrase: list[str], ontologies: Sequence[Ontology]
+) -> list[str] | None:
+    """How a title names a product phrase: as the product, as a part of it, or not at all.
+
+    A part word after the phrase, before any accessory word, makes the item a part of the
+    product: "Brass foot valve nipple set" buys a nipple, not a foot valve.
+
+    Args:
+        title_words: The title as words.
+        phrase: The product phrase as words ("foot valve").
+        ontologies: Their `part_words` and `accessory_words` are used.
+
+    Returns:
+        None if the title lacks the phrase; the phrase if it names the product; else the
+        words from the phrase through the part word (["foot", "valve", "nipple"]).
+    """
+    start = _at(title_words, phrase) if phrase else None
+    if start is None:
+        return None
+    end = start + len(phrase)
+    tail = _before_accessory(title_words[end:], ontologies)
+    parts = [words(p) for o in ontologies for p in o.part_words]
+    found = [(i, len(p)) for p in parts if p for i in [_at(tail, p)] if i is not None]
+    if not found:
+        return phrase
+    i, n = min(found)
+    return title_words[start : end + i + n]
 
 
 def _other_product(title_words: list[str], ontologies: Sequence[Ontology]) -> str | None:
-    """The longest `other_products` phrase the title holds, as a key."""
+    """The longest `other_products` phrase the title holds, as a key (through a part word)."""
     phrases = sorted(
         (words(p) for o in ontologies for p in o.other_products), key=len, reverse=True
     )
-    return next(("_".join(p) for p in phrases if _contains(title_words, p)), None)
+    for phrase in phrases:
+        named = named_as(title_words, phrase, ontologies)
+        if named:
+            return "_".join(named)
+    return None
 
 
 def _before_accessory(title_words: list[str], ontologies: Sequence[Ontology]) -> list[str]:

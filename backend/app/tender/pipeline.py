@@ -26,6 +26,7 @@ from app.tender.link_fetcher import BID_ROLE
 from app.tender.normalizer import names_material, stems, title_size, words
 from app.tender.quality import QualityRules
 from app.tender.splitter import SIZE_LABEL, SplitOptions, item_requirements
+from app.tender.title_key import named_as
 
 SIZE_DIFFERS_FROM_TITLE: Final = "size_differs_from_title"
 MAKE_LABEL: Final = "MAKE"
@@ -94,12 +95,11 @@ def _named(title_words: list[str], product: ProductType) -> bool:
 
 
 def _names_other_product(title_words: list[str], ontology: Ontology) -> bool:
-    """True if the title names, as a phrase, a product the ontology has no type for."""
-    for phrase in ontology.other_products:
-        other = words(phrase)
-        if any(title_words[i : i + len(other)] == other for i in range(len(title_words))):
-            return True
-    return False
+    """True if the title names, as a phrase, a product the ontology has no type for.
+
+    Also true for a part of one ("foot valve nipple"): the item is no typed product either.
+    """
+    return any(named_as(title_words, words(p), [ontology]) for p in ontology.other_products)
 
 
 def _before_accessories(title_words: list[str], ontology: Ontology) -> list[str]:

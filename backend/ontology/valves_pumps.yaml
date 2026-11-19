@@ -113,7 +113,7 @@ accessory_words: [with, along with, including, complete with, for]
 # After a product name, these make the name a part, tool or service for it, not the product
 # ("Valve Repair Kit", "Pump Spare Parts", "Valve Grinding Machine"). Not "part" alone
 # ("3 Part Body Ball Valve") and not "actuator"/"operator" (they stem like "actuated").
-part_words: [spare, spares, spare parts, repair, kit, tool, tools, spanner, machine, tester,
+part_words: [spare, spares, spare parts, repair, kit, tool, tools, spanner, machine, tester, nipple,
   test bench, test rig, calibrator, calibration, furnace, trainer, cut section, starter,
   starters, cable, cables, panel, control panel]
 
