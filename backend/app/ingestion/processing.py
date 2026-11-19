@@ -21,7 +21,8 @@ from app.ingestion.glyph_repair import RepairOptions
 from app.ingestion.layout import LayoutOptions
 from app.ingestion.ocr import OcrEngine
 from app.ingestion.ocr_table import OcrTableOptions, ocr_tables
-from app.ingestion.pdf_parser import ParserOptions, open_pdf, parse_pdf
+from app.ingestion.parse_stage import ParseCache, ParseOptions, parse_with_tables
+from app.ingestion.pdf_parser import ParserOptions
 from app.ingestion.product_tagger import (
     Declared,
     ProductMatcher,
@@ -30,7 +31,6 @@ from app.ingestion.product_tagger import (
 )
 from app.ingestion.section_classifier import SectionClassifier, load_section_rules
 from app.ingestion.table_cleanup import TableCleanupOptions
-from app.ingestion.table_extractor import extract_page_tables, merge_continued_tables
 from app.ingestion.tabular import Sheet, read_csv, read_xlsx, sheet_chunks
 from app.retrieval.text_normalizer import SearchVocabulary, normalize_for_search
 from app.schemas.chunking import ChunkDraft, ExtractedTable
@@ -68,6 +68,8 @@ class ProcessingOptions:
     ocr_tables: bool = False
     # Tesseract --psm for scanned tender pages (row by row reading keeps table cells).
     tender_page_segmentation: int | None = None
+    # Parsed pages + vector tables on disk, so chunking or ontology changes skip re-parsing.
+    parse_cache: ParseCache | None = None
 
     @classmethod
     def from_settings(
@@ -125,6 +127,18 @@ class ProcessingOptions:
             chunker=replace(self.chunker, variant_header_keywords=()),
             table_cleanup=replace(self.table_cleanup, max_label_words=0),
         )
+
+
+def parse_options(options: ProcessingOptions) -> ParseOptions:
+    """The part of the processing options that decides the (cached) parse."""
+    return ParseOptions(
+        parser=options.parser,
+        ocr_engine=options.ocr_engine,
+        table_edge_fraction=options.table_edge_fraction,
+        key_value_tables=options.key_value_tables,
+        table_cleanup=options.table_cleanup,
+        layout=options.layout if options.rule_grid_tables else None,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,41 +207,6 @@ def drop_duplicate_rule_rows(chunks: Sequence[ChunkDraft]) -> list[ChunkDraft]:
     return renumbered
 
 
-def extract_tables(
-    path: Path,
-    pages: Sequence[ParsedPage],
-    edge: float,
-    key_value: bool = False,
-    cleanup: TableCleanupOptions | None = None,
-    layout: LayoutOptions | None = None,
-) -> dict[int, list[ExtractedTable]]:
-    """Find vector tables on every non-OCR page and link those that continue across pages.
-
-    Args:
-        path: The PDF.
-        pages: Its parsed pages (OCR pages are skipped: they have no vector tables).
-        edge: Page-edge fraction for continuation detection.
-        key_value: Tender file: read two-column tables as label/value pairs.
-        cleanup: Row and header repairs (unit spellings, caption detection).
-        layout: Rule-grid thresholds, for tables drawn without stroked lines.
-
-    Rows holding several stacked items (no dividing line) are split in every file: in
-    catalogues they would otherwise mix two parts' materials ("01 02 | Body Body Seat Ring").
-
-    Returns:
-        Tables keyed by 1-based page number.
-    """
-    text_pages = {p.page_number for p in pages if not p.ocr}
-    with open_pdf(path) as doc:
-        found = {
-            page.number + 1: extract_page_tables(page, key_value, True, cleanup, layout)
-            for page in doc
-            if page.number + 1 in text_pages
-        }
-    heights = {p.page_number: p.height for p in pages}
-    return merge_continued_tables(found, heights, edge)
-
-
 def scanned_tables(
     pages: Sequence[ParsedPage], options: OcrTableOptions
 ) -> dict[int, list[ExtractedTable]]:
@@ -245,27 +224,20 @@ def scanned_tables(
 
 
 def process_pdf(path: Path, options: ProcessingOptions) -> ProcessedDocument:
-    """Parse, extract tables, and chunk a PDF.
+    """Parse, extract tables, and chunk a PDF (the parse from `options.parse_cache` if set).
 
     Raises:
         DocumentParseError: If the PDF cannot be opened.
         ExternalServiceError: If OCR is needed and fails.
     """
-    parsed = parse_pdf(path, options.parser, options.ocr_engine)
+    parsed = parse_with_tables(path, parse_options(options), options.parse_cache)
     cleaned, boilerplate = remove_boilerplate(parsed.pages, options.boilerplate)
     if boilerplate:
         logger.info(
             "Dropped boilerplate lines",
             extra={"path": str(path), "lines": sorted(boilerplate)},
         )
-    tables = extract_tables(
-        path,
-        parsed.pages,
-        options.table_edge_fraction,
-        options.key_value_tables,
-        options.table_cleanup,
-        options.layout if options.rule_grid_tables else None,
-    )
+    tables = parsed.tables
     if options.ocr_tables and options.ocr_table is not None:
         tables = {**tables, **scanned_tables(parsed.pages, options.ocr_table)}
     chunks = chunk_document(cleaned, tables, options.chunker)

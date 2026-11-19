@@ -11,7 +11,7 @@ import hashlib
 import logging
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -21,6 +21,7 @@ from app.core.config import Settings
 from app.core.exceptions import InvalidInputError, NotFoundError
 from app.core.logging import log_context
 from app.ingestion.ocr import build_ocr_engine
+from app.ingestion.parse_stage import ParseCache, parse_code_fingerprint
 from app.ingestion.processing import (
     ProcessedDocument,
     ProcessingOptions,
@@ -85,6 +86,8 @@ logger = logging.getLogger(__name__)
 # Parsed tender files live next to the catalogue cache, under their own fingerprint: tender
 # processing options derive from the same settings and code (`ProcessingOptions.for_tender`).
 TENDER_CACHE_SUBDIR = "tenders"
+# Parsed PDFs (pages + vector tables) of catalogues and tender files, see parse_stage.
+PARSE_CACHE_SUBDIR = "parsed"
 _HASH_BLOCK_BYTES = 1 << 20
 
 
@@ -571,11 +574,15 @@ def build_match_service(
     ontologies = load_ontologies(settings.ONTOLOGY_DIR)
     vocabulary = SearchVocabulary.from_ontologies(ontologies)
     matcher = ProductMatcher.from_ontologies(ontologies, vocabulary)
-    options = ProcessingOptions.from_settings(
-        settings, vocabulary, matcher, build_ocr_engine(settings)
+    backend_dir = Path(__file__).resolve().parents[2]
+    options = replace(
+        ProcessingOptions.from_settings(settings, vocabulary, matcher, build_ocr_engine(settings)),
+        parse_cache=ParseCache(
+            settings.CHUNK_CACHE_DIR / PARSE_CACHE_SUBDIR, parse_code_fingerprint(backend_dir)
+        ),
     )
     files = store or build_file_store(settings)
-    catalogue_fingerprint = processing_fingerprint(settings, Path(__file__).resolve().parents[2])
+    catalogue_fingerprint = processing_fingerprint(settings, backend_dir)
     cache = ProcessedCache(settings.CHUNK_CACHE_DIR, catalogue_fingerprint)
     tender_cache = ProcessedCache(
         settings.CHUNK_CACHE_DIR / TENDER_CACHE_SUBDIR,
