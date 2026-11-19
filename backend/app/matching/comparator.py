@@ -406,6 +406,15 @@ def _coded(tokens: frozenset[str]) -> bool:
     return any(is_code(t) or t.isdigit() for t in tokens)
 
 
+def _shared_part(wanted: frozenset[str], have: frozenset[str]) -> bool:
+    """True if a value shares a real part of a code with the requirement: a code or a word.
+
+    A bare number or a single letter is no part of a code (B4): `2" 1500#RTJ` against
+    `1/2 inch NPT(M)` shares only "2", which is no near miss.
+    """
+    return any(not t.isdigit() and len(t) > 1 for t in wanted & have)
+
+
 def _is_standard(requirement: Requirement, ctx: MatchContext) -> bool:
     """True if the requirement's attribute is a standard (its ontology lists standard codes)."""
     attribute = ctx.attribute(requirement)
@@ -467,7 +476,7 @@ def judge_code(
         return _Outcome(MatchStatus.FULL_MATCH, "same material, named another way")
     if not any(_coded(w) for w in wanted) and _coded(have):
         return _Outcome(None, "tender names words, catalogue names codes: not like-for-like")
-    if any(w & have for w in wanted):
+    if any(_shared_part(w, have) for w in wanted):
         return _Outcome(MatchStatus.PARTIAL_MATCH, _NEAR_MISS)
     if same_material:
         return _Outcome(MatchStatus.PARTIAL_MATCH, "same material, grade not printed")
