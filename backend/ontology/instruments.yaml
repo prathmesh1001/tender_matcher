@@ -9,16 +9,21 @@ category: instruments
 version: 1
 
 product_types:
-  # "Thermocouple with Thermowell" is one thermocouple assembly: a thermowell is not a type
-  # here, so such a title names exactly one type.
+  # "Thermocouple with Thermowell" is one thermocouple assembly: the type named before an
+  # accessory word (below) is the item, so it is a thermocouple; "Test Thermowell" is a thermowell.
   - name: thermocouple
     synonyms: [thermocouple, thermo couple, thermocouples]
     sub_types:
       - name: mineral_insulated
         synonyms: [mineral insulated, mi thermocouple]
+  - name: rtd
+    synonyms: [rtd, rtds, resistance temperature detector, pt100, pt 100]
+  - name: thermowell
+    synonyms: [thermowell, thermowells, thermo well, test thermowell]
 
-other_products: [rtd, resistance temperature detector, pressure gauge, temperature gauge,
-  pressure transmitter, temperature transmitter, thermowell]
+other_products: [pressure gauge, temperature gauge, pressure transmitter, temperature transmitter]
+
+accessory_words: [with, along with, including, complete with]
 
 label_generic_words: [moc, material, parameter, type, spec, specification, description, detail,
                       range, of, to, and, for, at, the, max, maximum, min, minimum]
@@ -36,7 +41,7 @@ attributes:
   - name: thermowell_material
     dimension: none
     material: true
-    synonyms: [thermowell material, thermowell moc, thermowell]
+    synonyms: [thermowell material, thermowell moc, thermowell, tw material, tw moc]
   - name: sheath_diameter
     dimension: length
     canonical_unit: mm
@@ -44,17 +49,23 @@ attributes:
   - name: insertion_length
     dimension: length
     canonical_unit: mm
-    synonyms: [insertion length, immersion length, length of thermocouple, length]
+    synonyms: [insertion length, immersion length, thermowell immersion length,
+               tw immersion length, length of thermocouple, length]
   - name: max_temperature
     dimension: temperature
     canonical_unit: degC
     synonyms: [temperature range, max temperature, maximum temperature, operating temperature,
-               measuring range, temperature]
+               measuring range, temperature, range]
     limit: max
     physical_min: -273.15
   - name: process_connection
     dimension: none
-    synonyms: [process connection, mounting, connection type, connection]
+    synonyms: [process connection, process connection size, mounting, connection type,
+               connection]
+  - name: flange_material
+    dimension: none
+    material: true
+    synonyms: [flange material, process connection flange material, flange moc]
   - name: pressure_class
     dimension: none
     synonyms: [class, flange rating, pressure class, rating]
@@ -78,3 +89,4 @@ units:
   deg c: degC
   degc: degC
   c: degC
+  oc: degC

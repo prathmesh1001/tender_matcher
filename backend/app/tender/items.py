@@ -30,6 +30,7 @@ from app.retrieval.text_normalizer import fold_text
 from app.schemas.chunking import ChunkDraft
 from app.schemas.enums import ChunkType, Operator, RequirementType
 from app.schemas.requirements import LineItem, Requirement, ValueKind
+from app.tender.code_rows import codes_in, find_code_row
 from app.tender.general import english_part, general_requirements, row_text
 from app.tender.line_items import header_key
 from app.tender.name_segments import NameRules, segment_by_name
@@ -596,6 +597,41 @@ def _block_item(
     return ItemRequirements(item, entry.category, [*entry.requirements, *added], entry.product_type)
 
 
+def _with_code_rows(
+    found: TenderRequirements, options: RequirementOptions, ontologies: Sequence[Ontology]
+) -> TenderRequirements:
+    """Each item listed by a code takes the one table row keyed by that code (`code_rows`).
+
+    The row leaves the general list; an item matching no row, or rows for several of its
+    codes, is left as it was.
+    """
+    min_length = options.item_code_min_length
+    codes = [
+        codes_in([e.item.title, *(r.raw_text for r in e.requirements)], min_length)
+        for e in found.items
+    ]
+    every = set().union(*codes) if codes else set()
+    texts = [r.raw_text for r in found.general]
+    taken: set[int] = set()
+    items: list[ItemRequirements] = []
+    for entry, own in zip(found.items, codes, strict=True):
+        hits = [
+            hit
+            for code in sorted(own)
+            if (hit := find_code_row(code, texts, every - {code}, options.item_code_row_min_cells))
+        ]
+        if len(hits) != 1:
+            items.append(entry)
+            continue
+        index, row = hits[0]
+        source = found.general[index]
+        block = _SpecBlock(None, None, None, [(source, line) for line in row.lines])
+        items.append(_block_item(entry, block, options, ontologies))
+        taken.add(index)
+    general = [r for i, r in enumerate(found.general) if i not in taken]
+    return TenderRequirements(items, general, found.source)
+
+
 def _with_spec_rows(
     found: TenderRequirements, options: RequirementOptions, ontologies: Sequence[Ontology]
 ) -> TenderRequirements:
@@ -646,7 +682,7 @@ def parse_tender_files(
         general = _general(files, set(), set(chosen), options, held)
         sized = [with_title_size(_once(e), options, ontologies) for e in items]
         found = TenderRequirements([_with_title(e) for e in sized], general, source)
-        return _with_spec_rows(found, options, ontologies)
+        return _with_spec_rows(_with_code_rows(found, options, ontologies), options, ontologies)
     category = _category_entry(files, options, ontologies)
     if category is None:
         return TenderRequirements([], _general(files, set(), set(), options), ItemSource.NONE)
@@ -655,7 +691,7 @@ def parse_tender_files(
     parts = split_category(entry, options, ontologies)
     sized = [_with_title(with_title_size(_once(e), options, ontologies)) for e in parts]
     found = TenderRequirements(sized, general, ItemSource.ITEM_CATEGORY)
-    return _with_spec_rows(found, options, ontologies)
+    return _with_spec_rows(_with_code_rows(found, options, ontologies), options, ontologies)
 
 
 def _sized(requirement: Requirement, ontology: Ontology | None) -> bool:

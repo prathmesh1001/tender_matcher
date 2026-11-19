@@ -131,6 +131,12 @@ class Ontology(BaseModel):
         description="Products of the category with no product type here (no catalogues): a title "
         "naming one is not read as a type sharing its words ('foot valve, ball type').",
     )
+    accessory_words: list[str] = Field(
+        default_factory=list,
+        description="Words after which a title names accessories: when a title names several "
+        "types, the one named before the first such word is the item ('Thermocouple with "
+        "Thermowell' is a thermocouple). Empty: a title naming several types has none.",
+    )
     material_names: list[str] = Field(
         default_factory=list,
         description='Words that start a material value: they end a merged key ("Shaft Bronze").',

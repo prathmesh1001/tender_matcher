@@ -18,10 +18,10 @@ Steps, in order:
 """
 
 import re
+import threading
 import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Final
 
 import snowballstemmer
@@ -81,10 +81,21 @@ class SearchVocabulary:
         return cls(code_rules=rules, units=units, unit_spellings=spellings)
 
 
-@lru_cache(maxsize=1)
+_LOCAL: Final = threading.local()
+
+
 def _stemmer() -> snowballstemmer.stemmer:
-    """The English Snowball stemmer (stateless; built once)."""
-    return snowballstemmer.stemmer("english")
+    """This thread's English Snowball stemmer.
+
+    A stemmer keeps the word being stemmed in its own fields, so one shared instance breaks
+    when two threads stem at once (the catalogue warm-up next to a run: IndexError inside
+    snowballstemmer). Each thread builds its own, once.
+    """
+    stemmer: snowballstemmer.stemmer | None = getattr(_LOCAL, "stemmer", None)
+    if stemmer is None:
+        stemmer = snowballstemmer.stemmer("english")
+        _LOCAL.stemmer = stemmer
+    return stemmer
 
 
 def fold_unicode(text: str) -> str:

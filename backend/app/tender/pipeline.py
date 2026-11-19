@@ -45,6 +45,8 @@ class RequirementOptions:
     item_category_labels: tuple[str, ...]
     quality: QualityRules
     spec_row_labels: tuple[str, str] = ("", "")
+    item_code_min_length: int = 8
+    item_code_row_min_cells: int = 3
 
     @classmethod
     def from_settings(cls, settings: Settings) -> RequirementOptions:
@@ -67,6 +69,8 @@ class RequirementOptions:
                 settings.TENDER_SPEC_ROW_LABELS[0],
                 settings.TENDER_SPEC_ROW_LABELS[1],
             ),
+            item_code_min_length=settings.TENDER_ITEM_CODE_MIN_LENGTH,
+            item_code_row_min_cells=settings.TENDER_ITEM_CODE_ROW_MIN_CELLS,
         )
 
 
@@ -98,6 +102,17 @@ def _names_other_product(title_words: list[str], ontology: Ontology) -> bool:
     return False
 
 
+def _before_accessories(title_words: list[str], ontology: Ontology) -> list[str]:
+    """Types named before the first accessory word ("with"); [] if the title has none."""
+    for i in range(len(title_words)):
+        for phrase in ontology.accessory_words:
+            accessory = words(phrase)
+            if accessory and title_words[i : i + len(accessory)] == accessory:
+                head = title_words[:i]
+                return [p.name for p in ontology.product_types if _named(head, p)]
+    return []
+
+
 def product_types_named(title: str, ontology: Ontology) -> list[str]:
     """Product types a title names: as a phrase, else with its words in any order.
 
@@ -115,6 +130,9 @@ def product_types_named(title: str, ontology: Ontology) -> list[str]:
     """
     title_words = words(fold_text(title))
     exact = [p.name for p in ontology.product_types if _named(title_words, p)]
+    if len(exact) > 1:
+        main = _before_accessories(title_words, ontology)
+        return main if len(main) == 1 else exact
     if exact:
         return exact
     if _names_other_product(title_words, ontology):

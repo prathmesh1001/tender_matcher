@@ -226,6 +226,18 @@ class Settings(BaseSettings):
         default_factory=lambda: ["item category"],
         description="Label of the bid row naming the items, the last source of items (JSON list).",
     )
+    TENDER_ITEM_CODE_MIN_LENGTH: int = Field(
+        default=8,
+        ge=4,
+        description="Shortest letters-and-digits token of an item read as its code (material / "
+        "part code); shorter ones such as 'SS316' are values.",
+    )
+    TENDER_ITEM_CODE_ROW_MIN_CELLS: int = Field(
+        default=3,
+        ge=1,
+        description="Fewest labelled cells, besides the code cell, of a table row taken as an "
+        "item's own specification row (found by the item's code).",
+    )
     TENDER_SPEC_ROW_LABELS: list[str] = Field(
         default_factory=lambda: ["Specification Name", "Bid Requirement (Allowed Values)"],
         min_length=2,

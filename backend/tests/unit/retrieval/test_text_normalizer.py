@@ -130,3 +130,15 @@ def test_is_code() -> None:
 
 def test_unit_spellings_keep_symbols_and_slashes(vocab: SearchVocabulary) -> None:
     assert {"bar", "m3/h", "°c", "kg/cm2"} <= vocab.unit_spellings
+
+
+def test_stemming_is_safe_from_several_threads() -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    from app.retrieval.text_normalizer import stem_token
+
+    words = ["valves", "thermocouples", "connections", "immersion", "ratings", "flanged"] * 400
+    expected = [stem_token(w) for w in words]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _: [stem_token(w) for w in words], range(8)))
+    assert all(r == expected for r in results)

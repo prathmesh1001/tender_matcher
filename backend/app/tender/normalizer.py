@@ -50,6 +50,17 @@ _OPTION_OR: Final = re.compile(
 
 
 _TEMPERATURE_UNIT: Final = "degc"
+# Drawing notation: "U=280 MM", "U≤400 MM" (a dimension symbol and a sign before one number with
+# its unit), and "0 ≤ 1200 oC" (a lower and an upper bound). Rewritten into the plain forms read
+# below; anything with more than one number after the sign ("L1≤325mm, N1≤100mm") is left as is.
+_ONE_QUANTITY: Final = rf"{_NUMBER}\s*[^\s\d,;=<>≤≥]*"
+_SIGNED_VALUE: Final = re.compile(
+    rf"^(?:[A-Za-z][A-Za-z0-9]?\s*)?(?P<sign>=|≤|<=|≥|>=)\s*(?P<rest>{_ONE_QUANTITY})$"
+)
+_BOUNDED_VALUE: Final = re.compile(
+    rf"^(?P<low>{_NUMBER})\s*(?:≤|<=)\s*(?P<high>{_NUMBER})(?P<unit>\s*[^\s\d,;=<>≤≥]*)$"
+)
+_SIGN_WORDS: Final = {"=": "", "≤": "up to ", "<=": "up to ", "≥": "at least ", ">=": "at least "}
 # A PN designation is the nominal pressure in bar (EN 1333): "Nominal Pressure (PN) (MPa) : 1.6"
 # is PN 16. Only whole PN numbers count; anything else stays a pressure.
 _PN_UNIT: Final = "bar"
@@ -91,6 +102,28 @@ _TEMPERATURE_VALUE: Final = re.compile(
     + _TEMPERATURE.format(name="high")
     + ")?"
 )
+
+
+def unsigned_value(value: str) -> str:
+    """A value in drawing notation as plain words ("U≤400 MM" -> "up to 400 MM").
+
+    "0 ≤ 1200 oC" becomes "0 to 1200 oC" (only when the first bound is the lower one);
+    "U=280 MM" becomes "280 MM". Any other value is returned unchanged.
+
+    Args:
+        value: A value as printed.
+
+    Returns:
+        The value in a form the number patterns read.
+    """
+    text = value.strip()
+    bounded = _BOUNDED_VALUE.match(text)
+    if bounded and float(bounded["low"]) < float(bounded["high"]):
+        return f"{bounded['low']} to {bounded['high']}{bounded['unit']}"
+    signed = _SIGNED_VALUE.match(text)
+    if signed:
+        return _SIGN_WORDS[signed["sign"]] + signed["rest"]
+    return value
 
 
 def temperature_form(value: str) -> tuple[float, float | None] | None:
@@ -345,7 +378,7 @@ def parse_value(
     Returns:
         The parsed value: numeric (number, unit, operator), code, or text.
     """
-    stripped = spell_fractions(value.strip().rstrip("."))
+    stripped = unsigned_value(spell_fractions(value.strip().rstrip(".")))
     # "PN 16 OR HIGHER": the direction words set the operator, the rest is the number.
     bare = _AT_MOST_VALUE.sub("", _AT_LEAST_VALUE.sub("", fold_text(stripped))).strip()
     size = size_form(bare)
