@@ -3,6 +3,7 @@
 import hashlib
 import math
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -384,3 +385,25 @@ def test_retrieve_many_of_nothing_calls_no_model(
     )
     assert retriever.retrieve_many([]) == []
     assert embedder.calls == []
+
+
+def test_rerank_candidates_caps_what_the_reranker_scores(
+    db_session: Session, vocabularies: tuple[SearchVocabulary, QueryVocabulary]
+) -> None:
+    search, vocab = vocabularies
+    _doc(db_session, search, ["check_valve", "ball_valve"], CHECK_DOC)
+    reranker = KeywordReranker("PN16")
+    retriever = _retriever(db_session, vocab, reranker)
+    capped = Retriever(
+        chunks=retriever.chunks,
+        embeddings=retriever.embeddings,
+        embedder=retriever.embedder,
+        reranker=reranker,
+        vocabulary=retriever.vocabulary,
+        params=replace(retriever.params, rerank_candidates=1),
+    )
+
+    result = capped.retrieve(_request("NRV PN 16 flanged"))
+
+    assert len(reranker.passages) == 1
+    assert len(result.hits) == 1

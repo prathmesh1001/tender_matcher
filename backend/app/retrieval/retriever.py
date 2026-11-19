@@ -50,6 +50,7 @@ class RetrievalParams:
     min_score: float
     dense_search: DenseSearch = DenseSearch.EXACT
     hnsw_ef_search: int = 100
+    rerank_candidates: int = 0  # 0 = rerank every fused candidate
 
     @classmethod
     def from_settings(cls, settings: Settings) -> RetrievalParams:
@@ -66,6 +67,7 @@ class RetrievalParams:
             min_score=settings.RERANK_MIN_SCORE,
             dense_search=settings.DENSE_SEARCH,
             hnsw_ef_search=settings.HNSW_EF_SEARCH,
+            rerank_candidates=settings.RERANK_CANDIDATES,
         )
 
 
@@ -180,6 +182,8 @@ class Retriever:
                 query=query,
                 candidates_searched=len(chunks),
             )
+        if self.params.rerank_candidates:
+            fused = fused[: self.params.rerank_candidates]  # RRF order: best first
         hits = self._rerank(query, fused, {c.id: c for c in chunks})
         outcome = (
             RetrievalOutcome.EVIDENCE

@@ -617,6 +617,13 @@ class Settings(BaseSettings):
         default=512, ge=32, le=8192, description="Query + chunk longer than this is truncated."
     )
     RERANK_TOP_K: int = Field(default=5, ge=1, description="Chunks kept after reranking.")
+    RERANK_CANDIDATES: int = Field(
+        default=20,
+        ge=0,
+        description="Best fused (RRF) candidates sent to the reranker; 0 = all of them. The "
+        "reranker is the slowest part of a judge search on CPU (20: Docker judge searches 135 s -> "
+        "67 s on 8181356; gold: no correct decision lost).",
+    )
     RERANK_MIN_SCORE: float = Field(
         default=0.3,
         ge=0,
