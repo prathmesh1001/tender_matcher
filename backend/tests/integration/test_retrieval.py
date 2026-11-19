@@ -321,3 +321,66 @@ def test_evidence_hits_are_empty_below_the_threshold(
 
     assert result.outcome == RetrievalOutcome.BELOW_THRESHOLD
     assert retriever.evidence_hits(result) == ()
+
+
+class CountingEmbedder(FakeEmbedder):
+    """FakeEmbedder that records each call's texts."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        self.calls.append(list(texts))
+        return super().embed(texts)
+
+
+def test_retrieve_many_equals_one_by_one_with_one_embedder_call(
+    db_session: Session, vocabularies: tuple[SearchVocabulary, QueryVocabulary]
+) -> None:
+    search, vocab = vocabularies
+    _doc(db_session, search, ["check_valve", "ball_valve"], CHECK_DOC)
+    _doc(db_session, search, ["check_valve"], [("Check valve PN16", "check_valve")], "Other")
+    requests = [
+        _request("NRV PN 16 flanged"),
+        _request("check valve PN40"),
+        _request("NRV PN 16 flanged"),  # a repeated query is embedded once
+        _request("butterfly valve PN16", product_type="butterfly_valve"),
+        RetrievalRequest(
+            manufacturer="Other", category=CATEGORY, product_type="check_valve", text="PN16"
+        ),
+    ]
+    single = [_retriever(db_session, vocab, KeywordReranker("PN16")).retrieve(r) for r in requests]
+    embedder = CountingEmbedder()
+    batched = _retriever(db_session, vocab, KeywordReranker("PN16"))
+    batched = Retriever(
+        chunks=batched.chunks,
+        embeddings=batched.embeddings,
+        embedder=embedder,
+        reranker=batched.reranker,
+        vocabulary=batched.vocabulary,
+        params=batched.params,
+    )
+
+    results = batched.retrieve_many(requests)
+
+    assert results == single
+    assert len(embedder.calls) == 1
+    assert len(embedder.calls[0]) == len(set(embedder.calls[0])) == 3
+
+
+def test_retrieve_many_of_nothing_calls_no_model(
+    db_session: Session, vocabularies: tuple[SearchVocabulary, QueryVocabulary]
+) -> None:
+    _, vocab = vocabularies
+    retriever = _retriever(db_session, vocab, KeywordReranker("x"))
+    embedder = CountingEmbedder()
+    retriever = Retriever(
+        chunks=retriever.chunks,
+        embeddings=retriever.embeddings,
+        embedder=embedder,
+        reranker=retriever.reranker,
+        vocabulary=retriever.vocabulary,
+        params=retriever.params,
+    )
+    assert retriever.retrieve_many([]) == []
+    assert embedder.calls == []

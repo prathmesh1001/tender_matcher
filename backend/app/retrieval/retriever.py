@@ -16,6 +16,7 @@ The structured `spec_facts` lookup (step 2 of section 7) is done by matching, no
 
 import logging
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.core.config import DenseSearch, Settings
@@ -68,6 +69,22 @@ class RetrievalParams:
         )
 
 
+# The filtered chunks of one manufacturer x product (x document) and their BM25 index.
+type _ChunkSet = tuple[list[Chunk], Bm25Index]
+type _SetKey = tuple[str, str, str, str | None]
+
+
+@dataclass(frozen=True, slots=True)
+class _Prepared:
+    """A search up to the point where it needs its query embedding."""
+
+    request: RetrievalRequest
+    chunks: list[Chunk]
+    index: Bm25Index
+    query: SearchQuery
+    dense: bool  # the dense ranking takes part (weight > 0 and the chunks have vectors)
+
+
 @dataclass(frozen=True, slots=True)
 class Retriever:
     """Product filter -> hybrid search -> rerank, for one manufacturer at a time."""
@@ -91,19 +108,72 @@ class Retriever:
         Raises:
             ExternalServiceError: If the embedder or reranker fails.
         """
-        chunks = self.chunks.list_for_product(
+        return self.retrieve_many([request])[0]
+
+    def retrieve_many(self, requests: Sequence[RetrievalRequest]) -> list[RetrievalResult]:
+        """`retrieve` for several requirements, with the same results, in far less time.
+
+        Requests for the same manufacturer and product share one chunk list and BM25 index,
+        and every query is embedded in one embedder call (one by one, the model is called once
+        per requirement, measured 0.9 s each on CPU).
+
+        Args:
+            requests: The searches, in any order.
+
+        Returns:
+            One result per request, in the same order.
+
+        Raises:
+            ExternalServiceError: If the embedder or reranker fails.
+        """
+        sets: dict[_SetKey, _ChunkSet] = {}
+        prepared = [self._prepare(r, sets) for r in requests]
+        texts = sorted(
+            {p.query.dense_text for p in prepared if isinstance(p, _Prepared) and p.dense}
+        )
+        vectors = dict(zip(texts, self.embedder.embed(texts), strict=True)) if texts else {}
+        return [
+            (
+                p
+                if isinstance(p, RetrievalResult)
+                else self._finish(p, vectors.get(p.query.dense_text))
+            )
+            for p in prepared
+        ]
+
+    def _chunk_set(self, request: RetrievalRequest, sets: dict[_SetKey, _ChunkSet]) -> _ChunkSet:
+        """The request's filtered chunks and their index, read once per manufacturer x product."""
+        key = (
             request.manufacturer,
             request.category,
             request.product_type,
-            sha256=request.document_sha256,
+            request.document_sha256,
         )
+        if key not in sets:
+            chunks = self.chunks.list_for_product(*key[:3], sha256=key[3])
+            sets[key] = (
+                chunks,
+                Bm25Index.build([(c.id, c.search_text) for c in chunks], self.params.bm25),
+            )
+        return sets[key]
+
+    def _prepare(
+        self, request: RetrievalRequest, sets: dict[_SetKey, _ChunkSet]
+    ) -> _Prepared | RetrievalResult:
+        """Product filter and query; a result already if the product has no chunks."""
+        chunks, index = self._chunk_set(request, sets)
         if not chunks:
             return RetrievalResult(outcome=RetrievalOutcome.NO_PRODUCT_DOCUMENTS)
-        index = Bm25Index.build([(c.id, c.search_text) for c in chunks], self.params.bm25)
         query = build_query(
             request.text, self.vocabulary, known_terms=index.vocabulary, attribute=request.attribute
         )
-        fused = self._fuse(chunks, index, query)
+        dense = self.params.fusion.dense_weight > 0 and any(c.embed_hash for c in chunks)
+        return _Prepared(request, chunks, index, query, dense)
+
+    def _finish(self, prepared: _Prepared, vector: list[float] | None) -> RetrievalResult:
+        """Fuse, rerank and decide the outcome of one prepared search."""
+        request, chunks, query = prepared.request, prepared.chunks, prepared.query
+        fused = self._fuse(chunks, prepared.index, query, vector)
         if not fused:
             return RetrievalResult(
                 outcome=RetrievalOutcome.NO_CANDIDATES,
@@ -131,17 +201,20 @@ class Retriever:
         )
 
     def _fuse(
-        self, chunks: list[Chunk], index: Bm25Index, query: SearchQuery
+        self,
+        chunks: list[Chunk],
+        index: Bm25Index,
+        query: SearchQuery,
+        vector: list[float] | None,
     ) -> list[FusedCandidate]:
-        """BM25 and dense rankings of the filtered chunks, fused."""
+        """BM25 and dense rankings of the filtered chunks, fused (dense only with a vector)."""
         limit = self.params.candidates
         terms = [*query.terms, *query.expansion_terms]
         lexical = [chunk_id for chunk_id, _ in index.rank(terms, limit)]
         dense: list[uuid.UUID] = []
         pairs = [(c.id, c.embed_hash) for c in chunks]
         hashes = {h for _, h in pairs if h is not None}
-        if self.params.fusion.dense_weight > 0 and hashes:
-            vector = self.embedder.embed([query.dense_text])[0]
+        if vector is not None and hashes:
             dense = dense_ranking(pairs, self._distances(vector, hashes), limit)
         return rrf_fuse(lexical, dense, self.params.fusion)
 

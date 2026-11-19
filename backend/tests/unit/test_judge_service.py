@@ -67,6 +67,7 @@ class _Finder:
     def __init__(self, found: FoundEvidence | Exception | None = None) -> None:
         self.found = found or FoundEvidence(RetrievalOutcome.EVIDENCE, (PASSAGE,))
         self.requests: list[RetrievalRequest] = []
+        self.batches: list[list[RetrievalRequest]] = []
         self.warm_calls: list[int] = []
 
     def warm_up(self, calls: int) -> None:
@@ -77,6 +78,12 @@ class _Finder:
         if isinstance(self.found, Exception):
             raise self.found
         return self.found
+
+    def find_many(self, requests: Sequence[RetrievalRequest]) -> list[FoundEvidence]:
+        self.batches.append(list(requests))
+        if isinstance(self.found, Exception):
+            raise self.found
+        return [self.find(r) for r in requests]
 
 
 class _Pages:
@@ -253,6 +260,25 @@ def test_a_retrieval_failure_leaves_the_requirement_unsupported() -> None:
     judged = _service(llm, finder).judge_items(inputs, reports, _Pages())
     assert llm.prompts == []
     assert "Cannot load embedding model" in _results(judged)[0].reason
+
+
+def test_every_line_is_searched_in_one_batch() -> None:
+    finder = _Finder()
+    lines = [_requirement(f"10.{i}", f"Actuation: line {i}") for i in range(3)]
+    inputs, reports = _inputs(lines)
+    _service(_Llm(), finder).judge_items(inputs, reports, _Pages())
+    assert len(finder.batches) == 1
+    assert len(finder.batches[0]) == 3
+
+
+def test_a_failed_batch_falls_back_to_one_search_per_line() -> None:
+    finder = _Finder(ExternalServiceError("Cannot load embedding model"))
+    lines = [_requirement(f"10.{i}", f"Actuation: line {i}") for i in range(5)]
+    inputs, reports = _inputs(lines)
+    judged = _service(_Llm(), finder, max_failures=2).judge_items(inputs, reports, _Pages())
+    assert len(finder.batches) == 1
+    assert len(finder.requests) == 2  # one by one, stopped after two failures in a row
+    assert all(r.status is MatchStatus.UNSUPPORTED for r in _results(judged))
 
 
 def test_repeated_failures_stop_the_calls() -> None:

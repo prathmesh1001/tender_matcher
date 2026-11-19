@@ -6,7 +6,8 @@ A run has a call limit and stops calling after repeated failures, so an exhauste
 some `unsupported` results instead of the run. Answers are cached by prompt and model, so a rerun
 gives the same results and calls nothing; failures are never cached.
 
-Catalogue searches run one by one (they are CPU bound); LLM calls run `workers` at a time. Which
+Catalogue searches run as one batch (CPU bound: shared chunk sets, one embedder call); LLM calls
+run `workers` at a time. Which
 lines get the limited calls is decided in document order before any call is made, so a run gives
 the same results with 1 worker or many.
 """
@@ -54,7 +55,12 @@ from app.schemas.enums import MatchStatus
 from app.schemas.matching import Comparison, JudgeVerdict
 from app.schemas.report import ItemReport, ManufacturerItemReport
 from app.schemas.requirements import Requirement
-from app.schemas.retrieval import RetrievalHit, RetrievalOutcome, RetrievalRequest
+from app.schemas.retrieval import (
+    RetrievalHit,
+    RetrievalOutcome,
+    RetrievalRequest,
+    RetrievalResult,
+)
 from app.tender.splitter import leaves
 
 logger = logging.getLogger(__name__)
@@ -105,6 +111,10 @@ class EvidenceFinder(Protocol):
 
     def find(self, request: RetrievalRequest) -> FoundEvidence:
         """Search the catalogue the request names."""
+        ...
+
+    def find_many(self, requests: Sequence[RetrievalRequest]) -> list[FoundEvidence]:
+        """`find` for several requests at once, one outcome per request in order."""
         ...
 
     def warm_up(self, calls: int) -> None:
@@ -262,6 +272,20 @@ class DbEvidenceFinder:
         Raises:
             ExternalServiceError: If the embedder or reranker fails.
         """
+        return self.find_many([request])[0]
+
+    def find_many(self, requests: Sequence[RetrievalRequest]) -> list[FoundEvidence]:
+        """`find` for several requests in one session, with their queries embedded together.
+
+        Args:
+            requests: The searches.
+
+        Returns:
+            One outcome per request, in the same order.
+
+        Raises:
+            ExternalServiceError: If the embedder or reranker fails.
+        """
         with session_scope(self.session_factory) as session:
             chunks = ChunkRepository(session)
             retriever = Retriever(
@@ -272,19 +296,33 @@ class DbEvidenceFinder:
                 vocabulary=self.vocabulary,
                 params=self.params,
             )
-            result = retriever.retrieve(request)
-            found = {c.id: c for c in chunks.list_by_ids([h.chunk_id for h in result.hits])}
-            allowed = _allowed(result.hits, found, request.exclude_passages)
-            accepted = {h.chunk_id for h in retriever.evidence_hits(result)}
-            hits = [h for h in allowed if h.chunk_id in accepted][: self.max_passages]
-            low = not hits and result.outcome is RetrievalOutcome.BELOW_THRESHOLD
-            if low:
-                hits = allowed[: self.low_score_hits]
-            passages = tuple(
-                _passage(found[h.chunk_id], not low and h.rerank_score < self.params.min_score, low)
-                for h in hits
-            )
-            return FoundEvidence(result.outcome, passages)
+            results = retriever.retrieve_many(requests)
+            hit_ids = {h.chunk_id for result in results for h in result.hits}
+            found = {c.id: c for c in chunks.list_by_ids(list(hit_ids))}
+            return [
+                self._evidence(request, result, retriever.evidence_hits(result), found)
+                for request, result in zip(requests, results, strict=True)
+            ]
+
+    def _evidence(
+        self,
+        request: RetrievalRequest,
+        result: RetrievalResult,
+        evidence_hits: Sequence[RetrievalHit],
+        found: Mapping[uuid.UUID, Chunk],
+    ) -> FoundEvidence:
+        """The passages one search gives the judge: accepted hits, else the best low ones."""
+        allowed = _allowed(result.hits, found, request.exclude_passages)
+        accepted = {h.chunk_id for h in evidence_hits}
+        hits = [h for h in allowed if h.chunk_id in accepted][: self.max_passages]
+        low = not hits and result.outcome is RetrievalOutcome.BELOW_THRESHOLD
+        if low:
+            hits = allowed[: self.low_score_hits]
+        passages = tuple(
+            _passage(found[h.chunk_id], not low and h.rerank_score < self.params.min_score, low)
+            for h in hits
+        )
+        return FoundEvidence(result.outcome, passages)
 
 
 class JudgeService:
@@ -433,9 +471,14 @@ class JudgeService:
             progress: Receives the decisions and the counts.
         """
         keys = list(jobs)
-        # Searches stay one by one: the embedder and reranker already use every CPU core, and
-        # running them side by side measured 2x slower (2026-11-14). Only the calls overlap.
-        prepared = [self._prepare(jobs[key], progress) for key in keys]
+        # Searches never run side by side: the embedder and reranker already use every CPU
+        # core, and that measured 2x slower (2026-11-14). They run as one batch instead (shared
+        # chunk sets, one embedder call); only the LLM calls overlap.
+        searched = self._search_all([jobs[key] for key in keys])
+        prepared = [
+            self._prepare(jobs[key], found, progress)
+            for key, found in zip(keys, searched, strict=True)
+        ]
         questions: list[tuple[_Key, _Question]] = []
         for key, outcome in zip(keys, prepared, strict=True):
             if isinstance(outcome, _Decision):
@@ -452,12 +495,30 @@ class JudgeService:
         for (key, _), decision in zip(questions, answers, strict=True):
             progress.decisions[key] = decision
 
-    def _prepare(self, job: _Job, progress: _Progress) -> _Question | _Decision:
-        """Search the catalogue and look the prompt up in the cache; never calls the model."""
+    def _search_all(self, jobs: Sequence[_Job]) -> list[FoundEvidence | None]:
+        """Every job's catalogue search in one batch; None = search again on its own.
+
+        A failed batch falls back to one search per job, so a failure counts per line (and
+        stops the judge after `max_failures` in a row) exactly as before batching.
+        """
+        if not jobs:
+            return []
+        try:
+            return list(self._finder.find_many([job.request for job in jobs]))
+        except ExternalServiceError as exc:
+            logger.warning(
+                "batched search failed, searching one by one", extra={"error": exc.message}
+            )
+            return [None] * len(jobs)
+
+    def _prepare(
+        self, job: _Job, searched: FoundEvidence | None, progress: _Progress
+    ) -> _Question | _Decision:
+        """Use (or redo) the catalogue search and look the prompt up in the cache; no LLM call."""
         if progress.failures_in_a_row >= self._options.max_failures:
             return _Decision(note="LLM judge stopped: too many failures in a row")
         try:
-            found = self._finder.find(job.request)
+            found = searched if searched is not None else self._finder.find(job.request)
         except ExternalServiceError as exc:
             return self._failed(exc, progress)
         if not found.passages:
