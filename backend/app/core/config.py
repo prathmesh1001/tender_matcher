@@ -668,6 +668,18 @@ class Settings(BaseSettings):
         description="Offer GeM Marketplace listings as evidence for item product types that no "
         "manufacturer document covers. Off: no button, no endpoint work, no listing in matching.",
     )
+    GEM_IN_RUN: bool = Field(
+        default=True,
+        description="With DISCOVERY_ENABLED: every run also searches GeM for all its items' "
+        "product types, in parallel with the catalogue matching, and adds the listing vendors "
+        "to the same report.",
+    )
+    GEM_RUN_BUDGET_SECONDS: float = Field(
+        default=120.0,
+        ge=0,
+        description="How long a run waits for its GeM branch after the run started; types "
+        "checked later arrive as a child run.",
+    )
     GEM_MARKETPLACE_FILE: Path = Field(
         default=Path("config/gem_marketplace.yaml"),
         description="Product type -> GeM Marketplace category pages to read listings from.",
@@ -746,7 +758,7 @@ class Settings(BaseSettings):
         description="Filler words never part of a title key (JSON list, lower case).",
     )
     GEM_REQUEST_DELAY_SECONDS: float = Field(
-        default=3.0, ge=0, description="Pause before every request to GeM Marketplace."
+        default=1.0, ge=0, description="Pause before every request to GeM Marketplace."
     )
     GEM_MIN_SPEC_ROWS: int = Field(
         default=5, ge=1, description="A listing with fewer specification rows is not kept."

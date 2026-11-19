@@ -92,3 +92,17 @@ def test_without_title_keys_untyped_items_are_not_offered() -> None:
 def test_a_title_naming_several_types_gets_no_key() -> None:
     # Never guessed: "Gate valve and globe valve" names two ontology types.
     assert _service(KEYS).uncovered_types(_report("Gate valve and globe valve set"), []) == []
+
+
+def test_item_types_lists_every_type_covered_or_not(monkeypatch: Any) -> None:
+    service = _service(KEYS)
+    items = [
+        SimpleNamespace(item=SimpleNamespace(title=t, item_no=str(n)))
+        for n, t in enumerate(["Gate Valve DN100 PN16", TITLE, "Gate Valve DN150"], 1)
+    ]
+    monkeypatch.setattr(service, "parse_tender", lambda tender: SimpleNamespace(items=items))
+    found = service.item_types("GEM_X")
+    assert [(t.product_type, t.item_nos, t.titles) for t in found] == [
+        ("gate_valve", ["1", "3"], ["Gate Valve DN100 PN16", "Gate Valve DN150"]),
+        ("control_valve", ["2"], [TITLE]),
+    ]

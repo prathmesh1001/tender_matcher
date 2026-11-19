@@ -119,14 +119,20 @@ def _source_url(report: ManufacturerItemReport) -> str | None:
     )
 
 
+def _gem(report: ManufacturerItemReport) -> bool:
+    """True if the vendor's chosen document is a GeM listing (seller-declared)."""
+    return report.chosen is not None and report.chosen.seller_declared
+
+
 def top_vendors(
     manufacturers: Sequence[ManufacturerItemReport], min_coverage_pct: float, limit: int
 ) -> list[ItemVendor]:
     """The best vendors for one item: a document chosen for it and at least one decision.
 
     Ordered like the tender ranking (enough coverage first, then compatibility, coverage,
-    name), on the item's results alone. A vendor whose only evidence is a GeM listing is
-    marked as such, with the listing page.
+    name), on the item's results alone; at an equal score a catalogue vendor comes before a
+    GeM listing vendor (a datasheet is stronger evidence than a seller's declaration). A vendor
+    whose only evidence is a GeM listing is marked as such, with the listing page.
 
     Args:
         manufacturers: The item's per-manufacturer reports (scores already worked out).
@@ -141,10 +147,16 @@ def top_vendors(
         for m in manufacturers
         if (m.chosen or m.tied_documents) and m.score.compatibility_pct is not None
     ]
-    eligible.sort(key=lambda m: _order(m.manufacturer, m.score, min_coverage_pct))
+    eligible.sort(
+        key=lambda m: (
+            *_order(m.manufacturer, m.score, min_coverage_pct)[:-1],
+            _gem(m),
+            m.manufacturer,
+        )
+    )
     out: list[ItemVendor] = []
     for i, m in enumerate(eligible[:limit], start=1):
-        gem = m.chosen is not None and m.chosen.seller_declared
+        gem = _gem(m)
         out.append(
             ItemVendor(
                 rank=i,

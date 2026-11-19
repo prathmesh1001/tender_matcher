@@ -10,7 +10,7 @@ optional judge then handles what they cannot read.
 import hashlib
 import logging
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -64,7 +64,7 @@ from app.schemas.report import (
     SingleFirmWarning,
     TenderReport,
 )
-from app.schemas.requirements import Requirement
+from app.schemas.requirements import LineItem, Requirement
 from app.schemas.sections import EvidenceSource
 from app.storage.file_store import FileStore, LocalFileStore, build_file_store
 from app.tender.items import ItemSource, TenderFile, TenderRequirements, parse_tender_files
@@ -99,6 +99,7 @@ class UncoveredType:
     category: str
     item_nos: list[str]
     by_title: bool = False  # no ontology type: a key from the item title (`title_key`)
+    titles: list[str] = field(default_factory=list)  # the items' titles, each once
 
 
 @dataclass(slots=True)
@@ -407,19 +408,111 @@ class MatchService:
         """
         self._source.refresh()
         declared = self._source.product_types()
+        return self._types(
+            [i.item for i in report.items],
+            lambda product_type: self._covered(product_type, declared, manufacturers),
+        )
+
+    def item_types(self, tender: str) -> list[UncoveredType]:
+        """Every product type (or title key) of a tender's items, covered or not.
+
+        The GeM branch of a run searches all of them, while the catalogues are matched.
+
+        Args:
+            tender: Tender folder name.
+
+        Returns:
+            One entry per type, in first-item order, with its category and item numbers.
+
+        Raises:
+            NotFoundError: If the tender folder has no tender.yaml.
+            DocumentParseError: If a tender file cannot be parsed.
+        """
+        return self._types([e.item for e in self.parse_tender(tender).items], lambda _: False)
+
+    def _types(
+        self, items: Sequence[LineItem], covered: Callable[[str], bool]
+    ) -> list[UncoveredType]:
+        """The items' product types (or title keys) not `covered`, in first-item order."""
         found: dict[str, UncoveredType] = {}
-        for item in report.items:
-            ontology = ontology_for(item.item.title, self._ontologies)
-            product_type = self.item_key(item.item.title, ontology)
-            if product_type is None or self._covered(product_type, declared, manufacturers):
+        for item in items:
+            ontology = ontology_for(item.title, self._ontologies)
+            product_type = self.item_key(item.title, ontology)
+            if product_type is None or covered(product_type):
                 continue
             typed = ontology is not None and ontology.product_type(product_type) is not None
             category = ontology.category if ontology else self._untyped_category
-            uncovered = found.setdefault(
+            entry = found.setdefault(
                 product_type, UncoveredType(product_type, category, [], by_title=not typed)
             )
-            uncovered.item_nos.append(item.item.item_no)
+            entry.item_nos.append(item.item_no)
+            if item.title not in entry.titles:
+                entry.titles.append(item.title)
         return list(found.values())
+
+    def add_listing_vendors(
+        self, previous: TenderReport, brands: Mapping[str, Sequence[str]]
+    ) -> TenderReport:
+        """Add GeM listing brands, matched by rules, to the items of their product type.
+
+        The catalogue vendors' results (rules and LLM judge) stay as they are; a brand the item
+        already lists is not added again, so its catalogue evidence is kept. Top vendors and
+        the ranking are worked out again over all vendors.
+
+        Args:
+            previous: The run's report.
+            brands: Listing brands per product type (or title key).
+
+        Returns:
+            A new report.
+
+        Raises:
+            InvalidInputError: If the tender now parses into other items than the report has.
+        """
+        with log_context(tender_id=previous.tender):
+            self._source.refresh()
+            parsed = self.parse_tender(previous.tender)
+            if len(parsed.items) != len(previous.items):
+                raise InvalidInputError(
+                    "The tender no longer parses into the report's items; start a new run",
+                    details={"tender": previous.tender},
+                )
+            note = _review_note(previous.extraction_quality)
+            items = [
+                self._with_brands(entry, old, brands, note)
+                for entry, old in zip(parsed.items, previous.items, strict=True)
+            ]
+        changed = sum(new is not old for new, old in zip(items, previous.items, strict=True))
+        if not changed:
+            return previous
+        return previous.model_copy(
+            update={
+                "generated_at": datetime.now(UTC),
+                "decided_by": f"{previous.decided_by} + GeM listings (rules, {changed} items)",
+                "items": items,
+                "ranking": self._ranking(items),
+                "status_lists": status_lists(items),
+            }
+        )
+
+    def _with_brands(
+        self,
+        entry: ItemInput,
+        old: ItemReport,
+        brands: Mapping[str, Sequence[str]],
+        note: str | None,
+    ) -> ItemReport:
+        """One item with the new brands of its type appended (the item itself if none)."""
+        listed = {m.manufacturer.casefold() for m in old.manufacturers}
+        key = self.item_key(entry.item.title, entry.ctx.ontology)
+        new = [b for b in brands.get(key or "", ()) if b.casefold() not in listed]
+        if not new:
+            return old
+        added = self._rematched(entry, new, note)
+        merged = old.model_copy(
+            update={"manufacturers": [*old.manufacturers, *added.manufacturers]}
+        )
+        return self._with_top_vendors(merged)
 
     def item_key(self, title: str, ontology: Ontology | None) -> str | None:
         """The item's product type, or for a title naming none, a key from its words.
@@ -486,12 +579,7 @@ class MatchService:
                     details={"tender": previous.tender},
                 )
             wanted = set(product_types)
-            quality = previous.extraction_quality
-            note = (
-                "extraction unreliable: " + ", ".join(r.code.value for r in quality.reasons)
-                if quality.status is ExtractionStatus.UNRELIABLE
-                else None
-            )
+            note = _review_note(previous.extraction_quality)
             items = [
                 (
                     self._rematched(entry, manufacturers, note)
@@ -611,6 +699,13 @@ def build_match_service(
         ),
         untyped_category=settings.GEM_UNTYPED_CATEGORY,
     )
+
+
+def _review_note(quality: ExtractionQuality) -> str | None:
+    """The note that sends every result to review when the extraction is unreliable."""
+    if quality.status is not ExtractionStatus.UNRELIABLE:
+        return None
+    return "extraction unreliable: " + ", ".join(r.code.value for r in quality.reasons)
 
 
 def _file_sha256(path: Path) -> str:

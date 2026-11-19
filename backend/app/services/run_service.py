@@ -9,7 +9,7 @@ import logging
 import threading
 import time
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from functools import cache
 from typing import Protocol
@@ -26,6 +26,7 @@ from app.llm.factory import llm_configured
 from app.schemas.enums import RunStatus
 from app.schemas.report import TenderReport
 from app.schemas.runs import RunResponse, StartRunRequest
+from app.services.gem_branch import GemBranch
 from app.services.ingestion_service import build_ingestion_service
 from app.services.judge_service import JudgeService, build_judge_service
 from app.services.manufacturer_service import ManufacturerService, build_manufacturer_service
@@ -55,6 +56,12 @@ class Matcher(Protocol):
 
     def parse_tender(self, tender: str) -> object:
         """Read one tender folder (fills the tender cache)."""
+        ...
+
+    def add_listing_vendors(
+        self, previous: TenderReport, brands: Mapping[str, Sequence[str]]
+    ) -> TenderReport:
+        """Add GeM listing brands, matched by rules, to the items of their type."""
         ...
 
 
@@ -122,6 +129,7 @@ class RunService:
         self._warm_up = warm_up
         self._warm_thread: threading.Thread | None = None
         self._handlers: dict[JobName, Callable[[str], None]] = {}
+        self._gem_branch: Callable[[uuid.UUID, str], GemBranch | None] | None = None
         queue.bind(self.handle)
 
     def register(self, job: JobName, handler: Callable[[str], None]) -> None:
@@ -132,6 +140,15 @@ class RunService:
             handler: Called with the job's argument.
         """
         self._handlers[job] = handler
+
+    def use_gem_branch(self, start: Callable[[uuid.UUID, str], GemBranch | None]) -> None:
+        """Let every run start a GeM branch (GeM discovery registers it when it is on).
+
+        Args:
+            start: Called with the run id and tender folder before matching; returns the
+                started branch, or None.
+        """
+        self._gem_branch = start
 
     def handle(self, job: JobName, argument: str) -> None:
         """Execute one queued job, in whichever process runs the queue.
@@ -278,14 +295,41 @@ class RunService:
             used = {"tender_revision": tender.revision, "bid_sha256": tender.sha256}
             names = run.manufacturers
         unfetched = self._fetch_links(folder)
-        report = self._matcher().match_tender(folder, manufacturers=names, unfetched=unfetched)
-        report = report.model_copy(update=used)
-        with session_scope(self._session_factory) as session:
-            build_report_service(session, self._settings).save(run_id, report)
-            run = RunRepository(session).get_or_raise(run_id)
-            run.status = RunStatus.DONE
-            run.finished_at = datetime.now(UTC)
+        branch = self._start_gem(run_id, folder)
+        saved = False
+        try:
+            report = self._matcher().match_tender(folder, manufacturers=names, unfetched=unfetched)
+            report = report.model_copy(update=used)
+            if branch is not None:
+                report = self._with_gem(report, branch)
+            with session_scope(self._session_factory) as session:
+                build_report_service(session, self._settings).save(run_id, report)
+                run = RunRepository(session).get_or_raise(run_id)
+                run.status = RunStatus.DONE
+                run.finished_at = datetime.now(UTC)
+            saved = True
+        finally:
+            if branch is not None:
+                branch.report_saved(saved)
         logger.info("run done")
+
+    def _start_gem(self, run_id: uuid.UUID, folder: str) -> GemBranch | None:
+        """The run's GeM branch, started; None if there is none or it cannot start."""
+        if self._gem_branch is None:
+            return None
+        try:
+            return self._gem_branch(run_id, folder)
+        except Exception:  # GeM is extra evidence: the catalogue run goes on without it
+            logger.exception("gem branch did not start")
+            return None
+
+    def _with_gem(self, report: TenderReport, branch: GemBranch) -> TenderReport:
+        """The report with the GeM listing vendors the branch found within its budget."""
+        brands = branch.collect()
+        logger.info("gem branch collected", extra={"types": sorted(brands)})
+        if not brands:
+            return report
+        return self._matcher().add_listing_vendors(report, brands)
 
     def _finish_failed(self, run_id: uuid.UUID, reason: str) -> None:
         with session_scope(self._session_factory) as session:

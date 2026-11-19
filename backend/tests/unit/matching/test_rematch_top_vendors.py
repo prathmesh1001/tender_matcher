@@ -55,3 +55,51 @@ def test_a_rematched_item_lists_its_top_vendors() -> None:
 def test_review_notes_come_before_the_top_vendors() -> None:
     item = cast(Any, _service()._rematched(cast(Any, None), None, "extraction unreliable"))
     assert item.fields == {"note": "extraction unreliable", "top_vendors": ["best of ['listing']"]}
+
+
+class _Old:
+    """Stands in for the run's item report: catalogue vendors already matched."""
+
+    def __init__(self, *names: str) -> None:
+        self.manufacturers = [SimpleNamespace(manufacturer=n) for n in names]
+        self.fields: dict[str, Any] = {}
+
+    def model_copy(self, update: dict[str, Any]) -> _Old:
+        copy = _Old()
+        copy.manufacturers = update.get("manufacturers", self.manufacturers)
+        copy.fields = {**self.fields, **update}
+        return copy
+
+
+def _entry() -> Any:
+    return SimpleNamespace(
+        item=SimpleNamespace(title="Gate valve"), ctx=SimpleNamespace(ontology=None)
+    )
+
+
+def test_listing_brands_are_appended_after_the_catalogue_vendors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service()
+    monkeypatch.setattr(service, "item_key", lambda title, ontology: "gate_valve")
+    asked: list[Any] = []
+
+    def rematched(entry: Any, brands: Any, note: Any) -> Any:
+        asked.append(list(brands))
+        return SimpleNamespace(manufacturers=[SimpleNamespace(manufacturer=b) for b in brands])
+
+    monkeypatch.setattr(service, "_rematched", rematched)
+    old = _Old("KSB", "Kirloskar Brothers")
+    brands = {"gate_valve": ["ksb", "Zoloto"], "ball_valve": ["Other"]}
+    item = cast(Any, service._with_brands(_entry(), cast(Any, old), brands, None))
+    assert asked == [["Zoloto"]]  # KSB is listed already: its catalogue evidence is kept
+    assert [m.manufacturer for m in item.manufacturers] == ["KSB", "Kirloskar Brothers", "Zoloto"]
+    assert "top_vendors" in item.fields
+
+
+def test_an_item_with_no_new_brand_is_returned_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
+    service = _service()
+    monkeypatch.setattr(service, "item_key", lambda title, ontology: "gate_valve")
+    old = _Old("KSB")
+    result: Any = service._with_brands(_entry(), cast(Any, old), {"ball_valve": ["X"]}, None)
+    assert result is old

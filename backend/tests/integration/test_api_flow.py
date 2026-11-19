@@ -7,7 +7,7 @@ everything else (routes, services, queue, database) is real.
 import hashlib
 import threading
 import uuid
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from datetime import UTC, datetime
 from functools import cache
 from io import BytesIO
@@ -179,6 +179,11 @@ class _Matcher:
         if isinstance(self.report, Exception):
             raise self.report
         return self.report
+
+    def add_listing_vendors(
+        self, previous: TenderReport, brands: Mapping[str, Sequence[str]]
+    ) -> TenderReport:
+        return previous
 
 
 @pytest.fixture

@@ -1,4 +1,8 @@
-"""Use case: check GeM Marketplace for a run's uncovered product type, then re-match by rules.
+"""Use case: check GeM Marketplace for a run's product types, and add the listing vendors.
+
+Two ways in: a check asked for by hand for one uncovered type of a finished run (below), or
+the GeM branch of a run (GEM_IN_RUN, `start_branch`), which checks every item type while the
+catalogues are matched and adds the listing vendors to the run's own report (`gem_branch`).
 
 Behind DISCOVERY_ENABLED (off by default). A check is a job in the run queue: it searches GeM
 with the words of the run's items of that type, keeps at most GEM_MAX_CATEGORIES fitting
@@ -10,8 +14,9 @@ checked run is never changed. No LLM is called.
 """
 
 import logging
+import time
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from functools import cache
@@ -58,6 +63,7 @@ from app.schemas.discovery import (
 )
 from app.schemas.enums import DiscoveryStatus, RunStatus
 from app.schemas.report import TenderReport
+from app.services.gem_branch import GemBranch
 from app.services.match_service import UncoveredType
 from app.services.report_service import build_report_service
 from app.services.run_service import RunService, failure_reason
@@ -84,6 +90,16 @@ class DiscoveryMatcher(Protocol):
         manufacturers: Sequence[str] | None,
     ) -> TenderReport:
         """Re-match, by rules, the items of these product types."""
+        ...
+
+    def item_types(self, tender: str) -> list[UncoveredType]:
+        """Every product type (or title key) of a tender's items."""
+        ...
+
+    def add_listing_vendors(
+        self, previous: TenderReport, brands: Mapping[str, Sequence[str]]
+    ) -> TenderReport:
+        """Add listing brands, matched by rules, to the items of their type."""
         ...
 
 
@@ -260,10 +276,27 @@ class DiscoveryService:
             product_type, category, run_id = job.product_type, job.category, run.id
             manufacturers, report = list(run.manufacturers), _report(run)
         uncovered = self._matcher().uncovered_types(report, manufacturers)
-        check = self._tools().check.for_type(product_type, self._settings.GEM_TITLE_STOP_WORDS)
-        request = self._request(
-            product_type, category, _item_titles(report, product_type, uncovered), check
+        titles = _item_titles(report, product_type, uncovered)
+        brands = self._check(job_id, product_type, category, titles)
+        if not brands:
+            return
+        new_report = self._matcher().rematch_items(
+            report, [product_type], sorted({*manufacturers, *brands})
         )
+        result_run = self._save_run(run_id, new_report, brands)
+        self._finish(job_id, DiscoveryStatus.DONE, result_run=result_run)
+
+    def _check(
+        self, job_id: uuid.UUID, product_type: str, category: str, titles: list[str]
+    ) -> list[str]:
+        """Search GeM for one type and store the listings that pass; record them on the job.
+
+        Returns:
+            Brands of every stored listing of the type; empty when nothing is kept, and then
+            the job is finished here with the reason.
+        """
+        check = self._tools().check.for_type(product_type, self._settings.GEM_TITLE_STOP_WORDS)
+        request = self._request(product_type, category, titles, check)
         withdrawn = self._withdraw_stale(request, check)
         pages = find_category_pages(request, self._deps(check))
         logger.info(
@@ -276,7 +309,7 @@ class DiscoveryService:
             self._finish(
                 job_id, DiscoveryStatus.DONE, error=f"GeM search found no category for {label}"
             )
-            return
+            return []
         gone = {o.url for o in withdrawn}  # reported once, as withdrawn
         outcomes = [
             o
@@ -287,12 +320,88 @@ class DiscoveryService:
         brands = self._listing_brands(product_type)
         if not brands:
             self._finish(job_id, DiscoveryStatus.DONE, error="No listing was kept")
-            return
-        new_report = self._matcher().rematch_items(
-            report, [product_type], sorted({*manufacturers, *brands})
+        return brands
+
+    def start_branch(self, run_id: uuid.UUID, tender: str) -> GemBranch | None:
+        """Start the GeM branch of a run: every item type checked while catalogues are matched.
+
+        Args:
+            run_id: The run that is starting.
+            tender: Its tender folder.
+
+        Returns:
+            The started branch, or None when discovery or GEM_IN_RUN is off or no item has a
+            type.
+        """
+        settings = self._settings
+        if not (settings.DISCOVERY_ENABLED and settings.GEM_IN_RUN):
+            return None
+        started = time.monotonic()
+        types = self._matcher().item_types(tender)
+        if not types:
+            return None
+        with session_scope(self._session_factory) as session:
+            jobs = DiscoveryJobRepository(session)
+            queued = [
+                (
+                    jobs.add(
+                        DiscoveryJob(
+                            run_id=run_id,
+                            product_type=t.product_type,
+                            category=t.category,
+                            status=DiscoveryStatus.QUEUED,
+                            listings=[],
+                        )
+                    ).id,
+                    t,
+                )
+                for t in types
+            ]
+        branch = GemBranch(
+            run_id=str(run_id),
+            jobs=queued,
+            deadline=started + settings.GEM_RUN_BUDGET_SECONDS,
+            check=self._check_in_run,
+            late=lambda late: self._late_types(run_id, late, [j for j, _ in queued]),
         )
-        result_run = self._save_run(run_id, new_report, brands)
-        self._finish(job_id, DiscoveryStatus.DONE, result_run=result_run)
+        branch.start()
+        logger.info("gem branch started", extra={"types": [t.product_type for t in types]})
+        return branch
+
+    def _check_in_run(self, job_id: uuid.UUID, item_type: UncoveredType) -> list[str]:
+        """One type of a run's GeM branch; the job is finished here, even on failure."""
+        with session_scope(self._session_factory) as session:
+            DiscoveryJobRepository(session).get_or_raise(job_id).status = DiscoveryStatus.RUNNING
+        try:
+            brands = self._check(
+                job_id, item_type.product_type, item_type.category, list(item_type.titles)
+            )
+        except Exception as exc:
+            reason = failure_reason(exc, self._settings.RUN_ERROR_MAX_CHARS)
+            self._finish(job_id, DiscoveryStatus.FAILED, error=reason)
+            raise
+        if brands:
+            self._finish(job_id, DiscoveryStatus.DONE)
+        return brands
+
+    def _late_types(
+        self,
+        run_id: uuid.UUID,
+        brands: Mapping[str, list[str]],
+        job_ids: Sequence[uuid.UUID],
+    ) -> None:
+        """Types the run did not wait for: add their vendors in a child run of the run."""
+        with session_scope(self._session_factory) as session:
+            report = _report(RunRepository(session).get_or_raise(run_id))
+        new_report = self._matcher().add_listing_vendors(report, brands)
+        every = sorted({b for names in brands.values() for b in names})
+        child = self._save_run(run_id, new_report, every)
+        with session_scope(self._session_factory) as session:
+            for job_id in job_ids:
+                job = DiscoveryJobRepository(session).get_or_raise(job_id)
+                if job.product_type in brands:
+                    job.result_run_id = child
+        logger.info("gem late types saved", extra={"types": sorted(brands), "child": str(child)})
 
     def _request(
         self, product_type: str, category: str, titles: list[str], check: ListingCheck
@@ -501,4 +610,5 @@ def build_discovery_service(
         cache(lambda: load_gem_config(settings.GEM_MARKETPLACE_FILE)),
     )
     runs.register(JobName.DISCOVER, lambda argument: service.execute(uuid.UUID(argument)))
+    runs.use_gem_branch(service.start_branch)
     return service

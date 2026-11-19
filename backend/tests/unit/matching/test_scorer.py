@@ -163,3 +163,15 @@ def test_low_coverage_vendors_come_after_well_covered_ones() -> None:
 def test_a_vendor_without_a_document_for_the_item_is_not_listed() -> None:
     vendors = [_vendor("NoDoc", [FULL], document=False), _vendor("KSB", [PARTIAL])]
     assert [v.manufacturer for v in top_vendors(vendors, 50.0, 3)] == ["KSB"]
+
+
+def test_at_an_equal_score_a_catalogue_vendor_comes_before_a_gem_listing() -> None:
+    vendors = [
+        _vendor("Alpha", [FULL, FULL], gem=True),  # name first, but seller-declared
+        _vendor("Zeta", [FULL, FULL]),
+    ]
+    top = top_vendors(vendors, min_coverage_pct=50.0, limit=3)
+    assert [(v.manufacturer, v.source) for v in top] == [
+        ("Zeta", VendorSource.CATALOGUE),
+        ("Alpha", VendorSource.GEM_LISTING),
+    ]
