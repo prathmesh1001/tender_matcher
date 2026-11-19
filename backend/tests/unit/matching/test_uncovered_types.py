@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from app.ontology.loader import load_ontologies
 from app.services.match_service import MatchService
+from app.tender.title_key import TitleKeyOptions
 
 BACKEND = Path(__file__).resolve().parents[3]
 TITLE = 'Pneumatic (ATO) Globe Type Two Way Control Valve Of Size 1" For Steam Line'
@@ -30,7 +31,10 @@ class _Source:
         return self.docs.get((manufacturer, category, product_type), [])
 
 
-def _service() -> MatchService:
+KEYS = TitleKeyOptions(stop_words=frozenset({"supply", "of", "with"}), max_words=3)
+
+
+def _service(title_keys: TitleKeyOptions | None = None) -> MatchService:
     unused = cast(Any, None)
     return MatchService(
         source=cast(Any, _Source()),
@@ -40,6 +44,8 @@ def _service() -> MatchService:
         confidence=unused,
         ontologies=load_ontologies(BACKEND / "ontology"),
         tender_root=BACKEND,
+        title_keys=title_keys,
+        untyped_category="general",
     )
 
 
@@ -68,3 +74,16 @@ def test_without_manufacturers_any_stored_document_covers() -> None:
 
 def test_a_type_with_a_catalogue_of_the_run_is_not_offered() -> None:
     assert _service().uncovered_types(_report("Gate Valve DN100 PN16"), ["KSB"]) == []
+
+
+def test_an_item_naming_no_ontology_type_is_offered_by_its_title_key() -> None:
+    report = _report("PVC foot valve Ball type 50 mm", "Supply of Hydraulic Hose Pipe 1/2 inch")
+    uncovered = _service(KEYS).uncovered_types(report, ["KSB"])
+    assert [(u.product_type, u.category, u.item_nos, u.by_title) for u in uncovered] == [
+        ("foot_valve", "general", ["1"], True),
+        ("hydraulic_hose_pipe", "general", ["2"], True),
+    ]
+
+
+def test_without_title_keys_untyped_items_are_not_offered() -> None:
+    assert _service().uncovered_types(_report("PVC foot valve Ball type"), ["KSB"]) == []

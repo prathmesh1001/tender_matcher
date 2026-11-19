@@ -677,6 +677,53 @@ class Settings(BaseSettings):
         description="Most listings opened per brand in one check, so one brand cannot fill "
         "every slot (a category page often shows one brand in many sizes).",
     )
+    GEM_UNTYPED_CATEGORY: str = Field(
+        default="general",
+        min_length=1,
+        pattern=r"^[a-z0-9_]+$",
+        description="Category of GeM listings found for items whose title names no ontology "
+        "product type (they are searched by a key from the title).",
+    )
+    GEM_TITLE_KEY_MAX_WORDS: int = Field(
+        default=3,
+        ge=1,
+        le=6,
+        description="Most title words in the key of an item with no ontology product type.",
+    )
+    GEM_TITLE_STOP_WORDS: list[str] = Field(
+        default_factory=lambda: [
+            "supply",
+            "supplying",
+            "providing",
+            "procurement",
+            "purchase",
+            "of",
+            "for",
+            "the",
+            "and",
+            "or",
+            "as",
+            "per",
+            "to",
+            "in",
+            "on",
+            "new",
+            "complete",
+            "set",
+            "nos",
+            "no",
+            "item",
+            "items",
+            "type",
+            "make",
+            "model",
+            "size",
+            "spare",
+            "spares",
+            "with",
+        ],
+        description="Filler words never part of a title key (JSON list, lower case).",
+    )
     GEM_REQUEST_DELAY_SECONDS: float = Field(
         default=3.0, ge=0, description="Pause before every request to GeM Marketplace."
     )

@@ -152,3 +152,30 @@ def test_type_words_apart_never_beat_another_type_named_whole(check: ListingChec
     # "ball" and "valve" are both here, but the name is a gate valve with ball-type words.
     links = _names("Ball Type Gate Valve")
     assert fitting_categories(links, "ball_valve", check) == []
+
+
+def test_a_title_key_is_searched_and_fitted_like_a_type(check: ListingCheck) -> None:
+    keyed = check.for_type("foot_valve", ["type", "for"])  # an ontology product with no type
+    links = _names(
+        "PVC Foot Valve (V2)",
+        "Ball Valve",
+        "Foot Valve Strainer Repair Kit",
+        "Foot Operated Water Valve",  # live GeM 2026-11-19: a tap, not a foot valve
+    )
+    assert [c.name for c in fitting_categories(links, "foot_valve", keyed)] == [
+        "PVC Foot Valve (V2)"
+    ]
+
+
+def test_filler_words_may_sit_between_a_keys_words(check: ListingCheck) -> None:
+    keyed = check.for_type("y_strainer", ["type"])
+    links = _names("Y Type Strainer", "Y Strainer", "Y Water Strainer")
+    assert [c.name for c in fitting_categories(links, "y_strainer", keyed)] == [
+        "Y Type Strainer",
+        "Y Strainer",
+    ]
+    assert search_queries("foot_valve", ["PVC foot valve Ball type"], keyed) == ["foot valve"]
+
+
+def test_a_known_type_keeps_the_same_check(check: ListingCheck) -> None:
+    assert check.for_type("ball_valve") is check

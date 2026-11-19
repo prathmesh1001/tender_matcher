@@ -1,12 +1,16 @@
 """A stored GeM listing as chunks, matched next to catalogues, cited with its provenance."""
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from app.discovery.gem_parser import GemListing
+from app.discovery.listing_check import ListingCheck
 from app.ingestion.gem_listing import LISTING_PAGE, listing_name, process_listing
 from app.ingestion.processing import ProcessingOptions
 from app.matching.chunk_source import CatalogueDocument, provenance
+from app.matching.comparator import MatchContext
 from app.matching.confidence import ConfidenceOptions, with_confidence
+from app.matching.engine import item_product_type
 from app.matching.listing_source import StoredListing, WithListings
 from app.schemas.enums import (
     DecisionSource,
@@ -162,3 +166,24 @@ def test_seller_flag_adds_no_second_rule_factor() -> None:
     twice = with_confidence(once, _Facts(), options)
     assert twice.confidence == options.gem_listing
     assert twice.flags.count(ReviewFlag.SELLER_DECLARED) == 1
+
+
+def test_a_listing_stored_under_a_title_key_is_found_for_its_untyped_item(
+    listing: GemListing, processing: ProcessingOptions, check: ListingCheck
+) -> None:
+    # Step C: "PVC foot valve Ball type" names no ontology type; its GeM listings are stored
+    # under the title key "foot_valve" in the general category and must be matched again.
+    stored = _stored(listing, processing)
+    # As the discovery service stores it: the check's matcher, which knows the key, tags it.
+    keyed_matcher = check.for_type("foot_valve").matcher
+    keyed = StoredListing(
+        replace(stored.document, category="general", product_types=("foot_valve",)),
+        process_listing(listing, "foot_valve", replace(processing, product_matcher=keyed_matcher)),
+    )
+    source = WithListings(_Catalogues(), lambda: [keyed])  # type: ignore[arg-type]
+    source.refresh()
+    declared = sorted(source.product_types())
+    title = "PVC foot valve Ball type 50 mm"
+    assert item_product_type(title, declared, MatchContext.for_ontology(None)) == "foot_valve"
+    chunks = source.chunks_for_product("Unbranded", "general", "foot_valve", use_tags=False)
+    assert len(chunks) == len(listing.specs)

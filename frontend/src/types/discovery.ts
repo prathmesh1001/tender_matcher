@@ -39,6 +39,8 @@ export interface UncoveredType {
   item_nos: string[];
   /** config/gem_marketplace.yaml lists GeM categories for this type. */
   gem_configured: boolean;
+  /** The items name no ontology product type: GeM is searched by their title words. */
+  by_title?: boolean;
   /** Checks already asked for this type, newest first. */
   jobs: DiscoveryJob[];
 }

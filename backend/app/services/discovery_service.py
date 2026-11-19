@@ -176,6 +176,7 @@ class DiscoveryService:
                     category=u.category,
                     item_nos=u.item_nos,
                     gem_configured=True,  # GeM is searched by the items' words
+                    by_title=u.by_title,
                     jobs=[j for j in jobs if j.product_type == u.product_type],
                 )
                 for u in self._matcher().uncovered_types(report, manufacturers)
@@ -259,11 +260,12 @@ class DiscoveryService:
             product_type, category, run_id = job.product_type, job.category, run.id
             manufacturers, report = list(run.manufacturers), _report(run)
         uncovered = self._matcher().uncovered_types(report, manufacturers)
+        check = self._tools().check.for_type(product_type, self._settings.GEM_TITLE_STOP_WORDS)
         request = self._request(
-            product_type, category, _item_titles(report, product_type, uncovered)
+            product_type, category, _item_titles(report, product_type, uncovered), check
         )
-        withdrawn = self._withdraw_stale(request)
-        pages = find_category_pages(request, self._deps())
+        withdrawn = self._withdraw_stale(request, check)
+        pages = find_category_pages(request, self._deps(check))
         logger.info(
             "gem categories",
             extra={"source": pages.source, "categories": pages.names, "type": product_type},
@@ -278,7 +280,7 @@ class DiscoveryService:
         gone = {o.url for o in withdrawn}  # reported once, as withdrawn
         outcomes = [
             o
-            for o in discover(replace(request, page_urls=pages.page_urls), self._deps())
+            for o in discover(replace(request, page_urls=pages.page_urls), self._deps(check))
             if o.url not in gone
         ]
         self._record(job_id, [*withdrawn, *outcomes])
@@ -292,9 +294,11 @@ class DiscoveryService:
         result_run = self._save_run(run_id, new_report, brands)
         self._finish(job_id, DiscoveryStatus.DONE, result_run=result_run)
 
-    def _request(self, product_type: str, category: str, titles: list[str]) -> DiscoveryRequest:
+    def _request(
+        self, product_type: str, category: str, titles: list[str], check: ListingCheck
+    ) -> DiscoveryRequest:
         """What to look for: search pages from the item titles, hand-listed pages as fallback."""
-        settings, config, check = self._settings, self._config(), self._tools().check
+        settings, config = self._settings, self._config()
         base = settings.GEM_BASE_URL
         queries = search_queries(product_type, titles, check)
         return DiscoveryRequest(
@@ -321,7 +325,9 @@ class DiscoveryService:
                 o.as_json() for o in outcomes
             ]
 
-    def _withdraw_stale(self, request: DiscoveryRequest) -> list[ListingOutcome]:
+    def _withdraw_stale(
+        self, request: DiscoveryRequest, check: ListingCheck
+    ) -> list[ListingOutcome]:
         """Withdraw stored listings of the type that today's check rejects (never deleted).
 
         A listing stored by an earlier, looser check (or before a look-alike was configured)
@@ -330,6 +336,7 @@ class DiscoveryService:
 
         Args:
             request: The product type, empty values and look-alikes of this check.
+            check: Today's listing check for the type.
 
         Returns:
             One outcome per withdrawn listing.
@@ -342,7 +349,7 @@ class DiscoveryService:
                     continue
                 with tools.store.local_path(doc.file_path) as path:
                     html = path.read_text(encoding="utf-8", errors="replace")
-                reason = recheck_stored(html, doc.url, request, tools.check)
+                reason = recheck_stored(html, doc.url, request, check)
                 if reason is None:
                     continue
                 doc.withdrawn_reason = reason
@@ -358,15 +365,18 @@ class DiscoveryService:
                 logger.info("gem listing withdrawn", extra={"url": doc.url, "reason": reason})
         return out
 
-    def _deps(self) -> DiscoveryDeps:
-        """Fetcher, store, check, stored-URL check and ingestion."""
+    def _deps(self, check: ListingCheck) -> DiscoveryDeps:
+        """Fetcher, store, the check for this type, stored-URL check and ingestion."""
         tools = self._tools()
         return DiscoveryDeps(
             fetcher=tools.fetcher,
             store=tools.store,
-            check=tools.check,
+            check=check,
             known=self._known,
-            save=lambda source, listing: self._save(source, listing, tools.processing),
+            # The check's matcher also knows a title key, so the tagger can tag by it.
+            save=lambda source, listing: self._save(
+                source, listing, replace(tools.processing, product_matcher=check.matcher)
+            ),
         )
 
     def _known(self, url: str) -> bool:

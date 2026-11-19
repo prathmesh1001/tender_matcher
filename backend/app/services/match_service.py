@@ -77,6 +77,7 @@ from app.tender.pipeline import (
 )
 from app.tender.quality import ItemFacts, extraction_quality, low_confidence_pages
 from app.tender.splitter import leaves
+from app.tender.title_key import TitleKeyOptions, title_key
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,7 @@ class UncoveredType:
     product_type: str
     category: str
     item_nos: list[str]
+    by_title: bool = False  # no ontology type: a key from the item title (`title_key`)
 
 
 @dataclass(slots=True)
@@ -139,8 +141,12 @@ class MatchService:
         judge: ItemJudge | None = None,
         store: FileStore | None = None,
         tender_cache: ProcessedCache | None = None,
+        title_keys: TitleKeyOptions | None = None,
+        untyped_category: str = "general",
     ) -> None:
         self._source = source
+        self._title_keys = title_keys
+        self._untyped_category = untyped_category
         self._tender_cache = tender_cache
         self._tender_options = tender_options
         self._requirement_options = requirement_options
@@ -400,18 +406,33 @@ class MatchService:
         found: dict[str, UncoveredType] = {}
         for item in report.items:
             ontology = ontology_for(item.item.title, self._ontologies)
-            product_type = product_type_for(item.item.title, ontology)
-            if (
-                ontology is None
-                or product_type is None
-                or self._covered(product_type, declared, manufacturers)
-            ):
+            product_type = self.item_key(item.item.title, ontology)
+            if product_type is None or self._covered(product_type, declared, manufacturers):
                 continue
+            category = ontology.category if ontology else self._untyped_category
             uncovered = found.setdefault(
-                product_type, UncoveredType(product_type, ontology.category, [])
+                product_type, UncoveredType(product_type, category, [], by_title=ontology is None)
             )
             uncovered.item_nos.append(item.item.item_no)
         return list(found.values())
+
+    def item_key(self, title: str, ontology: Ontology | None) -> str | None:
+        """The item's product type, or for a title naming none, a key from its words.
+
+        A title naming several ontology types gets neither (never guessed).
+
+        Args:
+            title: The item title.
+            ontology: The ontology whose types the title names, or None.
+
+        Returns:
+            The ontology type, the title key, or None.
+        """
+        if ontology is not None:
+            return product_type_for(title, ontology)
+        if self._title_keys is None:
+            return None
+        return title_key(title, self._ontologies, self._title_keys)
 
     def _covered(
         self,
@@ -467,7 +488,7 @@ class MatchService:
             items = [
                 (
                     self._rematched(entry, manufacturers, note)
-                    if product_type_for(entry.item.title, entry.ctx.ontology) in wanted
+                    if self.item_key(entry.item.title, entry.ctx.ontology) in wanted
                     else old
                 )
                 for entry, old in zip(parsed.items, previous.items, strict=True)
@@ -568,6 +589,11 @@ def build_match_service(
         judge=judge,
         store=files,
         tender_cache=tender_cache,
+        title_keys=TitleKeyOptions(
+            stop_words=frozenset(w.lower() for w in settings.GEM_TITLE_STOP_WORDS),
+            max_words=settings.GEM_TITLE_KEY_MAX_WORDS,
+        ),
+        untyped_category=settings.GEM_UNTYPED_CATEGORY,
     )
 
 

@@ -72,6 +72,12 @@ function UncoveredRow({ runId, uncovered }: { runId: string; uncovered: Uncovere
         No manufacturer document covers <strong>{name}</strong> (items{" "}
         {uncovered.item_nos.join(", ")}).
       </p>
+      {uncovered.by_title === true && (
+        <p className="text-xs text-ink-600">
+          No product type in the ontology names these items: GeM is searched by the words of their
+          title.
+        </p>
+      )}
       {uncovered.gem_configured ? (
         <Button
           variant="secondary"

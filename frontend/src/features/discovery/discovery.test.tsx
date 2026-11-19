@@ -125,6 +125,23 @@ describe("DiscoveryPanel", () => {
     });
   });
 
+  it("says when an item with no ontology type is searched by its title words", async () => {
+    const base = overview();
+    const [entry] = base.uncovered;
+    if (entry === undefined) throw new Error("fixture has an entry");
+    stubFetch(() =>
+      json({
+        ...base,
+        uncovered: [{ ...entry, product_type: "foot_valve", category: "general", by_title: true }],
+      }),
+    );
+    renderWithProviders(<DiscoveryPanel runId="run-1" />);
+    expect(
+      await screen.findByRole("button", { name: "Check GeM Marketplace for foot valve?" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/searched by the words of\s+their title/)).toBeInTheDocument();
+  });
+
   it("links to the re-matched report once the check is done", async () => {
     stubFetch(() => json(overview([JOB])));
     renderWithProviders(<DiscoveryPanel runId="run-1" />);

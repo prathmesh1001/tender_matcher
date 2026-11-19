@@ -59,6 +59,11 @@ class UncoveredTypeResponse(BaseModel):
     category: str
     item_nos: list[str]
     gem_configured: bool = Field(description="config/gem_marketplace.yaml lists categories.")
+    by_title: bool = Field(
+        default=False,
+        description="The items name no ontology product type: GeM is searched by a key made "
+        "from their title words.",
+    )
     jobs: list[DiscoveryJobResponse] = Field(
         default_factory=list, description="Checks already asked for this type, newest first."
     )

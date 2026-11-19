@@ -21,8 +21,9 @@ Furnace", "Valve Repair Kit"). A name may also hold a synonym's words apart or i
 order ("Submersible Sewerage Pump", "Centrifugal Cooling Water Pump"), as tender titles do.
 """
 
+import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from app.discovery.gem_parser import GemListing
 from app.ingestion.product_tagger import ProductMatcher
@@ -87,6 +88,25 @@ def synonym_words(
     return found
 
 
+def key_pattern(
+    phrase: str, gap_words: Sequence[str], vocabulary: SearchVocabulary
+) -> re.Pattern[str]:
+    """A phrase over normalized text, its words in order with only filler words between.
+
+    Args:
+        phrase: The key as words ("y strainer").
+        gap_words: Filler words allowed between them ("type").
+        vocabulary: Compiled ontology code rules.
+
+    Returns:
+        The pattern ("y type strainer" and "y strainer" match, "y water strainer" does not).
+    """
+    parts = [re.escape(w) for w in normalize_for_search(phrase, vocabulary).split()]
+    gaps = sorted({g for w in gap_words for g in normalize_for_search(w, vocabulary).split()})
+    gap = rf"(?:\s+(?:{'|'.join(re.escape(g) for g in gaps)}))*" if gaps else ""
+    return re.compile(rf"(?<!\S){(gap + r'\s+').join(parts)}(?!\S)")
+
+
 @dataclass(frozen=True, slots=True)
 class ListingCheck:
     """What a kept listing must show."""
@@ -129,6 +149,26 @@ class ListingCheck:
             parts,
             synonym_words(ontologies, vocabulary),
         )
+
+    def for_type(self, product_type: str, gap_words: Sequence[str] = ()) -> ListingCheck:
+        """This check, knowing `product_type` even when no ontology defines it.
+
+        A title key ("y_strainer", see `tender/title_key.py`) has no curated synonyms, so its
+        words must appear in order, with only filler words between them: "Y Type Strainer"
+        names `y_strainer`, "Foot Operated Water Valve" does not name `foot_valve`.
+
+        Args:
+            product_type: An ontology type or a title key.
+            gap_words: Filler words allowed between a key's words ("type").
+
+        Returns:
+            The same check for a known type, else one that also knows the key.
+        """
+        if product_type in self.matcher.types:
+            return self
+        pattern = key_pattern(product_type.replace("_", " "), gap_words, self.vocabulary)
+        matcher = replace(self.matcher, types={**self.matcher.types, product_type: (pattern,)})
+        return replace(self, matcher=matcher, type_words={**self.type_words, product_type: ()})
 
     def names_type(self, listing: GemListing, product_type: str) -> bool:
         """True if the title or a specification row names the product type.
@@ -274,6 +314,9 @@ class ListingCheck:
         foreign: dict[str, PhrasePatterns] = {
             name: pats for name, pats in self.matcher.types.items() if name != product_type
         }
-        foreign |= dict(self.other_products)
+        # A product with no type may be the wanted key itself, or part of it ("strainer" in
+        # "y_strainer"): neither is foreign to it.
+        own = set(product_type.split("_"))
+        foreign |= {p: pats for p, pats in self.other_products.items() if not set(p.split()) <= own}
         foreign |= {e: phrase_patterns([e], self.vocabulary) for e in excludes}
         return foreign
