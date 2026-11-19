@@ -26,7 +26,7 @@ from app.matching.comparator import (
     judge_numeric,
     offered_as_option,
 )
-from app.matching.evidence_verifier import PageTexts, verify_comparison
+from app.matching.evidence_verifier import PageTexts, QuoteSplit, verify_comparison
 from app.matching.fields import located_fields, option_fields
 from app.matching.headings import ProductGroups, group_by_product, other_product_passages
 from app.matching.product_identity import product_ask, product_identity
@@ -52,6 +52,7 @@ class SelectionOptions:
     quote_threshold: float
     min_coverage_pct: float
     top_vendors_per_item: int = 3
+    quote_split: QuoteSplit | None = None
     overview_min_headings: int = 3
     page_title_max_words: int = 5
     product_label_words: frozenset[str] = frozenset()
@@ -65,6 +66,11 @@ class SelectionOptions:
             quote_threshold=settings.QUOTE_MATCH_THRESHOLD,
             min_coverage_pct=settings.RANKING_MIN_COVERAGE_PCT,
             top_vendors_per_item=settings.REPORT_TOP_VENDORS_PER_ITEM,
+            quote_split=QuoteSplit(
+                max_pieces=settings.QUOTE_SPLIT_MAX_PIECES,
+                min_words=settings.QUOTE_SPLIT_MIN_WORDS,
+                max_words=settings.QUOTE_SPLIT_MAX_WORDS,
+            ),
             overview_min_headings=settings.CATALOGUE_OVERVIEW_MIN_HEADINGS,
             page_title_max_words=settings.CATALOGUE_PAGE_TITLE_MAX_WORDS,
             product_label_words=frozenset(stem_token(w) for w in settings.PRODUCT_TYPE_LABEL_WORDS),
@@ -185,7 +191,10 @@ def _chosen_heading(
         fields = located_fields(groups.by_heading[heading], options.comparator.fields)
         found = [
             verify_comparison(
-                compare(r, fields, ctx, options.comparator), pages, options.quote_threshold
+                compare(r, fields, ctx, options.comparator),
+                pages,
+                options.quote_threshold,
+                options.quote_split,
             )
             for r in requirements
         ]
@@ -439,7 +448,9 @@ def evaluate_document(
         offered_as_option(r, c, offers, ctx, options.comparator, owned)
         for r, c in zip(requirements, raw, strict=True)
     ]
-    comparisons = [verify_comparison(c, pages, options.quote_threshold) for c in softened]
+    comparisons = [
+        verify_comparison(c, pages, options.quote_threshold, options.quote_split) for c in softened
+    ]
     score, decided = _fit(comparisons, options.status_scores)
     critical = [c for r, c in zip(requirements, comparisons, strict=True) if _is_critical(r, ctx)]
     return DocumentResult(

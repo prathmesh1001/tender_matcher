@@ -74,6 +74,7 @@ from app.tender.pipeline import (
     RequirementOptions,
     ontology_for,
     product_type_for,
+    product_types_named,
 )
 from app.tender.quality import ItemFacts, extraction_quality, low_confidence_pages
 from app.tender.splitter import leaves
@@ -409,9 +410,10 @@ class MatchService:
             product_type = self.item_key(item.item.title, ontology)
             if product_type is None or self._covered(product_type, declared, manufacturers):
                 continue
+            typed = ontology is not None and ontology.product_type(product_type) is not None
             category = ontology.category if ontology else self._untyped_category
             uncovered = found.setdefault(
-                product_type, UncoveredType(product_type, category, [], by_title=ontology is None)
+                product_type, UncoveredType(product_type, category, [], by_title=not typed)
             )
             uncovered.item_nos.append(item.item.item_no)
         return list(found.values())
@@ -429,7 +431,9 @@ class MatchService:
             The ontology type, the title key, or None.
         """
         if ontology is not None:
-            return product_type_for(title, ontology)
+            typed = product_type_for(title, ontology)
+            if typed is not None or product_types_named(title, ontology):
+                return typed  # one type, or several (never guessed)
         if self._title_keys is None:
             return None
         return title_key(title, self._ontologies, self._title_keys)
@@ -507,12 +511,17 @@ class MatchService:
     def _rematched(
         self, entry: ItemInput, manufacturers: Sequence[str] | None, review_note: str | None
     ) -> ItemReport:
-        """One item matched again by rules, with confidence; all to review if the note says so."""
+        """One item matched again by rules, with confidence and its top vendors.
+
+        All results go to review if the note says so.
+        """
         report = match_item(entry, self._source, self._selection, manufacturers)
         report = items_with_confidence(
             [report], self._source, self._confidence, self._selection.status_scores
         )[0]
-        return item_for_review(report, review_note, self._selection) if review_note else report
+        if review_note:
+            report = item_for_review(report, review_note, self._selection)
+        return self._with_top_vendors(report)
 
     def _with_top_vendors(self, report: ItemReport) -> ItemReport:
         """The item with its best vendors listed (after review notes changed the scores)."""

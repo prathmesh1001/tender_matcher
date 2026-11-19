@@ -146,8 +146,17 @@ def product_types_named(title: str, ontology: Ontology) -> list[str]:
 
 
 def ontology_for(title: str, ontologies: Sequence[Ontology]) -> Ontology | None:
-    """The first ontology whose product types the item title names, or None."""
-    return next((o for o in ontologies if product_types_named(title, o)), None)
+    """The first ontology whose product types the item title names, or None.
+
+    A title naming no type but one of an ontology's products without a type ("PVC foot valve",
+    `other_products`) belongs to that ontology: its attributes, units and size table apply,
+    while the item itself has no product type (GeM searches it by a title key).
+    """
+    typed = next((o for o in ontologies if product_types_named(title, o)), None)
+    if typed is not None:
+        return typed
+    title_words = words(fold_text(title))
+    return next((o for o in ontologies if _names_other_product(title_words, o)), None)
 
 
 def product_type_for(title: str, ontology: Ontology | None) -> str | None:

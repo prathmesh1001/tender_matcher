@@ -368,7 +368,7 @@ def test_excel_downloads_for_a_finished_run_only(app: FastAPI, client: TestClien
     assert response.headers["content-type"].startswith("application/vnd.openxmlformats")
     assert f"_{done}.xlsx" in response.headers["content-disposition"]
     book = load_workbook(BytesIO(response.content))
-    assert book.sheetnames == ["Summary", "Requirements", "By status", "General"]
+    assert book.sheetnames == ["Summary", "Requirements", "Top vendors", "By status", "General"]
 
 
 def test_a_stored_document_opens_inline(

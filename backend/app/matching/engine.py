@@ -50,6 +50,10 @@ def item_product_type(title: str, declared: Sequence[str], ctx: MatchContext) ->
         found = matcher.types_in(normalize_for_search(title, ctx.vocabulary), wanted) or set(
             wanted.intersection(product_types_named(title, ctx.ontology))
         )
+        if not found and not product_types_named(title, ctx.ontology):
+            # A product of the ontology without a type ("foot valve"): GeM listings declare
+            # it under a title key the title names.
+            found = declared_types_named(title, [d for d in declared if d not in known])
     else:
         found = declared_types_named(title, declared)
     return next(iter(found)) if len(found) == 1 else None

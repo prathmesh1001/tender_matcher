@@ -457,6 +457,20 @@ class Settings(BaseSettings):
         le=1,
         description="Tender is unreliable if this share of item requirements cite such pages.",
     )
+    QUOTE_SPLIT_MAX_PIECES: int = Field(
+        default=3,
+        ge=1,
+        le=4,
+        description="A quote piece not found as one run (a cell printed on two lines with other "
+        "columns between) also verifies as this many consecutive pieces, each printed on the "
+        "page. 1: never split.",
+    )
+    QUOTE_SPLIT_MIN_WORDS: int = Field(
+        default=2, ge=1, description="Fewest words in each piece of a split quote."
+    )
+    QUOTE_SPLIT_MAX_WORDS: int = Field(
+        default=24, ge=2, description="Longer quote pieces are never split."
+    )
     REPORT_TOP_VENDORS_PER_ITEM: int = Field(
         default=3,
         ge=1,

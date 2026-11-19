@@ -1,6 +1,6 @@
 """Evidence verification on comparisons. Evidence rows and pages are synthetic."""
 
-from app.matching.evidence_verifier import verify_comparison
+from app.matching.evidence_verifier import QuoteSplit, verify_comparison
 from app.schemas.enums import DecisionSource, MatchStatus
 from app.schemas.matching import Comparison, Evidence, LabelBasis
 
@@ -76,3 +76,39 @@ def test_unsupported_evidence_is_only_marked() -> None:
     result = verify_comparison(_comparison(MatchStatus.UNSUPPORTED, [considered]), PAGES, 0.9)
     assert result.status is MatchStatus.UNSUPPORTED
     assert result.evidence[0].verified is True
+
+
+# ---------------------------------------------------------------- a cell printed on two lines
+
+# Kirloskar KBL monobloc catalogue p2 (8226616): a five-model table whose "Power Rating" cells
+# print kW on one line and HP on another, with the other models' kW values between.
+KBL_PAGE = _Pages(
+    {
+        2: "Power Rating \n0.37 to 22 kW  \n1.5 to 22 kW  \n3.7 to 15 kW  \n \n"
+        "(0.5 to 30 HP) \n(2 to 30 HP) \n(5 to 20 HP)\nVoltage Range"
+    }
+)
+SPLIT = QuoteSplit(max_pieces=3, min_words=2, max_words=24)
+
+
+def test_a_cell_printed_on_two_lines_verifies_piece_by_piece() -> None:
+    evidence = _evidence(["Power Rating", "0.37 to 22 kW (0.5 to 30 HP)"], page=2)
+    result = verify_comparison(
+        _comparison(MatchStatus.FULL_MATCH, [evidence]), KBL_PAGE, 0.9, SPLIT
+    )
+    assert result.status is MatchStatus.FULL_MATCH
+    assert result.evidence[0].verified is True
+
+
+def test_without_splitting_the_same_cell_fails() -> None:
+    evidence = _evidence(["Power Rating", "0.37 to 22 kW (0.5 to 30 HP)"], page=2)
+    result = verify_comparison(_comparison(MatchStatus.FULL_MATCH, [evidence]), KBL_PAGE, 0.9)
+    assert result.status is MatchStatus.UNSUPPORTED
+
+
+def test_a_piece_not_printed_anywhere_still_fails_when_split() -> None:
+    evidence = _evidence(["Power Rating", "0.37 to 22 kW (0.5 to 45 HP)"], page=2)
+    result = verify_comparison(
+        _comparison(MatchStatus.FULL_MATCH, [evidence]), KBL_PAGE, 0.9, SPLIT
+    )
+    assert result.status is MatchStatus.UNSUPPORTED

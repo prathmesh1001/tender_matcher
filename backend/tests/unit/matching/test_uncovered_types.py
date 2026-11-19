@@ -80,10 +80,15 @@ def test_an_item_naming_no_ontology_type_is_offered_by_its_title_key() -> None:
     report = _report("PVC foot valve Ball type 50 mm", "Supply of Hydraulic Hose Pipe 1/2 inch")
     uncovered = _service(KEYS).uncovered_types(report, ["KSB"])
     assert [(u.product_type, u.category, u.item_nos, u.by_title) for u in uncovered] == [
-        ("foot_valve", "general", ["1"], True),
+        ("foot_valve", "valves_pumps", ["1"], True),  # an ontology product without a type
         ("hydraulic_hose_pipe", "general", ["2"], True),
     ]
 
 
 def test_without_title_keys_untyped_items_are_not_offered() -> None:
     assert _service().uncovered_types(_report("PVC foot valve Ball type"), ["KSB"]) == []
+
+
+def test_a_title_naming_several_types_gets_no_key() -> None:
+    # Never guessed: "Gate valve and globe valve" names two ontology types.
+    assert _service(KEYS).uncovered_types(_report("Gate valve and globe valve set"), []) == []
