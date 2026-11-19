@@ -60,8 +60,15 @@ def test_review_notes_come_before_the_top_vendors() -> None:
 class _Old:
     """Stands in for the run's item report: catalogue vendors already matched."""
 
-    def __init__(self, *names: str) -> None:
-        self.manufacturers = [SimpleNamespace(manufacturer=n) for n in names]
+    def __init__(self, *names: str, without_document: tuple[str, ...] = ()) -> None:
+        self.manufacturers = [
+            SimpleNamespace(
+                manufacturer=n,
+                chosen=None if n in without_document else "catalogue.pdf",
+                tied_documents=[],
+            )
+            for n in names
+        ]
         self.fields: dict[str, Any] = {}
 
     def model_copy(self, update: dict[str, Any]) -> _Old:
@@ -103,3 +110,23 @@ def test_an_item_with_no_new_brand_is_returned_unchanged(monkeypatch: pytest.Mon
     old = _Old("KSB")
     result: Any = service._with_brands(_entry(), cast(Any, old), {"ball_valve": ["X"]}, None)
     assert result is old
+
+
+def test_a_catalogue_maker_without_a_document_for_the_item_gets_its_gem_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # 8148400: catalogue maker "Zoloto" has no butterfly valve document; GeM brand "ZOLOTO" has.
+    service = _service()
+    monkeypatch.setattr(service, "item_key", lambda title, ontology: "butterfly_valve")
+    monkeypatch.setattr(
+        service,
+        "_rematched",
+        lambda entry, brands, note: SimpleNamespace(
+            manufacturers=[SimpleNamespace(manufacturer=b) for b in brands]
+        ),
+    )
+    old = _Old("Keystone", "Zoloto", without_document=("Zoloto",))
+    item = cast(
+        Any, service._with_brands(_entry(), cast(Any, old), {"butterfly_valve": ["ZOLOTO"]}, None)
+    )
+    assert [m.manufacturer for m in item.manufacturers] == ["Keystone", "ZOLOTO"]

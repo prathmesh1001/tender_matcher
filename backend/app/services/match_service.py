@@ -502,16 +502,23 @@ class MatchService:
         brands: Mapping[str, Sequence[str]],
         note: str | None,
     ) -> ItemReport:
-        """One item with the new brands of its type appended (the item itself if none)."""
-        listed = {m.manufacturer.casefold() for m in old.manufacturers}
+        """One item with the new brands of its type added (the item itself if none).
+
+        A brand whose catalogue has a document for the item keeps its catalogue result
+        (stronger evidence). A brand listed without one (a catalogue maker of other products,
+        e.g. Zoloto for butterfly valves on 8148400) is replaced by its GeM listing result.
+        """
+        with_document = {
+            m.manufacturer.casefold() for m in old.manufacturers if m.chosen or m.tied_documents
+        }
         key = self.item_key(entry.item.title, entry.ctx.ontology)
-        new = [b for b in brands.get(key or "", ()) if b.casefold() not in listed]
+        new = [b for b in brands.get(key or "", ()) if b.casefold() not in with_document]
         if not new:
             return old
         added = self._rematched(entry, new, note)
-        merged = old.model_copy(
-            update={"manufacturers": [*old.manufacturers, *added.manufacturers]}
-        )
+        replaced = {m.manufacturer.casefold() for m in added.manufacturers}
+        kept = [m for m in old.manufacturers if m.manufacturer.casefold() not in replaced]
+        merged = old.model_copy(update={"manufacturers": [*kept, *added.manufacturers]})
         return self._with_top_vendors(merged)
 
     def item_key(self, title: str, ontology: Ontology | None) -> str | None:
