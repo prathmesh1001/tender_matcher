@@ -34,7 +34,12 @@ def test_ligatures_quotes_dashes_and_nbsp_are_folded(vocab: SearchVocabulary) ->
     ("variants", "canonical"),
     [
         (["SS316", "SS 316", "SS-316", "316 SS", "AISI 316"], "ss316"),
-        (["SS316L", "SS 316 L", "316L SS"], "ss316l"),
+        (["SS316L", "SS 316 L", "316L SS", "Stainless Steel 316L"], "ss316l"),
+        (
+            ["Stainless Steel, Gr 316", "stainless steel grade 316", "316 Stainless Steel"],
+            "ss316",
+        ),
+        (["SS 446", "Stainless Steel Type 446"], "ss446"),
         (["17-4-PH", "17-4PH", "17 4 PH"], "17_4ph"),
         (["A 216 Gr. WCB", "A216 WCB", "ASTM A-216 Grade WCB", "WCB"], "a216_wcb"),
         (["CF8M", "A351 CF8M", "CF-8M"], "a351_cf8m"),
@@ -49,6 +54,10 @@ def test_code_variants_have_one_form(
 ) -> None:
     # A4 / A5 sizes and ratings.
     assert {normalize_for_search(v, vocab) for v in variants} == {canonical}
+
+
+def test_stainless_steel_followed_by_a_size_is_not_a_grade(vocab: SearchVocabulary) -> None:
+    assert normalize_for_search("Stainless Steel 250 mm", vocab) == "stainless steel 250 mm"
 
 
 def test_longer_code_wins_over_its_prefix(vocab: SearchVocabulary) -> None:

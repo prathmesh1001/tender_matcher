@@ -198,6 +198,9 @@ def test_parse_value(
     [
         ("ASTM A217 Gr. CA15/CF8M", ("ASTM A217 Gr. CA15", "CF8M"), True),  # "/" alone
         ("B7/2H", ("B7", "2H"), True),
+        ("SS316 / 446", ("SS316", "SS446"), True),  # a bare grade keeps the prefix
+        ("SS 304/316L", ("SS 304", "SS 316L"), True),
+        ("DN 50/100", ("DN 50", "100"), True),  # not the same length: not a grade
         ("NITRILE OR SS", ("NITRILE", "SS"), True),
         ("CA15/CF8M or A105", ("CA15", "CF8M", "A105"), True),
         ("ASTM A216 WCB or equivalent", (), False),  # D4: a qualifier, not an option

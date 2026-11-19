@@ -32,6 +32,10 @@ _CODE: Final = re.compile(
     r"\b(?:(?=[A-Za-z-]*\d)(?=[\d-]*[A-Za-z])[A-Za-z0-9-]+|[A-Z]{2,}\s?\d{2,})\b"
 )
 _WORD: Final = re.compile(r"[a-z0-9]+")
+# "/" options: a bare grade number of 3+ digits ("446", "316L") after a lettered grade ("SS316");
+# shorter ones are other codes ("B7/2H" bolting, "PN 10/16" read as designations elsewhere).
+_BARE_GRADE: Final = re.compile(r"(\d{3,})[A-Za-z]?")
+_PREFIXED_GRADE: Final = re.compile(r"(.*[A-Za-z][\s.-]*)(\d+)[A-Za-z]?")
 # A bracketed part of a folded label: "nominal pressure (pn) (mpa)" -> "pn", "mpa".
 _LABEL_BRACKET: Final = re.compile(r"\(([^()]+)\)")
 _COMPOUND: Final = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
@@ -233,10 +237,32 @@ def has_code(text: str) -> bool:
     return bool(_CODE.search(text))
 
 
+def _with_prefix(previous: str, option: str) -> str:
+    """A bare grade number takes the code prefix of the option before it.
+
+    "SS316 / 446" means SS316 or SS446, "SS 304/316" means SS 304 or SS 316: the second option
+    is a number of the same length as the first option's grade. Any other option is kept.
+    """
+    bare = _BARE_GRADE.fullmatch(option)
+    coded = _PREFIXED_GRADE.fullmatch(previous)
+    if bare is None or coded is None or len(bare.group(1)) != len(coded.group(2)):
+        return option
+    return f"{coded.group(1)}{option}"
+
+
 def alternatives(value: str) -> tuple[str, ...]:
-    """Options written with "/" ("ASTM A217 Gr. CA15/CF8M" -> "ASTM A217 Gr. CA15", "CF8M")."""
-    parts = tuple(p.strip() for p in value.split("/"))
-    return parts if len(parts) > 1 and all(parts) else ()
+    """Options written with "/" ("ASTM A217 Gr. CA15/CF8M" -> "ASTM A217 Gr. CA15", "CF8M").
+
+    A bare grade number repeats the prefix of the option before it ("SS316 / 446" -> "SS316",
+    "SS446").
+    """
+    parts = [p.strip() for p in value.split("/")]
+    if len(parts) < 2 or not all(parts):
+        return ()
+    options = [parts[0]]
+    for part in parts[1:]:
+        options.append(_with_prefix(options[-1], part))
+    return tuple(options)
 
 
 def or_options(value: str) -> tuple[str, ...]:

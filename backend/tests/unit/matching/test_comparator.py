@@ -606,6 +606,27 @@ def test_trim_materials_are_materials(valves: Ontology, value: str) -> None:
     assert _compare("SEAT MOC : SS316", [row], valves).status is MatchStatus.MISSING_CAPABILITY
 
 
+@pytest.mark.parametrize(
+    ("line", "part", "value"),
+    [
+        ("STEM MOC : SS316", "Stem", "Stainless Steel, Gr 316"),  # valve trim, grade in words
+        ("IMPELLER MOC : SS 304", "Impeller", "Stainless steel grade 304"),  # pump
+        ("SHAFT MOC : AISI 410", "Shaft", "410 Stainless Steel"),  # pump, grade first
+        ("DISC MOC : SS316 / 446", "Disc", "Stainless Steel 446"),  # second option, bare grade
+    ],
+)
+def test_a_grade_written_in_words_is_the_same_code(
+    valves: Ontology, line: str, part: str, value: str
+) -> None:
+    result = _compare(line, [_row(["Part", "Material"], [part, value])], valves)
+    assert result.status is MatchStatus.FULL_MATCH
+
+
+def test_a_grade_written_in_words_still_fails_on_another_grade(valves: Ontology) -> None:
+    row = _row(["Part", "Material"], ["Stem", "Stainless Steel, Gr 304"])
+    assert _compare("STEM MOC : SS316", [row], valves).status is MatchStatus.MISSING_CAPABILITY
+
+
 def test_tender_naming_only_the_material_is_met_by_its_grade_code(valves: Ontology) -> None:
     row = _row(["Part", "Material"], ["Body", "Cast Iron EN 1561 Gr. 200"])
     assert _compare("BODY MOC : CI", [row], valves).status is MatchStatus.FULL_MATCH

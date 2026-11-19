@@ -260,6 +260,17 @@ material_names: [cast iron, ductile iron, sg iron, cast steel, carbon steel, sta
                  polypropylene, pvc, upvc, cpvc, hdpe]
 
 codes:
+  # Stainless grades written in words, any grade (2xx, 30x-34x, 40x-44x): "Stainless Steel, Gr 316",
+  # "stainless steel grade 304L", "316 stainless steel" -> the same code as "SS 316". A number
+  # followed by a unit ("stainless steel 250 mm") is a size, not a grade.
+  - pattern: '\bstainless\s+steel\s*,?\s*(?:(?:aisi|gr|grade|type)\.?\s*)?-?\s*(2\d\d|3[0-4]\d|4[0-4]\d)(?:\s*(l))?\b(?!\s*(?:mm|cm|m\b|bar|kg|psi|nb|dn|°|deg|"|#))'
+    canonical: 'ss\1\2'
+  - pattern: '\b(2\d\d|3[0-4]\d|4[0-4]\d)(?:\s*(l))?\s+stainless\s+steel\b'
+    canonical: 'ss\1\2'
+  # Any other stainless grade with the SS / AISI prefix ("SS 446", "AISI 420", "431 SS"); the
+  # named grades below keep their own rules.
+  - pattern: '\b(?:ss|aisi)\s*-?\s*(2\d\d|3[0-4]\d|4[0-4]\d)(?:\s*(l))?\b(?!\s*(?:mm|cm|m\b|bar|kg|psi|nb|dn|°|deg|"|#))|\b(2\d\d|3[0-4]\d|4[0-4]\d)(?:\s*(l))?\s*ss\b'
+    canonical: 'ss\1\2\3\4'
   # Stainless grades: "SS 316L", "SS-316", "316 SS", "AISI 316"
   - pattern: '\b(?:ss|aisi)\s*-?\s*316\s*l\b|\b316\s*l\s*ss\b'
     canonical: ss316l
