@@ -422,9 +422,8 @@ class DiscoveryService:
             listings = {j.product_type: list(j.listings) for j in jobs if j.product_type in keys}
         settings = self._settings
         recs = recommendations(categories, listings, settings.GEM_RECOMMENDED_PER_CATEGORY)
-        return with_recommendations(
-            report, recs, settings.GEM_TITLE_STOP_WORDS, settings.GEM_RELATED_PER_ITEM
-        )
+        ignore = [*settings.GEM_TITLE_STOP_WORDS, *settings.GEM_RELATED_IGNORE_WORDS]
+        return with_recommendations(report, recs, ignore, settings.GEM_RELATED_PER_ITEM)
 
     def _check_in_process(self, job_id: uuid.UUID, item_type: UncoveredType) -> list[str]:
         """`check_in_run` in a spawned child process; the brands are read from its job.

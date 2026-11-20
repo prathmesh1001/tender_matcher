@@ -252,7 +252,8 @@ def test_a_trusted_buyer_category_keeps_its_own_listings_only(check: ListingChec
     from app.discovery.pipeline import listing_rejection
 
     rows = tuple(SpecRow(None, f"Row {n}", "x") for n in range(6))
-    page = page_url(BASE, "stainless-steel-pump-impeller")
+    # search links carry the parent path; listing URLs only the category's own slug
+    page = page_url(BASE, "industrial-pumps-pump-parts-stainless-steel-pump-impeller")
     request = replace(
         _request("buyer_category_stainless_steel_pump_impeller"), trusted=True, page_urls=[page]
     )

@@ -51,12 +51,12 @@ def test_items_without_gem_get_related_listings_sharing_a_product_word() -> None
     rec = GemRecommendation(brand="K", product="K impeller", url="u", category=IMPELLER)
     items = [
         _item("1", "IMPELLER MOC BRONZE"),
-        _item("2", "BEARING HOLDER DE"),  # shares no product word
+        _item("2", "PUMP SHAFT 3 STAGE"),  # shares only "pump": an equipment word
         _item("3", "IMPELLER", gem=True),  # has its own GeM vendor
     ]
     report = SimpleNamespace(items=items)
     report.model_copy = lambda update: SimpleNamespace(**{**vars(report), **update})
-    out = with_recommendations(cast(TenderReport, report), [rec], ["of", "and"], per_item=3)
+    out = with_recommendations(cast(TenderReport, report), [rec], ["of", "pump"], per_item=3)
     assert [r.brand for r in out.recommended_gem_vendors] == ["K"]
     first, second, third = out.items
     assert [r.reason for r in first.related_gem_vendors] == [

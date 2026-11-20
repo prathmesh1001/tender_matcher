@@ -711,6 +711,29 @@ class Settings(BaseSettings):
         ge=1,
         description="Most related GeM listings shown on an item that has no GeM vendor of its own.",
     )
+    GEM_RELATED_IGNORE_WORDS: list[str] = Field(
+        default_factory=lambda: [
+            "pump",
+            "pumps",
+            "pumpset",
+            "valve",
+            "valves",
+            "motor",
+            "motors",
+            "assembly",
+            "assemblies",
+            "unit",
+            "units",
+            "part",
+            "parts",
+            "stage",
+            "type",
+            "complete",
+        ],
+        description="Words too general to relate an item to a buyer GeM category: equipment "
+        "names and part-of words ('PUMP SHAFT' is not an impeller because both say pump) "
+        "(JSON list, lower case).",
+    )
     GEM_CHECK_IN_PROCESS: bool = Field(
         default=True,
         description="Run each GeM check of a run's GeM branch in a child process, so storing "

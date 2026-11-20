@@ -303,9 +303,19 @@ def listing_rejection(
     if len(listing.specs) < check.min_spec_rows:
         return f"only {len(listing.specs)} specification rows (need {check.min_spec_rows})"
     own = _listing_category(listing.url)
-    if own not in {_slug(p) for p in request.page_urls}:
+    if not own or not any(_same_category(_slug(p), own) for p in request.page_urls):
         return f"in GeM category {own or 'unknown'}, not a buyer category"
     return None
+
+
+def _same_category(page_slug: str, own: str) -> bool:
+    """True if a category page's slug is the listing's category.
+
+    Search links carry the parent path ("industrial-pumps-...-stainless-steel-pump-impeller");
+    listing URLs only the category's own slug ("stainless-steel-pump-impeller").
+    """
+    page, own = page_slug.strip("-"), own.strip("-")
+    return page == own or page.endswith(f"-{own}")
 
 
 def _listing_category(url: str) -> str:
