@@ -11,9 +11,10 @@ order picks each item's top vendors (`top_vendors`), on that item's results alon
 """
 
 from collections.abc import Mapping, Sequence
+from typing import Final
 
 from app.schemas.enums import MatchStatus, VendorSource
-from app.schemas.matching import Comparison
+from app.schemas.matching import Comparison, SubTypeFit
 from app.schemas.report import ItemVendor, ManufacturerItemReport, RankingEntry, Score
 
 _PERCENT = 100.0
@@ -151,11 +152,22 @@ def top_vendors(
     ]
     eligible.sort(key=lambda m: _order(m.manufacturer, m.score, min_coverage_pct))
     catalogue = [m for m in eligible if not _gem(m)][:limit]
-    gem_listings = [m for m in eligible if _gem(m)][:limit]
+    # A GeM listing naming the item's sub-type goes before one naming none, and one naming
+    # another sub-type last (B2): a sluice valve at 50% is no knife-edge gate valve.
+    gem = sorted((m for m in eligible if _gem(m)), key=_sub_type_rank)
+    gem_listings = gem[:limit]
     return [
         *_vendors(catalogue, min_coverage_pct, gem=False),
         *_vendors(gem_listings, min_coverage_pct, gem=True),
     ]
+
+
+_SUB_TYPE_RANK: Final = {SubTypeFit.MATCH: 0, SubTypeFit.MISMATCH: 2}
+
+
+def _sub_type_rank(report: ManufacturerItemReport) -> int:
+    """0 for a sub-type match, 2 for a mismatch, 1 otherwise (general, unknown, no document)."""
+    return _SUB_TYPE_RANK.get(report.chosen.sub_type_fit, 1) if report.chosen else 1
 
 
 def _vendors(

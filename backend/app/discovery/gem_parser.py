@@ -22,7 +22,7 @@ from html.parser import HTMLParser
 from typing import Final
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
-from app.discovery.gem_cards import clean_brand
+from app.discovery.gem_cards import clean_brand, known_brand
 
 _LISTING_LINK: Final = re.compile(r"/p-\d+-\d+-cat\.html$")
 _CATEGORY_LINK: Final = re.compile(r"^/([^/]+)/search$")
@@ -302,7 +302,7 @@ def parse_listing(html: str, url: str, empty_values: Sequence[str] = ()) -> GemL
     return GemListing(
         url=_without_fragment(url),
         title=_clean(" ".join(state.title_parts)),
-        brand=clean_brand(" ".join(state.brand_parts)),
+        brand=known_brand(clean_brand(" ".join(state.brand_parts)), empty_values),
         model=_clean(model) if model else None,
         specs=specs,
     )

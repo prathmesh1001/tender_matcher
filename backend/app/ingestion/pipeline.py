@@ -289,6 +289,7 @@ class ListingSource:
     fetched_at: datetime
     sha256: str
     snapshot_ref: str
+    sub_types: tuple[str, ...] = ()  # ontology sub-types the listing's title or model names
 
 
 def ingest_listing(
@@ -322,7 +323,7 @@ def ingest_listing(
             url=source.url,
             file_path=source.snapshot_ref,
             product_types=[source.product_type],
-            sub_types=[],
+            sub_types=list(source.sub_types),
             sha256=source.sha256,
             fetched_at=source.fetched_at,
             publish_date=None,

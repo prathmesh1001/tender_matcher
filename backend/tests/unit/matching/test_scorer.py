@@ -183,3 +183,18 @@ def test_each_source_keeps_its_own_best_vendors() -> None:
         (1, "Alpha", VendorSource.GEM_LISTING),
         (2, "Beta", VendorSource.GEM_LISTING),
     ]
+
+
+def _with_fit(vendor: ManufacturerItemReport, fit: SubTypeFit) -> ManufacturerItemReport:
+    assert vendor.chosen is not None
+    chosen = vendor.chosen.model_copy(update={"sub_type_fit": fit})
+    return vendor.model_copy(update={"chosen": chosen, "candidates": [chosen]})
+
+
+def test_gem_listing_of_the_item_sub_type_goes_before_a_better_scored_other() -> None:
+    # 8210284 "KNIFE EDGE GATE VALVE 150MM": a sluice valve at 50 % came before knife listings.
+    sluice = _with_fit(_vendor("ajanta", [FULL, MISSING], gem=True), SubTypeFit.GENERAL)
+    knife = _with_fit(_vendor("getway", [FULL, MISSING, MISSING], gem=True), SubTypeFit.MATCH)
+    wedge = _with_fit(_vendor("XEN", [FULL, FULL], gem=True), SubTypeFit.MISMATCH)
+    top = top_vendors([sluice, wedge, knife], min_coverage_pct=50.0, limit=3)
+    assert [v.manufacturer for v in top] == ["getway", "ajanta", "XEN"]

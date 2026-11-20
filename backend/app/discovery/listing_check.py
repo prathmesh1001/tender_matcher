@@ -121,6 +121,8 @@ class ListingCheck:
     type_words: Mapping[str, tuple[tuple[str, ...], ...]] = field(default_factory=dict)
     # Title keys this check was given (`for_type`): products no ontology defines.
     key_types: frozenset[str] = frozenset()
+    # Inch size -> DN (mm), every ontology's `nps_to_dn`: card sizes in inches compare in mm.
+    nps_to_dn: Mapping[str, int] = field(default_factory=dict)
 
     @classmethod
     def from_ontologies(
@@ -150,6 +152,7 @@ class ListingCheck:
             accessory,
             parts,
             synonym_words(ontologies, vocabulary),
+            nps_to_dn={k: v for o in ontologies for k, v in o.nps_to_dn.items()},
         )
 
     def for_type(self, product_type: str, gap_words: Sequence[str] = ()) -> ListingCheck:

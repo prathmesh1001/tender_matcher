@@ -39,6 +39,7 @@ from app.db.repositories import (
     RunRepository,
 )
 from app.db.session import session_scope
+from app.discovery.card_fit import item_wants
 from app.discovery.gem_config import GemMarketplaceConfig, load_gem_config
 from app.discovery.gem_parser import GemListing
 from app.discovery.gem_search import rank_words, search_queries, search_url
@@ -530,6 +531,12 @@ class DiscoveryService:
             search_urls=[search_url(base, q) for q in queries],
             max_categories=settings.GEM_MAX_CATEGORIES,
             rank_words=rank_words(product_type, titles, check, config.rank_ignore_words),
+            item_wants=item_wants(
+                product_type,
+                titles,
+                check,
+                lambda title: rank_words(product_type, [title], check, config.rank_ignore_words),
+            ),
             base_url=base,
             max_pages=settings.GEM_MAX_CATEGORY_PAGES,
             max_per_brand=settings.GEM_MAX_LISTINGS_PER_BRAND,

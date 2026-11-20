@@ -7,10 +7,10 @@ from pathlib import Path
 import pytest
 
 from app.core.exceptions import LinkFetchError
+from app.discovery.card_fit import ItemWant, pick_for_items, rank_for_item
 from app.discovery.gem_cards import ListingCard, clean_brand, listing_cards, total_results
 from app.discovery.gem_config import load_gem_config
 from app.discovery.gem_parser import parse_listing
-from app.discovery.gem_search import pick_cards, rank_cards
 from app.discovery.listing_check import ListingCheck
 from app.discovery.pipeline import DiscoveryDeps, category_cards
 from app.ingestion.pipeline import IngestOutcome, IngestStatus
@@ -20,6 +20,11 @@ from tests.unit.discovery.conftest import BACKEND, fixture_text
 
 PAGE = "https://mkp.gem.gov.in/valves-butterfly-valves-v2-as-per-is-13095/search"
 SELLER_RANK = load_gem_config(BACKEND / "config" / "gem_marketplace.yaml").seller_rank
+BFV = "butterfly_valve"
+
+
+def _never(_url: str) -> bool:
+    return False
 
 
 def test_cards_hold_title_brand_seller_rating_and_assessment() -> None:
@@ -75,7 +80,9 @@ def _card(n: int, brand: str, title: str, sold: tuple[str, ...] = (), **kw: obje
 def test_product_fit_comes_before_how_it_is_sold(check: ListingCheck) -> None:
     fits = _card(1, "A", "Wafer Butterfly Valve PN16", ("resellers",))
     sold_well = _card(2, "B", "Butterfly Valve", ("oem",))
-    ranked = rank_cards([sold_well, fits], frozenset({"wafer", "pn16"}), check, SELLER_RANK)
+    ranked = rank_for_item(
+        [sold_well, fits], ItemWant(frozenset({"wafer", "pn16"})), BFV, check, SELLER_RANK
+    )
     assert ranked == [fits, sold_well]
 
 
@@ -86,7 +93,7 @@ def test_oem_then_authorised_then_rating_then_assessed(check: ListingCheck) -> N
     oem_high = _card(4, "D", "Butterfly Valve", ("oem",), rating=4.5)
     oem_high_assessed = _card(5, "E", "Butterfly Valve", ("oem",), rating=4.5, assessed=True)
     cards = [reseller, authorised, oem_low, oem_high, oem_high_assessed]
-    ranked = rank_cards(cards, frozenset(), check, SELLER_RANK)
+    ranked = rank_for_item(cards, ItemWant(frozenset()), BFV, check, SELLER_RANK)
     assert ranked == [oem_high_assessed, oem_high, oem_low, authorised, reseller]
 
 
@@ -94,13 +101,13 @@ def test_one_brand_cannot_fill_every_slot() -> None:
     # A real IS 13095 page: 12 cards, all ZOLOTO in different sizes.
     zoloto = [_card(n, "ZOLOTO", f"ZOLOTO Butterfly Valves {n}") for n in range(1, 13)]
     others = [_card(20, "Kirloskar", "KBL Butterfly"), _card(21, "zoloto", "ZOLOTO Wafer")]
-    picked = pick_cards([*zoloto, *others], max_listings=10, max_per_brand=2)
+    picked = pick_for_items([[*zoloto, *others]], 10, 2, _never)
     assert [c.brand for c in picked] == ["ZOLOTO", "ZOLOTO", "Kirloskar"]
 
 
 def test_cards_without_a_brand_are_not_capped() -> None:
     cards = [_card(n, "", f"Valve {n}") for n in range(1, 5)]
-    assert len(pick_cards(cards, max_listings=10, max_per_brand=1)) == 4
+    assert len(pick_for_items([cards], 10, 1, _never)) == 4
 
 
 @dataclass

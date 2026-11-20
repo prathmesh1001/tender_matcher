@@ -2,12 +2,12 @@
 
 import pytest
 
+from app.discovery.card_fit import item_wants, rank_for_item
 from app.discovery.gem_cards import ListingCard
 from app.discovery.gem_config import load_gem_config
 from app.discovery.gem_parser import CategoryLink, listing_slug_words, search_categories
 from app.discovery.gem_search import (
     fitting_categories,
-    rank_cards,
     rank_words,
     search_queries,
     search_url,
@@ -73,7 +73,10 @@ def test_listings_naming_more_item_words_go_first(check: ListingCheck) -> None:
         f"{base}/pneumatic-control-valve/p-3-3-cat.html",
     ]
     words = rank_words("control_valve", [TENDER_TITLE], check, CONFIG.rank_ignore_words)
-    ranked = rank_cards([ListingCard(u) for u in urls], words, check)  # no title: URL name
+    cards = [ListingCard(u) for u in urls]  # no title: URL name
+    [want] = item_wants("control_valve", [TENDER_TITLE], check, lambda _t: words)
+    assert want.sub_types == {"pneumatic"}
+    ranked = rank_for_item(cards, want, "control_valve", check)
     assert [c.url for c in ranked] == [urls[1], urls[2], urls[0]]
 
 

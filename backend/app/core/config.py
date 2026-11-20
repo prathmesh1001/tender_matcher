@@ -740,7 +740,7 @@ class Settings(BaseSettings):
         "listings never slows the catalogue matching (they share one interpreter lock).",
     )
     GEM_RUN_BUDGET_SECONDS: float = Field(
-        default=120.0,
+        default=180.0,
         ge=0,
         description="How long a run waits for its GeM branch after the run started; types "
         "checked later arrive as a child run.",
@@ -753,18 +753,22 @@ class Settings(BaseSettings):
         default="https://mkp.gem.gov.in", min_length=1, description="GeM Marketplace site."
     )
     GEM_MAX_LISTINGS: int = Field(
-        default=10, ge=1, le=20, description="Most listings read per product type and request."
+        default=20,
+        ge=1,
+        le=40,
+        description="Most new listings read per product type and request; shared out between "
+        "the type's items in turns.",
     )
     GEM_MAX_CATEGORIES: int = Field(
-        default=3,
+        default=4,
         ge=1,
         le=10,
         description="Most GeM categories (from the keyword search) read per product type.",
     )
     GEM_MAX_CATEGORY_PAGES: int = Field(
-        default=3,
+        default=6,
         ge=1,
-        le=10,
+        le=20,
         description="Most result pages (12 products each) read per GeM category; the listings "
         "to open are chosen from all of them.",
     )

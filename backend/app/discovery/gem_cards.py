@@ -14,6 +14,7 @@ category has. Only the standard library's `html.parser` is used. Every function 
 """
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from typing import Final
@@ -55,6 +56,21 @@ def clean_brand(text: str) -> str | None:
     brand = _BRAND_LABEL.sub("", _SPACES.sub(" ", text)).split("--")[0]
     brand = _MARKS.sub("", brand).strip()
     return brand or None
+
+
+def known_brand(brand: str | None, empty_values: Sequence[str]) -> str | None:
+    """The brand, or None when the seller typed a placeholder ("NA", "N/A", "-").
+
+    Args:
+        brand: A cleaned brand (`clean_brand`).
+        empty_values: Values that say nothing (config `empty_values`).
+
+    Returns:
+        The brand, or None.
+    """
+    if brand is None or brand.casefold() in {v.casefold() for v in empty_values}:
+        return None
+    return brand
 
 
 def total_results(html: str) -> int | None:

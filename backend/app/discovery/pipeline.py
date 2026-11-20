@@ -18,13 +18,15 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from app.core.exceptions import AppError, LinkFetchError
-from app.discovery.gem_cards import ListingCard, listing_cards, total_results
+from app.discovery.card_fit import ItemWant, pick_for_items, rank_for_item
+from app.discovery.gem_cards import ListingCard, known_brand, listing_cards, total_results
 from app.discovery.gem_parser import GemListing, listing_urls, parse_listing, search_categories
-from app.discovery.gem_search import fitting_categories, pick_cards, rank_cards, search_url
+from app.discovery.gem_search import fitting_categories, search_url
 from app.discovery.listing_check import ListingCheck
 from app.discovery.polite_fetcher import PageFetcher
 from app.ingestion.gem_listing import listing_name
 from app.ingestion.pipeline import IngestOutcome, IngestStatus, ListingSource
+from app.retrieval.text_normalizer import normalize_for_search
 from app.schemas.tender_files import FetchedFile
 from app.storage.file_store import FileStore
 
@@ -102,6 +104,8 @@ class DiscoveryRequest:
     tail_words: frozenset[str] = frozenset()  # words that may follow a title key in a category
     max_per_brand: int = 1_000  # most listings opened per brand
     seller_rank: Sequence[str] = ()  # "sold as" classes, best first
+    # One wish per distinct item (sub-type, size, title words); cards are picked per item.
+    item_wants: Sequence[ItemWant] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,28 +260,36 @@ def category_cards(page: str, max_pages: int, deps: DiscoveryDeps) -> list[Listi
 def candidate_cards(
     request: DiscoveryRequest, deps: DiscoveryDeps
 ) -> list[ListingOutcome | ListingCard]:
-    """Listings to read, best first, at most `max_listings`; stored ones ranked above reported.
+    """Listings to read, picked per item in turns (`card_fit`); stored ones are reported.
+
+    Each item's cards are ranked by sub-type, size and title words; the items then take turns
+    picking their next best card. A stored card counts for its item without a read; at most
+    `max_listings` cards are read.
 
     Args:
         request: What to look for (`page_urls` are the category pages to read).
         deps: Fetcher, listing check and the stored-URL check.
 
     Returns:
-        Cards to read, and outcomes for better-ranked ones skipped as already stored.
+        Cards to read, and outcomes for picked cards that are already stored, in picking order.
     """
     cards: list[ListingCard] = []
     for page in request.page_urls:
         seen = {c.url for c in cards}
-        cards += [c for c in category_cards(page, request.max_pages, deps) if c.url not in seen]
-    ranked = rank_cards(cards, request.rank_words, deps.check, request.seller_rank)
-    fresh = [c for c in ranked if not deps.known(c.url)]
-    picked = pick_cards(fresh, request.max_listings, request.max_per_brand)
-    last = ranked.index(picked[-1]) if picked else len(ranked) - 1
-    chosen = {c.url for c in picked}
+        cards += [
+            replace(c, brand=known_brand(c.brand, request.empty_values))
+            for c in category_cards(page, request.max_pages, deps)
+            if c.url not in seen
+        ]
+    wants = list(request.item_wants) or [ItemWant(request.rank_words, judge_sub_type=False)]
+    ranked = [
+        rank_for_item(cards, w, request.product_type, deps.check, request.seller_rank)
+        for w in wants
+    ]
+    picked = pick_for_items(ranked, request.max_listings, request.max_per_brand, deps.known)
     return [
-        c if c.url in chosen else ListingOutcome.for_card(c, "already stored (duplicate)")
-        for c in ranked[: last + 1]
-        if c.url in chosen or deps.known(c.url)
+        ListingOutcome.for_card(c, "already stored (duplicate)") if deps.known(c.url) else c
+        for c in picked
     ]
 
 
@@ -360,6 +372,27 @@ def read_listing(
     return _store(listing, fetched, request, deps, seen, base)
 
 
+def listing_sub_types(
+    listing: GemListing, product_type: str, check: ListingCheck
+) -> tuple[str, ...]:
+    """Ontology sub-types of the type that the listing's title or model names, sorted.
+
+    Stored on the document, so a knife-edge gate valve listing is a sub-type match for a knife
+    gate item and a wedge gate listing is not (CLAUDE.md B2); a listing naming none is general.
+
+    Args:
+        listing: A parsed listing.
+        product_type: The type it is stored for.
+        check: Gives the sub-type matcher and vocabulary.
+
+    Returns:
+        The sub-types.
+    """
+    text = " ".join(p for p in (listing.title, listing.model) if p)
+    norm = normalize_for_search(text, check.vocabulary)
+    return tuple(sorted(check.matcher.sub_types_in(product_type, norm)))
+
+
 def _store(
     listing: GemListing,
     fetched: FetchedFile,
@@ -381,6 +414,7 @@ def _store(
         fetched_at=fetched.fetched_at,
         sha256=sha256,
         snapshot_ref=ref,
+        sub_types=listing_sub_types(listing, request.product_type, deps.check),
     )
     try:
         outcome = deps.save(source, listing)
