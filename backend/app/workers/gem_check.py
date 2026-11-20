@@ -25,7 +25,13 @@ def _no_matcher() -> DiscoveryMatcher:
     raise RuntimeError("a GeM check process has no matcher")
 
 
-def run_gem_check(job_id: str, product_type: str, category: str, titles: list[str]) -> None:
+def run_gem_check(
+    job_id: str,
+    product_type: str,
+    category: str,
+    titles: list[str],
+    buyer_categories: list[str] | None = None,
+) -> None:
     """Process entry point: check one product type on GeM and record it on its job.
 
     Args:
@@ -33,6 +39,7 @@ def run_gem_check(job_id: str, product_type: str, category: str, titles: list[st
         product_type: Ontology product type.
         category: Its ontology category.
         titles: The run's item titles of the type (the GeM search words come from them).
+        buyer_categories: GeM categories the buyer selected for the bid (searched first).
     """
     settings = get_settings()
     configure_logging(settings.LOG_LEVEL, json_output=settings.LOG_JSON)
@@ -45,5 +52,12 @@ def run_gem_check(job_id: str, product_type: str, category: str, titles: list[st
         cache(lambda: load_gem_config(settings.GEM_MARKETPLACE_FILE)),
     )
     service.check_in_run(
-        uuid.UUID(job_id), UncoveredType(product_type, category, [], titles=list(titles))
+        uuid.UUID(job_id),
+        UncoveredType(
+            product_type,
+            category,
+            [],
+            titles=list(titles),
+            buyer_categories=list(buyer_categories or []),
+        ),
     )

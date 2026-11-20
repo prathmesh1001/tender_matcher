@@ -222,3 +222,26 @@ def test_stored_listing_is_rechecked_against_todays_rule(check: ListingCheck) ->
     strict = replace(_request(), excludes=["flow control valve"])
     assert recheck_stored(html, url, strict, check) == "names flow control valve, not control valve"
     assert recheck_stored(html, url, _request(), check) is None
+
+
+def test_the_buyers_own_category_is_searched_first(tmp_path: Path, check: ListingCheck) -> None:
+    """8081591: the bid's "Relevant Categories selected for notification" are GeM categories."""
+    fetcher, _, deps = _setup(tmp_path, check, [])
+    assert isinstance(fetcher, _Pages)
+    impeller = BASE + "/search?q=Stainless%20Steel%20Pump%20Impeller"
+    fetcher.pages[impeller] = (
+        "<ul><li class='bn-link'><a href='/stainless-steel-pump-impeller/search'>"
+        "Stainless Steel Pump Impeller<i>(Q3)</i></a></li>"
+        "<li class='bn-link'><a href='/pump-impeller-puller/search'>Impeller Puller</a></li></ul>"
+    )
+    keyed = check.for_type("impeller")
+    request = replace(
+        _search_request(product_type="impeller", search_urls=[]),
+        buyer_categories=["Stainless Steel Pump Impeller", "Shaft and Shaft Assembly (RCF)"],
+    )
+    pages = find_category_pages(request, replace(deps, check=keyed))
+    assert pages.source == "buyer"
+    assert pages.names == ["Stainless Steel Pump Impeller"]
+    assert pages.page_urls == [page_url(BASE, "stainless-steel-pump-impeller")]
+    # the shaft category names no impeller: never searched for this item
+    assert not any("Shaft" in url for url in fetcher.asked)

@@ -19,7 +19,7 @@ from typing import Any
 from app.core.exceptions import AppError, LinkFetchError
 from app.discovery.gem_cards import ListingCard, listing_cards, total_results
 from app.discovery.gem_parser import GemListing, listing_urls, parse_listing, search_categories
-from app.discovery.gem_search import fitting_categories, pick_cards, rank_cards
+from app.discovery.gem_search import fitting_categories, pick_cards, rank_cards, search_url
 from app.discovery.listing_check import ListingCheck
 from app.discovery.polite_fetcher import PageFetcher
 from app.ingestion.gem_listing import listing_name
@@ -94,6 +94,7 @@ class DiscoveryRequest:
     base_url: str = ""
     max_pages: int = 1  # result pages read per category (12 products each)
     title_words: frozenset[str] | None = None  # every normalized item title word (title keys)
+    buyer_categories: Sequence[str] = ()  # GeM categories the buyer selected (searched first)
     tail_words: frozenset[str] = frozenset()  # words that may follow a title key in a category
     max_per_brand: int = 1_000  # most listings opened per brand
     seller_rank: Sequence[str] = ()  # "sold as" classes, best first
@@ -129,20 +130,50 @@ def snapshot_ref(prefix: str, product_type: str, sha256: str) -> str:
     return f"{prefix}/{product_type}/{sha256}.html"
 
 
-def find_category_pages(request: DiscoveryRequest, deps: DiscoveryDeps) -> CategoryPages:
-    """Category pages for the type: from GeM's keyword search, else the hand-listed ones.
+def _buyer_pages(request: DiscoveryRequest, deps: DiscoveryDeps) -> dict[str, str]:
+    """Pages of the buyer's own GeM categories that name the type, found by their exact name.
 
-    Every search page is read in turn until `max_categories` fitting categories are found; a
-    search page that cannot be read is logged and skipped.
+    The buyer picked them on GeM ("Stainless Steel Pump Impeller"), so a category naming the
+    item's product and no other product needs no further fit rule; GeM is searched by the
+    category's name and the category of that same name is taken.
+    """
+    found: dict[str, str] = {}
+    check, product_type = deps.check, request.product_type
+    for name in request.buyer_categories:
+        if not check.names_type_in(name, product_type):
+            continue
+        if check.foreign_in(name, product_type, request.excludes) is not None:
+            continue
+        try:
+            fetched = deps.fetcher.get(search_url(request.base_url, name))
+        except LinkFetchError as exc:
+            logger.warning(
+                "gem buyer category not read", extra={"name": name, "error": exc.message}
+            )
+            continue
+        wanted = " ".join(name.casefold().split())
+        for link in search_categories(fetched.content.decode("utf-8", errors="replace")):
+            if " ".join(link.name.casefold().split()) == wanted:
+                found.setdefault(page_url(request.base_url, link.slug), link.name)
+    return found
+
+
+def find_category_pages(request: DiscoveryRequest, deps: DiscoveryDeps) -> CategoryPages:
+    """Category pages for the type: buyer's categories, keyword search, else hand-listed ones.
+
+    The buyer's categories that name the type come first (`_buyer_pages`). Then every search
+    page is read in turn until `max_categories` fitting categories are found; a search page
+    that cannot be read is logged and skipped.
 
     Args:
-        request: Search pages, hand-listed pages, limits.
+        request: Buyer categories, search pages, hand-listed pages, limits.
         deps: Fetcher and the listing check.
 
     Returns:
         The pages and their category names (slugs for hand-listed ones).
     """
-    found: dict[str, str] = {}
+    found = _buyer_pages(request, deps)
+    source = "buyer" if found else "search"
     for url in request.search_urls:
         if len(found) >= request.max_categories:
             break
@@ -164,7 +195,7 @@ def find_category_pages(request: DiscoveryRequest, deps: DiscoveryDeps) -> Categ
             found.setdefault(page_url(request.base_url, link.slug), link.name)
     if found:
         pages = list(found)[: request.max_categories]
-        return CategoryPages(pages, [found[p] for p in pages], "search")
+        return CategoryPages(pages, [found[p] for p in pages], source)
     if request.page_urls:
         pages = list(request.page_urls)
         return CategoryPages(pages, [_slug(p) for p in pages], "configured")

@@ -303,6 +303,19 @@ describe("ReportPage", () => {
     expect(within(firm).getByText(/only one firm is acceptable: Acme/)).toBeInTheDocument();
   });
 
+  it("says when the tender buys spare parts and names their maker", async () => {
+    serve({
+      ...REPORT,
+      spare_parts: {
+        boq_title: "Spares parts for various pump model of Kirloskar brother limited",
+        oem: "Kirloskar Brothers",
+      },
+    });
+    await openReport();
+    expect(screen.getByText("Spare parts tender")).toBeInTheDocument();
+    expect(screen.getByText(/usually come from its maker: Kirloskar Brothers/)).toBeInTheDocument();
+  });
+
   it("shows why a run failed instead of a report", async () => {
     serve(REPORT, { ...RUN, status: "failed", error: "2 cited catalogues are not stored" });
     renderWithProviders(<AppRoutes />, "/reports/run-1");

@@ -232,6 +232,19 @@ class Settings(BaseSettings):
         description="Shortest letters-and-digits token of an item read as its code (material / "
         "part code); shorter ones such as 'SS316' are values.",
     )
+    TENDER_BOQ_TITLE_LABELS: list[str] = Field(
+        default_factory=lambda: ["BOQ Title"],
+        description="Labels of the bid row holding the BOQ title (JSON list).",
+    )
+    TENDER_BUYER_CATEGORY_LABELS: list[str] = Field(
+        default_factory=lambda: ["Relevant Categories selected for notification"],
+        description="Labels of the bid row listing the GeM categories the buyer selected; "
+        "they are searched first on GeM (JSON list).",
+    )
+    TENDER_SPARE_PARTS_WORDS: list[str] = Field(
+        default_factory=lambda: ["spare", "spares"],
+        description="Words in the BOQ title that mark a spare-parts tender (JSON list).",
+    )
     TENDER_NUMBERED_ROW_MIN_WORDS: int = Field(
         default=5,
         ge=1,

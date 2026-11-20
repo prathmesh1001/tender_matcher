@@ -138,6 +138,12 @@ export interface ManufacturerStatusList {
   lists: Partial<Record<MatchStatus, StatusListEntry[]>>;
 }
 
+/** The tender buys spare parts; the BOQ title may name their maker. */
+export interface SparePartsNotice {
+  boq_title: string;
+  oem: string | null;
+}
+
 export interface TenderReport {
   tender: string;
   bid_number: string;
@@ -155,4 +161,7 @@ export interface TenderReport {
   status_lists: ManufacturerStatusList[];
   general_requirements: Requirement[];
   general_results: Comparison[];
+  boq_title?: string | null;
+  buyer_gem_categories?: string[];
+  spare_parts?: SparePartsNotice | null;
 }

@@ -198,6 +198,19 @@ class ManufacturerStatusList(BaseModel):
     lists: dict[MatchStatus, list[StatusListEntry]]
 
 
+class SparePartsNotice(BaseModel):
+    """The tender buys spare parts: catalogues and GeM rarely list them as products."""
+
+    model_config = ConfigDict(frozen=True)
+
+    boq_title: str = Field(description="The bid's BOQ title that names the spare parts.")
+    oem: str | None = Field(
+        default=None,
+        description="The maker the BOQ title names, if it is a manufacturer in the database; "
+        "spare parts usually come from that maker (original spares).",
+    )
+
+
 class TenderReport(BaseModel):
     """Everything one match run produced for one tender."""
 
@@ -244,4 +257,12 @@ class TenderReport(BaseModel):
     )
     named_makes: list[str] = Field(
         default_factory=list, description="Makes the tender names; a reviewer must read these."
+    )
+    boq_title: str | None = Field(default=None, description="The bid's BOQ title, if printed.")
+    buyer_gem_categories: list[str] = Field(
+        default_factory=list,
+        description="GeM categories the buyer selected for notification; searched first on GeM.",
+    )
+    spare_parts: SparePartsNotice | None = Field(
+        default=None, description="Set when the BOQ title buys spare parts."
     )

@@ -51,6 +51,9 @@ class RequirementOptions:
     item_code_min_length: int = 8
     item_code_row_min_cells: int = 3
     numbered_row_min_words: int = 5
+    boq_title_labels: tuple[str, ...] = ()
+    buyer_category_labels: tuple[str, ...] = ()
+    spare_parts_words: tuple[str, ...] = ()
 
     @classmethod
     def from_settings(cls, settings: Settings) -> RequirementOptions:
@@ -76,6 +79,9 @@ class RequirementOptions:
             item_code_min_length=settings.TENDER_ITEM_CODE_MIN_LENGTH,
             item_code_row_min_cells=settings.TENDER_ITEM_CODE_ROW_MIN_CELLS,
             numbered_row_min_words=settings.TENDER_NUMBERED_ROW_MIN_WORDS,
+            boq_title_labels=tuple(settings.TENDER_BOQ_TITLE_LABELS),
+            buyer_category_labels=tuple(settings.TENDER_BUYER_CATEGORY_LABELS),
+            spare_parts_words=tuple(settings.TENDER_SPARE_PARTS_WORDS),
         )
 
 

@@ -67,6 +67,7 @@ from app.schemas.report import (
 from app.schemas.requirements import LineItem, Requirement
 from app.schemas.sections import EvidenceSource
 from app.storage.file_store import FileStore, LocalFileStore, build_file_store
+from app.tender.bid_facts import BidFacts, bid_facts, spare_parts_notice
 from app.tender.items import ItemSource, TenderFile, TenderRequirements, parse_tender_files
 from app.tender.link_fetcher import MANIFEST_FILENAME, read_manifest
 from app.tender.ocr_flags import LowRow, flag_low_ocr, low_confidence_rows
@@ -100,6 +101,8 @@ class UncoveredType:
     item_nos: list[str]
     by_title: bool = False  # no ontology type: a key from the item title (`title_key`)
     titles: list[str] = field(default_factory=list)  # the items' titles, each once
+    # GeM categories the buyer selected for the whole bid; searched first.
+    buyer_categories: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -112,6 +115,7 @@ class ParsedTender:
     general: list[Requirement] = field(default_factory=list)
     item_source: ItemSource = ItemSource.NONE
     extraction_quality: ExtractionQuality = field(default_factory=ExtractionQuality)
+    facts: BidFacts = field(default_factory=BidFacts)
 
     @property
     def named_makes(self) -> list[str]:
@@ -229,7 +233,19 @@ class MatchService:
             general=found.general,
             item_source=found.source,
             extraction_quality=self._quality(found, low_ocr, unfetched, files),
+            facts=self._bid_facts(files),
         )
+
+    def _makers(self) -> list[str]:
+        """Every manufacturer with a stored document, in any category."""
+        categories = {c for found in self._source.product_types().values() for c in found}
+        return sorted({m for c in categories for m in self._source.manufacturers(c)})
+
+    def _bid_facts(self, files: Sequence[TenderFile]) -> BidFacts:
+        """BOQ title and buyer GeM categories from the bid document's own rows."""
+        options = self._requirement_options
+        chunks = [c for f in files if f.role == options.bid_role for c in f.chunks]
+        return bid_facts(chunks, options.boq_title_labels, options.buyer_category_labels)
 
     def _match_timed(self, entry: ItemInput, manufacturers: Sequence[str] | None) -> ItemReport:
         """`match_item`, logging how long the item took."""
@@ -388,6 +404,13 @@ class MatchService:
             general_results=general,
             named_makes=parsed.named_makes,
             item_source=parsed.item_source.value,
+            boq_title=parsed.facts.boq_title,
+            buyer_gem_categories=parsed.facts.gem_categories,
+            spare_parts=spare_parts_notice(
+                parsed.facts.boq_title,
+                self._requirement_options.spare_parts_words,
+                self._makers(),
+            ),
         )
 
     def uncovered_types(
@@ -411,6 +434,7 @@ class MatchService:
         return self._types(
             [i.item for i in report.items],
             lambda product_type: self._covered(product_type, declared, manufacturers),
+            report.buyer_gem_categories,
         )
 
     def item_types(self, tender: str) -> list[UncoveredType]:
@@ -428,7 +452,10 @@ class MatchService:
             NotFoundError: If the tender folder has no tender.yaml.
             DocumentParseError: If a tender file cannot be parsed.
         """
-        return self._types([e.item for e in self.parse_tender(tender).items], lambda _: False)
+        parsed = self.parse_tender(tender)
+        return self._types(
+            [e.item for e in parsed.items], lambda _: False, parsed.facts.gem_categories
+        )
 
     def branch_types(
         self,
@@ -467,7 +494,10 @@ class MatchService:
         ]
 
     def _types(
-        self, items: Sequence[LineItem], covered: Callable[[str], bool]
+        self,
+        items: Sequence[LineItem],
+        covered: Callable[[str], bool],
+        buyer_categories: Sequence[str] = (),
     ) -> list[UncoveredType]:
         """The items' product types (or title keys) not `covered`, in first-item order."""
         found: dict[str, UncoveredType] = {}
@@ -479,7 +509,14 @@ class MatchService:
             typed = ontology is not None and ontology.product_type(product_type) is not None
             category = ontology.category if ontology else self._untyped_category
             entry = found.setdefault(
-                product_type, UncoveredType(product_type, category, [], by_title=not typed)
+                product_type,
+                UncoveredType(
+                    product_type,
+                    category,
+                    [],
+                    by_title=not typed,
+                    buyer_categories=list(buyer_categories),
+                ),
             )
             entry.item_nos.append(item.item_no)
             if item.title not in entry.titles:

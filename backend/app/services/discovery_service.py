@@ -292,7 +292,7 @@ class DiscoveryService:
             manufacturers, report = list(run.manufacturers), _report(run)
         uncovered = self._matcher().uncovered_types(report, manufacturers)
         titles = _item_titles(report, product_type, uncovered)
-        brands = self._check(job_id, product_type, category, titles)
+        brands = self._check(job_id, product_type, category, titles, report.buyer_gem_categories)
         if not brands:
             return
         new_report = self._matcher().rematch_items(
@@ -302,7 +302,12 @@ class DiscoveryService:
         self._finish(job_id, DiscoveryStatus.DONE, result_run=result_run)
 
     def _check(
-        self, job_id: uuid.UUID, product_type: str, category: str, titles: list[str]
+        self,
+        job_id: uuid.UUID,
+        product_type: str,
+        category: str,
+        titles: list[str],
+        buyer_categories: Sequence[str] = (),
     ) -> list[str]:
         """Search GeM for one type and store the listings that pass; record them on the job.
 
@@ -311,7 +316,7 @@ class DiscoveryService:
             the job is finished here with the reason.
         """
         check = self._tools().check.for_type(product_type, self._settings.GEM_TITLE_STOP_WORDS)
-        request = self._request(product_type, category, titles, check)
+        request = self._request(product_type, category, titles, check, buyer_categories)
         withdrawn = self._withdraw_stale(request, check)
         pages = find_category_pages(request, self._deps(check))
         logger.info(
@@ -400,7 +405,13 @@ class DiscoveryService:
 
         process = multiprocessing.get_context("spawn").Process(
             target=run_gem_check,
-            args=(str(job_id), item_type.product_type, item_type.category, item_type.titles),
+            args=(
+                str(job_id),
+                item_type.product_type,
+                item_type.category,
+                item_type.titles,
+                item_type.buyer_categories,
+            ),
             name=f"gem-{item_type.product_type}",
             daemon=True,
         )
@@ -431,7 +442,11 @@ class DiscoveryService:
             DiscoveryJobRepository(session).get_or_raise(job_id).status = DiscoveryStatus.RUNNING
         try:
             brands = self._check(
-                job_id, item_type.product_type, item_type.category, list(item_type.titles)
+                job_id,
+                item_type.product_type,
+                item_type.category,
+                list(item_type.titles),
+                item_type.buyer_categories,
             )
         except Exception as exc:
             reason = failure_reason(exc, self._settings.RUN_ERROR_MAX_CHARS)
@@ -461,7 +476,12 @@ class DiscoveryService:
         logger.info("gem late types saved", extra={"types": sorted(brands), "child": str(child)})
 
     def _request(
-        self, product_type: str, category: str, titles: list[str], check: ListingCheck
+        self,
+        product_type: str,
+        category: str,
+        titles: list[str],
+        check: ListingCheck,
+        buyer_categories: Sequence[str] = (),
     ) -> DiscoveryRequest:
         """What to look for: search pages from the item titles, hand-listed pages as fallback."""
         settings, config = self._settings, self._config()
@@ -482,6 +502,7 @@ class DiscoveryService:
             max_pages=settings.GEM_MAX_CATEGORY_PAGES,
             max_per_brand=settings.GEM_MAX_LISTINGS_PER_BRAND,
             seller_rank=config.seller_rank,
+            buyer_categories=list(buyer_categories),
             title_words=frozenset(
                 w for t in titles for w in normalize_for_search(t, check.vocabulary).split()
             ),
