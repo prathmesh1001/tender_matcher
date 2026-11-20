@@ -92,6 +92,17 @@ _TITLE_SIZE: Final = re.compile(
     rf"|(?:{_INCH_NUMBER})\s*{_INCH_UNIT})"
     r"|(?:\bsize\s*:?\s*|,\s*)(?P<mm>\d+(?:\.\d+)?\s*mm\b)"
 )
+# Millimetre numbers in a title ("40mm", "220 mm"), and words that make one a dimension, not the
+# item's size ("STEM LENGTH 220 MM").
+_TITLE_MM: Final = re.compile(r"(?<![\w.-])\d+(?:\.\d+)?\s*mm\b")
+_DIMENSION_WORDS: Final = frozenset({"length", "thickness", "thick", "width", "height", "depth"})
+# A rating in an item title: "Rating 300", "Class 150", "#300", "300#", "300 lbs", "PN 16".
+# "Rating 16 bar" states a pressure (a unit follows), not a class.
+_TITLE_RATING: Final = re.compile(
+    r"\b(?:class|rating)\s*[#:]?\s*(?P<a>\d+)\b(?!\s*(?:\.\d|psi|bar|kg|mpa|deg|°|kw|hp|v\b|a\b))"
+    r"|(?<![\w#])#\s*(?P<b>\d+)\b|\b(?P<c>\d+)\s*(?:#|lbs?\b)"
+    r"|\bpn\s*-?\s*(?P<pn>\d+(?:\.\d+)?)\b"
+)
 # Distinct printed labels per process (catalogue labels repeat on every table row).
 _LABEL_CACHE_SIZE: Final = 65536
 # Distinct label words stemmed per process.
@@ -185,12 +196,52 @@ def split_size_rating(value: str) -> tuple[str, str] | None:
     return (size, rating) if size_form(size) and rating_form(rating) else None
 
 
+def title_rating(title: str) -> str | None:
+    """The one pressure rating an item title states, as "CLASS 300" or "PN 16"; else None.
+
+    "2 Inch Gate Valve 51430 Rating 300" -> "CLASS 300". A number after "rating" followed by a
+    unit ("Rating 16 bar") is a pressure, not a class; several ratings are never guessed.
+
+    Args:
+        title: The item title.
+
+    Returns:
+        The rating as a requirement value, or None.
+    """
+    found: set[str] = set()
+    for m in _TITLE_RATING.finditer(fold_text(title)):
+        pn = m.group("pn")
+        number = m.group("a") or m.group("b") or m.group("c")
+        found.add(f"PN {pn}" if pn else f"CLASS {number}")
+    return next(iter(found)) if len(found) == 1 else None
+
+
+def _edge_mm(folded: str) -> set[str]:
+    """The title's one millimetre number, if it is the first or last word and no dimension's."""
+    found = list(_TITLE_MM.finditer(folded))
+    if len(found) != 1:
+        return set()
+    match = found[0]
+    first, last = not folded[: match.start()].strip(), not folded[match.end() :].strip()
+    before = folded[: match.start()].split()[-1:]
+    if not (first or last) or set(before) & _DIMENSION_WORDS:
+        return set()
+    return {" ".join(match.group().split())}
+
+
 def title_size(title: str) -> str | None:
-    """The one size an item title states, as printed; None for none or several (never guessed)."""
+    """The one size an item title states, as printed; None for none or several (never guessed).
+
+    Millimetres count after "size" or a comma, or as the title's first or last word ("BALL
+    VALVE 40MM", "80MM BUTTERFLY VALVE"), unless a dimension word comes before them ("STEM
+    LENGTH 220 MM").
+    """
+    folded = fold_text(spell_fractions(title))
     found = {
-        " ".join((m.group("size") or m.group("mm")).split())
-        for m in _TITLE_SIZE.finditer(fold_text(spell_fractions(title)))
+        " ".join((m.group("size") or m.group("mm")).split()) for m in _TITLE_SIZE.finditer(folded)
     }
+    if not found:
+        found = _edge_mm(folded)
     return next(iter(found)) if len(found) == 1 else None
 
 

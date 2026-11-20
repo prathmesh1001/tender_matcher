@@ -286,6 +286,36 @@ def test_title_size_is_used_when_the_spec_states_none(
     assert (size.attribute, size.value_num) == ("nominal_size", 100.0)
 
 
+def test_title_rating_is_used_when_the_spec_states_none(
+    options: RequirementOptions, ontology: Ontology
+) -> None:
+    """8222933: "Rating 300" only in the title; without it a knife-edge valve looked full."""
+    row = _row(["Column 1", "Column 2"], ["Item Category", "2 Inch Gate Valve 51430 Rating 300"])
+    spec = _prose("VLV.GATE, SHEET 51430, 2.0 INCH", 3)
+    files = [
+        TenderFile("bid.pdf", "bid_document", [row]),
+        TenderFile("s.pdf", "buyer_spec", [spec]),
+    ]
+    [entry] = parse_tender_files(files, options, [ontology]).items
+    ratings = [r for r in leaves(entry.requirements) if r.unit == "class"]
+    assert [(r.value_num, r.raw_text) for r in ratings] == [
+        (300.0, "2 Inch Gate Valve 51430 Rating 300")
+    ]
+
+
+def test_a_rating_stated_in_the_spec_is_not_repeated_from_the_title(
+    options: RequirementOptions, ontology: Ontology
+) -> None:
+    row = _row(["Column 1", "Column 2"], ["Item Category", "Gate Valve 2 inch Class 300"])
+    spec = _prose("PRESSURE RATING : CLASS 600", 3)
+    files = [
+        TenderFile("bid.pdf", "bid_document", [row]),
+        TenderFile("s.pdf", "buyer_spec", [spec]),
+    ]
+    [entry] = parse_tender_files(files, options, [ontology]).items
+    assert [r.value_num for r in leaves(entry.requirements) if r.unit == "class"] == [600.0]
+
+
 def test_no_item_source_still_reports_everything(options: RequirementOptions) -> None:
     files = [TenderFile("bid.pdf", "bid_document", [_prose("Warranty period is 36 months.")])]
     found = parse_tender_files(files, options)

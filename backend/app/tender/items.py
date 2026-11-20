@@ -35,6 +35,7 @@ from app.tender.general import english_part, general_requirements, row_text
 from app.tender.line_items import header_key
 from app.tender.name_segments import NameRules, segment_by_name
 from app.tender.normalizer import title_size
+from app.tender.numbered_rows import NumberedRow, TableRow, rows_for_items
 from app.tender.pipeline import (
     ItemRequirements,
     RequirementOptions,
@@ -55,6 +56,8 @@ from app.tender.segments import (
 from app.tender.splitter import leaves
 
 ITEM_LABEL: Final = "ITEM"
+# Characters of a description that identify its general line (`_general_index`).
+_ROW_MATCH_CHARS: Final = 40
 _CATEGORY_ITEM_NO: Final = "1"
 _TRAILING_NUMBER: Final = re.compile(r"(\d+)$")
 _NOT_A_FILE_NAME_CHAR: Final = re.compile(r"[^A-Za-z0-9]+")
@@ -685,6 +688,69 @@ def _with_code_rows(
     return TenderRequirements(items, general, found.source)
 
 
+def _table_rows(files: Sequence[TenderFile], skip: set[str]) -> list[TableRow]:
+    """Every table row of the files not in `skip`, with its cells and their printed lines."""
+    return [
+        TableRow(f.name, c.page_number, c.meta.get("cells", []), c.meta.get("cell_lines", []))
+        for f in files
+        if f.name not in skip
+        for c in f.chunks
+        if c.chunk_type is ChunkType.TABLE_ROW and c.meta.get("cells")
+    ]
+
+
+def _with_numbered_rows(
+    found: TenderRequirements,
+    files: Sequence[TenderFile],
+    item_files: set[str],
+    options: RequirementOptions,
+    ontologies: Sequence[Ontology],
+) -> TenderRequirements:
+    """Title-only items take their description from the rows numbered like them (`numbered_rows`).
+
+    Only when every item is nearly empty (it repeats its title): an item list with its own
+    descriptions keeps them. The files the items come from are not searched. The rows leave
+    the general list.
+    """
+    nearly_empty = options.quality.nearly_empty_item
+    if not found.items or any(len(leaves(e.requirements)) > nearly_empty for e in found.items):
+        return found
+    rows = rows_for_items(
+        [e.item.item_no for e in found.items],
+        _table_rows(files, item_files),
+        options.numbered_row_min_words,
+    )
+    if not rows:
+        return found
+    taken: set[int] = set()
+    items = []
+    for entry in found.items:
+        row = rows[entry.item.item_no]
+        index = _general_index(found.general, row)
+        if index is None:
+            return found  # the row's general line is not found: leave everything as it was
+        taken.add(index)
+        block = _SpecBlock(None, None, None, [(found.general[index], ln) for ln in row.lines])
+        items.append(_block_item(entry, block, options, ontologies))
+    general = [r for i, r in enumerate(found.general) if i not in taken]
+    return TenderRequirements(items, general, found.source)
+
+
+def _general_index(general: Sequence[Requirement], row: NumberedRow) -> int | None:
+    """Position of the general requirement printed from a numbered row, or None."""
+    start = row.description[:_ROW_MATCH_CHARS]
+    return next(
+        (
+            i
+            for i, r in enumerate(general)
+            if r.document == row.document
+            and r.page_number == row.page_number
+            and start in " ".join(r.raw_text.split())
+        ),
+        None,
+    )
+
+
 def _with_spec_rows(
     found: TenderRequirements, options: RequirementOptions, ontologies: Sequence[Ontology]
 ) -> TenderRequirements:
@@ -735,7 +801,12 @@ def parse_tender_files(
         general = _general(files, set(), set(chosen), options, held)
         sized = [with_title_size(_once(e), options, ontologies) for e in items]
         found = TenderRequirements([_with_title(e) for e in sized], general, source)
-        return _with_spec_rows(_with_code_rows(found, options, ontologies), options, ontologies)
+        coded = _with_code_rows(
+            _with_numbered_rows(found, files, set(chosen), options, ontologies),
+            options,
+            ontologies,
+        )
+        return _with_spec_rows(coded, options, ontologies)
     category = _category_entry(files, options, ontologies)
     if category is None:
         return TenderRequirements([], _general(files, set(), set(), options), ItemSource.NONE)

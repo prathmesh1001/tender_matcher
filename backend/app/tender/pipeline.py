@@ -23,13 +23,15 @@ from app.tender.classifier import RequirementClassifier
 from app.tender.general import general_requirements
 from app.tender.line_items import ItemColumnOptions, is_schedule_row, line_items
 from app.tender.link_fetcher import BID_ROLE
-from app.tender.normalizer import names_material, stems, title_size, words
+from app.tender.normalizer import names_material, stems, title_rating, title_size, words
 from app.tender.quality import QualityRules
-from app.tender.splitter import SIZE_LABEL, SplitOptions, item_requirements
+from app.tender.splitter import RATING_LABEL, SIZE_LABEL, SplitOptions, item_requirements
 from app.tender.title_key import named_as
 
 SIZE_DIFFERS_FROM_TITLE: Final = "size_differs_from_title"
 MAKE_LABEL: Final = "MAKE"
+# Units of Class / PN designations (`ParsedValue.is_designation`): a stated rating.
+_DESIGNATION_UNITS: Final = frozenset({"class", "pn"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +50,7 @@ class RequirementOptions:
     spec_row_labels: tuple[str, str] = ("", "")
     item_code_min_length: int = 8
     item_code_row_min_cells: int = 3
+    numbered_row_min_words: int = 5
 
     @classmethod
     def from_settings(cls, settings: Settings) -> RequirementOptions:
@@ -72,6 +75,7 @@ class RequirementOptions:
             ),
             item_code_min_length=settings.TENDER_ITEM_CODE_MIN_LENGTH,
             item_code_row_min_cells=settings.TENDER_ITEM_CODE_ROW_MIN_CELLS,
+            numbered_row_min_words=settings.TENDER_NUMBERED_ROW_MIN_WORDS,
         )
 
 
@@ -278,9 +282,12 @@ def item_entry(
 def with_title_size(
     entry: ItemRequirements, options: RequirementOptions, ontologies: Sequence[Ontology]
 ) -> ItemRequirements:
-    """An item with its title's size as a requirement, if the title is all that states one.
+    """An item with its title's size and rating as requirements, where only the title states one.
 
-    Only for an item of a known product type: a size in any other title may mean anything.
+    Only for an item of a known product type: a size or rating in any other title may mean
+    anything. "2 Inch Gate Valve 51430 Rating 300" gets SIZE 2 inch and CLASS 300 when its spec
+    lines state neither (8222933: without the rating, a cast-iron knife-edge gate valve of the
+    same size looked like a full match).
 
     Args:
         entry: The item and its requirements.
@@ -288,25 +295,44 @@ def with_title_size(
         ontologies: Loaded ontologies.
 
     Returns:
-        The item, with one more requirement if none states the size and the title states one.
+        The item, with a requirement added for each of size and rating the title alone states.
     """
     ontology = ontology_for(entry.item.title, ontologies)
-    size = title_size(entry.item.title)
-    if ontology is None or entry.product_type is None or size is None:
+    if ontology is None or entry.product_type is None:
         return entry
-    for requirement in entry.requirements:
-        attribute = ontology.attribute(requirement.attribute) if requirement.attribute else None
-        if attribute is not None and attribute.nominal_pipe_size:
-            return entry
+    added: list[Requirement] = []
+    size = title_size(entry.item.title)
+    if size is not None and not any(_states_size(r, ontology) for r in entry.requirements):
+        added += _title_requirements(entry, "title", f"{SIZE_LABEL} : {size}", options, ontologies)
+    rating = title_rating(entry.item.title)
+    if rating is not None and not any(r.unit in _DESIGNATION_UNITS for r in entry.requirements):
+        line = f"{RATING_LABEL} : {rating}"
+        added += _title_requirements(entry, "title_rating", line, options, ontologies)
+    return replace(entry, requirements=[*entry.requirements, *added]) if added else entry
+
+
+def _states_size(requirement: Requirement, ontology: Ontology) -> bool:
+    """True if a requirement states the item's nominal pipe size."""
+    attribute = ontology.attribute(requirement.attribute) if requirement.attribute else None
+    return attribute is not None and attribute.nominal_pipe_size
+
+
+def _title_requirements(
+    entry: ItemRequirements,
+    suffix: str,
+    line: str,
+    options: RequirementOptions,
+    ontologies: Sequence[Ontology],
+) -> list[Requirement]:
+    """Requirements of one "LABEL : value" line read from the item title, cited as the title."""
     item_no = entry.item.item_no
-    line = entry.item.model_copy(
-        update={"item_no": f"{item_no}.title", "description_lines": [f"{SIZE_LABEL} : {size}"]}
+    part = entry.item.model_copy(
+        update={"item_no": f"{item_no}.{suffix}", "description_lines": [line]}
     )
-    added = [
+    return [
         r.model_copy(update={"item_no": item_no, "raw_text": entry.item.title})
-        for r in item_entry(line, options, ontologies).requirements
+        for r in item_entry(part, options, ontologies).requirements
     ]
-    return replace(entry, requirements=[*entry.requirements, *added])
 
 
 def tender_requirements(
