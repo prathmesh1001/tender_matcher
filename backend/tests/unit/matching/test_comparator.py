@@ -912,3 +912,46 @@ def test_a_plain_immersion_length_is_still_the_insertion_length(instruments: Ont
     assert _compare("Immersion length : 280 MM", [sensor], instruments).status is (
         MatchStatus.FULL_MATCH
     )
+
+
+# ---------------------------------------------------------------- GeM allowed values
+
+
+def _allowed(line: str, ontology: Ontology | None) -> Requirement:
+    """A GeM "Bid Requirement (Allowed Values)" row: its commas separate acceptable options."""
+    item = LineItem(
+        item_no="1",
+        title="BUTTERFLY VALVE",
+        description_lines=[line],
+        document="tender.pdf",
+        page_number=1,
+        allowed_values=True,
+    )
+    [requirement] = leaves(item_requirements(item, ontology, SPLIT))
+    return requirement
+
+
+@pytest.mark.parametrize(("line", "catalogue", "status"), [
+    ("Nominal Pressure (PN) (MPa) : 0.6, 1, 1.6", "Pressure rating: PN 10", FULL),  # 1 MPa
+    ("Nominal Pressure (PN) (MPa) : 1.6, 2.5", "Pressure rating: PN 6", MISSING),
+    # 0.25 MPa cannot be compared with a PN: one undecided option is no failure
+    ("Nominal Pressure (PN) (MPa) : 0.25, 0.6", "Pressure rating: PN 16", UNSUPPORTED),
+    ("End Connection : Wafer, Lugged", "End connection: Wafer", FULL),
+    ("End Connection : Wafer, Lugged", "End connection: Flanged", MISSING),
+])  # fmt: skip
+def test_one_allowed_value_is_enough(
+    valves: Ontology, line: str, catalogue: str, status: MatchStatus
+) -> None:
+    requirement = _allowed(line, valves)
+    assert requirement.any_alternative
+    fields = located_fields([_prose(catalogue)], OPTIONS.fields)
+    assert compare(requirement, fields, MatchContext.for_ontology(valves), OPTIONS).status is status
+
+
+def test_a_single_allowed_value_is_an_ordinary_requirement(valves: Ontology) -> None:
+    requirement = _allowed("Nominal Size (DN) (mm) : 50", valves)
+    assert (requirement.attribute, requirement.value_num, requirement.alternatives) == (
+        "nominal_size",
+        50.0,
+        [],
+    )

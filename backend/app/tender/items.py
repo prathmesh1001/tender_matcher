@@ -521,14 +521,32 @@ def spec_row_line(text: str, labels: tuple[str, str]) -> str | None:
     return f"{name.replace(',', '')} : {value}"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class _SpecBlock:
-    """One item's GeM specification rows, after its "<title> ( 70 pieces )" line if printed."""
+    """One item's GeM specification rows, after its "<title> ( 70 pieces )" line if printed.
+
+    `allowed_values`: the rows are GeM "Bid Requirement (Allowed Values)" rows, whose commas
+    separate options.
+    """
 
     header: Requirement | None
     quantity: str | None
     unit: str | None
     rows: list[tuple[Requirement, str]]
+    allowed_values: bool = False
+
+    def starts_again(self, line: str) -> bool:
+        """True if `line` repeats this block's first row name: the next item's table begins."""
+        return len(self.rows) > 1 and _row_name(line) == _row_name(self.rows[0][1])
+
+    def repeats(self, line: str) -> bool:
+        """True if `line` is already one of this block's rows (printed again at a page break)."""
+        return any(line == own for _, own in self.rows)
+
+
+def _row_name(line: str) -> str:
+    """The name part of a "name : value" specification row."""
+    return line.split(" : ", 1)[0].strip().lower()
 
 
 def quantity_header(text: str, title: str) -> tuple[str, str] | None:
@@ -552,22 +570,56 @@ def quantity_header(text: str, title: str) -> tuple[str, str] | None:
     return (found["qty"], found["unit"].strip()) if found else None
 
 
+def additional_quantity(text: str, title: str) -> tuple[str, str] | None:
+    """Quantity and unit from "Additional Specification Parameters - <title> ( 50 pieces )".
+
+    GeM prints this line after an item's table; it names the item's quantity again, which a
+    block whose own quantity line was lost (inside a table at a page top) still needs.
+
+    Args:
+        text: A general requirement's printed text.
+        title: The item category title.
+
+    Returns:
+        ("50", "pieces"), or None if the text holds no such line.
+    """
+    for line in text.splitlines():
+        _, dash, rest = line.partition(" - ")
+        if dash and (found := quantity_header(rest, title)) is not None:
+            return found
+    return None
+
+
 def _spec_blocks(
     general: Sequence[Requirement], title: str, labels: tuple[str, str]
 ) -> list[_SpecBlock]:
-    """Specification rows grouped by the quantity line printed before them, in bid order."""
-    blocks: list[_SpecBlock] = [_SpecBlock(None, None, None, [])]
+    """Specification rows grouped by item, in bid order.
+
+    A block starts at a "<title> ( 70 pieces )" line, or, when that line was lost, where a row
+    repeats the block's first row name (every GeM item table opens with the same row). A row
+    printed twice in a block (page break) is kept once.
+    """
+    blocks: list[_SpecBlock] = [_SpecBlock(None, None, None, [], allowed_values=True)]
     for requirement in general:
         header = quantity_header(requirement.raw_text, title)
         if header is not None:
-            blocks.append(_SpecBlock(requirement, header[0], header[1], []))
+            blocks.append(_SpecBlock(requirement, header[0], header[1], [], allowed_values=True))
+        extra = additional_quantity(requirement.raw_text, title)
+        if extra is not None and blocks[-1].quantity is None and blocks[-1].rows:
+            blocks[-1].quantity, blocks[-1].unit = extra
         line = spec_row_line(requirement.raw_text, labels)
-        if line is not None:
-            blocks[-1].rows.append((requirement, line))
+        if line is None or (blocks[-1].repeats(line) and not blocks[-1].starts_again(line)):
+            continue
+        if blocks[-1].starts_again(line):
+            blocks.append(_SpecBlock(None, None, None, [], allowed_values=True))
+        blocks[-1].rows.append((requirement, line))
     # Rows printed before the first quantity line belong to the first item.
-    if len(blocks) > 1 and blocks[0].rows:
+    if len(blocks) > 1 and blocks[0].rows and blocks[1].header is not None:
         blocks[1].rows[:0] = blocks[0].rows
-    return [b for b in blocks[1:] if b.rows] if len(blocks) > 1 else blocks
+        blocks.pop(0)
+    elif blocks[0].header is None and not blocks[0].rows:
+        blocks.pop(0)
+    return [b for b in blocks if b.rows] or blocks[:1]
 
 
 def _block_item(
@@ -588,6 +640,7 @@ def _block_item(
                 "document": row.document,
                 "page_number": row.page_number,
                 "item_no": f"{item.item_no}.spec{index}",
+                "allowed_values": block.allowed_values,
             }
         )
         added.extend(

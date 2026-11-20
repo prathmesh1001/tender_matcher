@@ -363,6 +363,68 @@ def _requirement(
     )
 
 
+def _numeric_options(
+    label: str | None, parts: Sequence[str], ontology: Ontology | None, enum_max_words: int
+) -> bool:
+    """True if every option of an allowed-values list is one number.
+
+    Units may differ: the ontology reads "0.6" MPa as PN 6 but leaves "0.25" in MPa, so the
+    comparator parses each option on its own.
+    """
+    parsed = [parse_value(label, part, ontology, enum_max_words) for part in parts]
+    return all(
+        p.kind is ValueKind.NUMERIC and p.number is not None and p.number_max is None
+        for p in parsed
+    )
+
+
+def options_requirement(
+    item: LineItem,
+    req_id: str,
+    position: int,
+    label: str | None,
+    value: str,
+    ontology: Ontology | None,
+    options: SplitOptions,
+) -> Requirement:
+    """One requirement for a list of allowed values: any one option is enough.
+
+    "Application : Tight Shut Off, Regulating, Low Leakage" names three acceptable options, not
+    three conditions. Numbers in one unit ("0.25, 0.6, 1.6" MPa) stay numeric, one option per
+    number; other options are codes, or free text when one is a long phrase without a code.
+
+    Args:
+        item: The line item (its allowed-values row).
+        req_id: The requirement id.
+        position: Order within the item.
+        label: The row's name.
+        value: The printed list.
+        ontology: Category ontology, or None.
+        options: Splitting thresholds.
+
+    Returns:
+        The requirement, with every option in `alternatives` and `any_alternative` set.
+    """
+    parts = split_parts(value)
+    first = _requirement(item, req_id, position, label, parts[0], ontology, options)
+    if _numeric_options(label, parts, ontology, options.enum_max_words):
+        kind, operator = ValueKind.NUMERIC, first.operator
+    else:
+        short = all(has_code(p) or len(p.split()) <= options.enum_max_words for p in parts)
+        kind = ValueKind.CODE if short else ValueKind.TEXT
+        operator = Operator.IN if short else Operator.TEXT
+    return first.model_copy(
+        update={
+            "kind": kind,
+            "operator": operator,
+            "value_text": value,
+            "alternatives": parts,
+            "any_alternative": True,
+            "raw_text": f"{label} : {value}" if label else value,
+        }
+    )
+
+
 def item_requirements(
     item: LineItem, ontology: Ontology | None, options: SplitOptions
 ) -> list[Requirement]:
@@ -387,6 +449,20 @@ def item_requirements(
     )
     for n, group in enumerate(groups, start=1):
         req_id = f"{item.item_no}.{n}"
+        if item.allowed_values:
+            # A GeM row is "name : value" by construction; a long name is still its label.
+            label, _, value = (
+                (group.label, "", group.value)
+                if group.label is not None or " : " not in group.value
+                else group.value.partition(" : ")
+            )
+            if len(split_parts(value)) > 1:
+                out.append(
+                    options_requirement(
+                        item, req_id, len(out), label, value.strip(), ontology, options
+                    )
+                )
+                continue
         parts = _size_rating_parts(split_parts(group.value))
         printed = f"{group.label} {group.value}" if group.merged else None
         parent = _requirement(

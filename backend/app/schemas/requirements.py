@@ -67,6 +67,13 @@ class LineItem(BaseModel):
     unit: str | None = None
     document: str = Field(description="Tender file the item comes from.")
     page_number: int = Field(ge=1)
+    allowed_values: bool = Field(
+        default=False,
+        description=(
+            "Commas separate the values the buyer allows (GeM 'Bid Requirement (Allowed "
+            "Values)'): any one of them is enough, so they are options, not separate parts."
+        ),
+    )
 
 
 class Requirement(BaseModel):

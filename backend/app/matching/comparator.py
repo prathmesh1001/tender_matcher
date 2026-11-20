@@ -51,7 +51,14 @@ from app.schemas.enums import (
 from app.schemas.matching import Comparison, Evidence, LabelBasis
 from app.schemas.requirements import Requirement, ValueKind
 from app.schemas.sections import EvidenceSource
-from app.tender.normalizer import ParsedValue, names_material, resolve_attribute, stems, words
+from app.tender.normalizer import (
+    ParsedValue,
+    names_material,
+    parse_value,
+    resolve_attribute,
+    stems,
+    words,
+)
 
 _RANK: Final = {
     MatchStatus.FULL_MATCH: 3,
@@ -385,6 +392,72 @@ def _printed(
     return [replace(q, unit=unit) for q in found]
 
 
+def option_requirements(requirement: Requirement, ctx: MatchContext) -> list[Requirement]:
+    """One numeric requirement per allowed option ("0.25, 0.6, 1.6" MPa), else itself.
+
+    Each option is parsed with the row's label, so it gets its own unit and attribute: the
+    ontology reads "0.6" MPa as PN 6 (a class) but keeps "0.25" in MPa.
+
+    Args:
+        requirement: A numeric requirement.
+        ctx: The item's ontology context.
+
+    Returns:
+        A copy for each numeric option when any one option is enough, else `[requirement]`.
+    """
+    if not (requirement.any_alternative and requirement.alternatives):
+        return [requirement]
+    out: list[Requirement] = []
+    for option in requirement.alternatives:
+        parsed = parse_value(requirement.label, option, ctx.ontology, 0)
+        if parsed.kind is not ValueKind.NUMERIC or parsed.number is None:
+            continue
+        ranged = parsed.number_max is not None
+        out.append(
+            requirement.model_copy(
+                update={
+                    "attribute": resolve_attribute(requirement.label, parsed, ctx.ontology),
+                    "operator": parsed.operator,
+                    "value_text": option,
+                    "value_num": None if ranged else parsed.number,
+                    "value_min": parsed.number if ranged else None,
+                    "value_max": parsed.number_max,
+                    "unit": parsed.unit,
+                    "canonical_unit": parsed.canonical_unit,
+                    "alternatives": [],
+                    "any_alternative": False,
+                }
+            )
+        )
+    return out or [requirement]
+
+
+def judge_numeric_options(
+    requirement: Requirement,
+    value: str,
+    in_dimension_table: bool,
+    ctx: MatchContext,
+    options: ComparatorOptions,
+    label: str = "",
+) -> _Outcome:
+    """`judge_numeric` for a requirement whose options are each enough on their own.
+
+    One option met is full, one partly met is partial; a failure needs every option decided
+    and failed: an option the field cannot decide may still be the one it offers.
+    """
+    outcomes = [
+        judge_numeric(one, value, in_dimension_table, ctx, options, label)
+        for one in option_requirements(requirement, ctx)
+    ]
+    if len(outcomes) == 1:
+        return outcomes[0]
+    for status in (MatchStatus.FULL_MATCH, MatchStatus.PARTIAL_MATCH, None):
+        found = next((o for o in outcomes if o.status is status), None)
+        if found is not None:
+            return found
+    return _Outcome(MatchStatus.MISSING_CAPABILITY, f"none of {len(outcomes)} allowed values")
+
+
 def judge_numeric(
     requirement: Requirement,
     value: str,
@@ -692,7 +765,7 @@ def compare(
         if value is None:
             continue
         if requirement.kind is ValueKind.NUMERIC:
-            outcome = judge_numeric(
+            outcome = judge_numeric_options(
                 requirement,
                 value,
                 located.field.in_dimension_table,

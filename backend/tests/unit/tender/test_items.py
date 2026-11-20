@@ -187,6 +187,70 @@ def test_one_quantity_block_stays_one_item(options: RequirementOptions, ontology
     assert specs == ["IS 13095", "100"]
 
 
+def test_a_lost_quantity_line_still_starts_the_next_item(
+    options: RequirementOptions, ontology: Ontology
+) -> None:
+    """8148400 p7: the quantity line sat inside a table at the page top and was lost."""
+    [bid] = _bfv_bid(("20", "50", 5), ("50", "65", 6))
+    chunks = list(bid.chunks)
+    chunks += [
+        _gem_row("Conformity to Governing Specification (ISS)", "IS 13095", 7),
+        _gem_row("Nominal Size (DN) (mm)", "80", 7),
+        _prose(
+            "Additional Specification Parameters - Butterfly Valves (V2) As Per IS 13095 "
+            "( 50 pieces )\n7 / 20",
+            7,
+        ),
+    ]
+    found = parse_tender_files([TenderFile("bid.pdf", "bid_document", chunks)], options, [ontology])
+    sizes = [
+        [r.value_text for r in leaves(e.requirements) if r.attribute == "nominal_size"]
+        for e in found.items
+    ]
+    assert sizes == [["50"], ["65"], ["80"]]
+    assert [e.item.quantity for e in found.items] == ["20", "50", "50"]
+
+
+def test_a_row_printed_again_at_a_page_break_is_kept_once(
+    options: RequirementOptions, ontology: Ontology
+) -> None:
+    [bid] = _bfv_bid(("50", "100", 8))
+    pressure = _gem_row("Nominal Pressure (PN) (MPa)", "0.25, 0.6, 1, 2.5, 4, 1.6", 9)
+    chunks = [*bid.chunks, pressure, pressure]
+    found = parse_tender_files([TenderFile("bid.pdf", "bid_document", chunks)], options, [ontology])
+    [entry] = found.items
+    assert [r.label for r in leaves(entry.requirements)].count("Nominal Pressure (PN) (MPa)") == 1
+
+
+def test_allowed_values_are_options_not_parts(
+    options: RequirementOptions, ontology: Ontology
+) -> None:
+    """GeM "Bid Requirement (Allowed Values)": any listed value is acceptable (8148400)."""
+    [bid] = _bfv_bid(("20", "50", 5))
+    application = _gem_row("Application", "Tight Shut Off, Regulating, Low Leakage", 5)
+    pressure = _gem_row("Nominal Pressure (PN) (MPa)", "0.25, 0.6, 1, 2.5, 4, 1.6", 5)
+    long_name = _gem_row(
+        "Face to Face Dimension (In this context, the final decision made by the consignee/ "
+        "Buyer shall be binding)",
+        "Double Flanged Short (PN 2.5) Class 125/150, Wafer(PN 4.0) Class 300",
+        5,
+    )
+    chunks = [*bid.chunks, application, pressure, long_name]
+    found = parse_tender_files([TenderFile("bid.pdf", "bid_document", chunks)], options, [ontology])
+    by_label = {r.label: r for r in leaves(found.items[0].requirements)}
+    app = by_label["Application"]
+    assert app.alternatives == ["Tight Shut Off", "Regulating", "Low Leakage"]
+    assert app.any_alternative
+    pn = by_label["Nominal Pressure (PN) (MPa)"]
+    assert (pn.kind.value, pn.any_alternative) == ("numeric", True)
+    assert pn.alternatives == ["0.25", "0.6", "1", "2.5", "4", "1.6"]
+    f2f = next(r for label, r in by_label.items() if label and label.startswith("Face to Face"))
+    assert f2f.alternatives == [
+        "Double Flanged Short (PN 2.5) Class 125/150",
+        "Wafer(PN 4.0) Class 300",
+    ]
+
+
 def test_several_products_in_the_category_are_not_guessed(
     options: RequirementOptions, ontology: Ontology
 ) -> None:
