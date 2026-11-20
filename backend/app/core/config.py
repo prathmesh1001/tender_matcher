@@ -232,6 +232,13 @@ class Settings(BaseSettings):
         description="Shortest letters-and-digits token of an item read as its code (material / "
         "part code); shorter ones such as 'SS316' are values.",
     )
+    TENDER_NUMBERED_ROW_MIN_WORDS: int = Field(
+        default=5,
+        ge=1,
+        description="Fewest words of the description cell of a specification table row taken "
+        "as an item's description because the row is numbered like the item (items that only "
+        "repeat their titles).",
+    )
     TENDER_ITEM_CODE_ROW_MIN_CELLS: int = Field(
         default=3,
         ge=1,
@@ -767,6 +774,27 @@ class Settings(BaseSettings):
             "with",
         ],
         description="Filler words never part of a title key (JSON list, lower case).",
+    )
+    GEM_CATEGORY_TAIL_WORDS: list[str] = Field(
+        default_factory=lambda: [
+            "conforming",
+            "confirming",
+            "according",
+            "compliant",
+            "is",
+            "iso",
+            "en",
+            "din",
+            "astm",
+            "bs",
+            "api",
+            "ansi",
+            "asme",
+            "iec",
+        ],
+        description="Words that may follow a title key in a GeM category name besides the "
+        "filler words (GEM_TITLE_STOP_WORDS), a code or a tender title word: 'Foot Valves IS "
+        "4038' is a foot valve, 'Switch Disconnectors' is no switch (JSON list, lower case).",
     )
     GEM_REQUEST_DELAY_SECONDS: float = Field(
         default=1.0, ge=0, description="Pause before every request to GeM Marketplace."

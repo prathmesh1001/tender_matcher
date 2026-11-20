@@ -93,6 +93,8 @@ class DiscoveryRequest:
     rank_words: frozenset[str] = frozenset()  # item title words; products holding more go first
     base_url: str = ""
     max_pages: int = 1  # result pages read per category (12 products each)
+    title_words: frozenset[str] | None = None  # every normalized item title word (title keys)
+    tail_words: frozenset[str] = frozenset()  # words that may follow a title key in a category
     max_per_brand: int = 1_000  # most listings opened per brand
     seller_rank: Sequence[str] = ()  # "sold as" classes, best first
 
@@ -150,7 +152,15 @@ def find_category_pages(request: DiscoveryRequest, deps: DiscoveryDeps) -> Categ
             logger.warning("gem search not read", extra={"url": url, "error": exc.message})
             continue
         links = search_categories(fetched.content.decode("utf-8", errors="replace"))
-        for link in fitting_categories(links, request.product_type, deps.check, request.excludes):
+        fitting = fitting_categories(
+            links,
+            request.product_type,
+            deps.check,
+            request.excludes,
+            request.title_words,
+            request.tail_words,
+        )
+        for link in fitting:
             found.setdefault(page_url(request.base_url, link.slug), link.name)
     if found:
         pages = list(found)[: request.max_categories]

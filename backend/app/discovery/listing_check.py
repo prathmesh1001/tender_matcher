@@ -25,7 +25,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 
-from app.discovery.gem_parser import GemListing
+from app.discovery.gem_parser import GemListing, listing_category_words
 from app.ingestion.product_tagger import ProductMatcher
 from app.ontology.schema import Ontology
 from app.retrieval.text_normalizer import (
@@ -119,6 +119,8 @@ class ListingCheck:
     part_words: PhrasePatterns = ()
     # Product type -> the normalized words of each of its multi-word synonyms.
     type_words: Mapping[str, tuple[tuple[str, ...], ...]] = field(default_factory=dict)
+    # Title keys this check was given (`for_type`): products no ontology defines.
+    key_types: frozenset[str] = frozenset()
 
     @classmethod
     def from_ontologies(
@@ -168,7 +170,53 @@ class ListingCheck:
             return self
         pattern = key_pattern(product_type.replace("_", " "), gap_words, self.vocabulary)
         matcher = replace(self.matcher, types={**self.matcher.types, product_type: (pattern,)})
-        return replace(self, matcher=matcher, type_words={**self.type_words, product_type: ()})
+        return replace(
+            self,
+            matcher=matcher,
+            type_words={**self.type_words, product_type: ()},
+            key_types=self.key_types | {product_type},
+        )
+
+    def is_title_key(self, product_type: str) -> bool:
+        """True for a title key (`for_type`), False for an ontology product type."""
+        return product_type in self.key_types
+
+    def qualifiers_named(
+        self,
+        category: str,
+        product_type: str,
+        title_words: frozenset[str],
+        tail_words: frozenset[str] = frozenset(),
+    ) -> bool:
+        """True if every word a category name puts before a title key is a tender title word.
+
+        A title key has no curated synonyms, so a qualifier the tender never wrote makes it
+        another product: "Cadaverous Injector" is no diesel "INJECTOR 74 110 HP", "Toggle
+        Switches" no "SWITCH FOR HAZARIODS". The word right after the key must only describe it:
+        a filler or standard word ("Starter Motors for IC Engines", "Foot Valves IS 4038"), a
+        code, or a title word; "Switch Disconnectors and Fuse Units" is another product.
+
+        Args:
+            category: A GeM category name.
+            product_type: The title key.
+            title_words: Normalized words of the tender items' titles.
+            tail_words: Normalized words that may follow the key (filler, standards).
+
+        Returns:
+            Whether the category may be the item's product.
+        """
+        text = self._normalized(category)
+        found = [m for p in self.matcher.types[product_type] if (m := p.search(text))]
+        if not found:
+            return False
+        first = min(found, key=lambda m: m.start())
+        before = [w for w in text[: first.start()].split() if not w.isdigit()]
+        after = text[first.end() :].split()[:1]
+        tail_ok = all(
+            w in tail_words or w in title_words or any(ch.isdigit() for ch in w) or len(w) == 1
+            for w in after
+        )
+        return tail_ok and all(w in title_words for w in before)
 
     def names_type(self, listing: GemListing, product_type: str) -> bool:
         """True if the title or a specification row names the product type.
@@ -181,8 +229,16 @@ class ListingCheck:
             Whether the type is named.
         """
         texts = [listing.title, *(f"{r.label} {r.value}" for r in listing.specs)]
-        return any(
-            self._names(normalize_for_search(t, self.vocabulary), product_type) for t in texts
+        if any(self._names(normalize_for_search(t, self.vocabulary), product_type) for t in texts):
+            return True
+        # A title key has no synonyms: sellers name the product their own way ("Aluminium
+        # Phosphide 56% Tab" in "Aluminium Phosphide Formulation (V3)"), so the listing's own
+        # GeM category, read from its URL, names it too.
+        category = listing_category_words(listing.url)
+        return (
+            self.is_title_key(product_type)
+            and bool(category)
+            and self.names_type_in(category, product_type)
         )
 
     def foreign_product(

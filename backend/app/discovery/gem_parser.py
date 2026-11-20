@@ -135,6 +135,22 @@ def search_categories(html: str) -> list[CategoryLink]:
     return list(out.values())
 
 
+def listing_category_words(url: str) -> str:
+    """The listing's own GeM category from its URL as words.
+
+    "/aluminium-phosphide-formulation-v3-conforming-6438/quickphos-.../p-1-2-cat.html" ->
+    "aluminium phosphide formulation v3 conforming 6438".
+
+    Args:
+        url: A listing URL (`/<category>/<product-name>/p-<id>-<variant>-cat.html`).
+
+    Returns:
+        The words, or "" if the URL has no category part.
+    """
+    parts = [p for p in urlsplit(url).path.split("/") if p]
+    return parts[0].replace("-", " ") if len(parts) >= 3 else ""
+
+
 def listing_slug_words(url: str) -> str:
     """The product-name part of a listing URL as words ("k-type-thermocouple" -> "k type ...").
 

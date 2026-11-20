@@ -79,23 +79,35 @@ def fitting_categories(
     product_type: str,
     check: ListingCheck,
     excludes: Sequence[str] = (),
+    title_words: frozenset[str] | None = None,
+    tail_words: frozenset[str] = frozenset(),
 ) -> list[CategoryLink]:
     """Search categories whose name names the product type and no other product instead.
 
+    For a title key, a qualifier before the key must also be a tender title word
+    (`ListingCheck.qualifiers_named`): "Cadaverous Injector" is not the item "INJECTOR 74 HP".
+
     Args:
         links: Categories offered by a search page.
-        product_type: The ontology product type.
+        product_type: The ontology product type, or a title key.
         check: The listing check.
         excludes: GeM look-alike phrases configured for the type.
+        title_words: Normalized tender item title words; None skips the qualifier rule.
+        tail_words: Normalized words that may follow a title key (filler, standards).
 
     Returns:
         The fitting categories, in page order.
     """
+    keyed = title_words is not None and check.is_title_key(product_type)
     return [
         c
         for c in links
         if check.names_type_in(c.name, product_type)
         and check.foreign_in(c.name, product_type, excludes) is None
+        and (
+            not keyed
+            or check.qualifiers_named(c.name, product_type, title_words or frozenset(), tail_words)
+        )
     ]
 
 

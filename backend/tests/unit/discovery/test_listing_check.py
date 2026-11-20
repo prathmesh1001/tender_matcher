@@ -1,6 +1,6 @@
 from dataclasses import replace
 
-from app.discovery.gem_parser import GemListing
+from app.discovery.gem_parser import GemListing, SpecRow
 from app.discovery.listing_check import ListingCheck
 
 
@@ -85,3 +85,20 @@ def test_a_listing_naming_the_type_only_after_with_is_rejected(
 ) -> None:
     actuator = replace(listing, model="Pneumatic Actuator with Control Valve")
     assert check.rejection(actuator, "control_valve") is not None
+
+
+def _phosphide(url: str) -> GemListing:
+    rows = tuple(SpecRow(None, f"Row {n}", "x") for n in range(10))
+    return GemListing(url, "QUICKPHOS Aluminium Phosphide 56% Tab 1 Kg", "QUICKPHOS", None, rows)
+
+
+def test_a_title_key_listing_is_named_by_its_own_gem_category(check: ListingCheck) -> None:
+    """Trial 8054155: sellers write "Aluminium Phosphide 56% Tab", never "formulation"."""
+    keyed = check.for_type("aluminium_phosphide_formulation")
+    inside = _phosphide(
+        "https://mkp.gem.gov.in/aluminium-phosphide-formulation-v3-conforming-6438/"
+        "quickphos-aluminium-phosphide-56-tablet/p-5116877-15809662103-cat.html"
+    )
+    assert keyed.rejection(inside, "aluminium_phosphide_formulation") is None
+    elsewhere = _phosphide("https://mkp.gem.gov.in/fumigants/quickphos/p-1-2-cat.html")
+    assert keyed.rejection(elsewhere, "aluminium_phosphide_formulation") is not None

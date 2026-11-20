@@ -59,7 +59,7 @@ from app.ingestion.pipeline import IngestOutcome, ListingSource, ingest_listing
 from app.ingestion.processing import ProcessingOptions
 from app.ingestion.product_tagger import ProductMatcher
 from app.ontology.loader import load_ontologies
-from app.retrieval.text_normalizer import SearchVocabulary
+from app.retrieval.text_normalizer import SearchVocabulary, normalize_for_search
 from app.schemas.discovery import (
     DiscoveryJobResponse,
     DiscoveryOverview,
@@ -482,6 +482,14 @@ class DiscoveryService:
             max_pages=settings.GEM_MAX_CATEGORY_PAGES,
             max_per_brand=settings.GEM_MAX_LISTINGS_PER_BRAND,
             seller_rank=config.seller_rank,
+            title_words=frozenset(
+                w for t in titles for w in normalize_for_search(t, check.vocabulary).split()
+            ),
+            tail_words=frozenset(
+                w
+                for t in [*settings.GEM_TITLE_STOP_WORDS, *settings.GEM_CATEGORY_TAIL_WORDS]
+                for w in normalize_for_search(t, check.vocabulary).split()
+            ),
         )
 
     def _record(self, job_id: uuid.UUID, outcomes: Sequence[ListingOutcome]) -> None:

@@ -1,5 +1,7 @@
 """Searching GeM by a tender's items: search page parsing, category filter, product ranking."""
 
+import pytest
+
 from app.discovery.gem_cards import ListingCard
 from app.discovery.gem_config import load_gem_config
 from app.discovery.gem_parser import CategoryLink, listing_slug_words, search_categories
@@ -11,6 +13,7 @@ from app.discovery.gem_search import (
     search_url,
 )
 from app.discovery.listing_check import ListingCheck
+from app.retrieval.text_normalizer import normalize_for_search
 from tests.unit.discovery.conftest import BACKEND, fixture_text
 
 TENDER_TITLE = '1" Pneumatic Globe Control valve ATO'  # 8063368-style item title
@@ -179,3 +182,74 @@ def test_filler_words_may_sit_between_a_keys_words(check: ListingCheck) -> None:
 
 def test_a_known_type_keeps_the_same_check(check: ListingCheck) -> None:
     assert check.for_type("ball_valve") is check
+
+
+def _words(check: ListingCheck, *titles: str) -> frozenset[str]:
+    return frozenset(w for t in titles for w in normalize_for_search(t, check.vocabulary).split())
+
+
+def test_a_title_key_category_needs_the_tenders_own_qualifiers(check: ListingCheck) -> None:
+    """Trial 8022837 (backhoe spares): "INJECTOR" found mortuary injectors, "SWITCH" any switch."""
+    injector = check.for_type("injector")
+    words = _words(check, "INJECTOR 74 110 HP 006023436DI AX124 AAD95")
+    assert fitting_categories(_names("CADAVEROUS INJECTOR"), "injector", injector, (), words) == []
+    switch = check.for_type("switch")
+    found = fitting_categories(
+        _names("Toggle Switches", "Limit Switch"), "switch", switch, (), _words(check, "FAN SWITCH")
+    )
+    assert found == []
+    starter = check.for_type("starter_motor")
+    kept = _names("Starter Motors for IC Engines")  # words after the key only describe it
+    words = _words(check, "STARTER MOTOR 4 2 KW")
+    assert fitting_categories(kept, "starter_motor", starter, (), words, _tails(check)) == kept
+
+
+def test_the_qualifier_rule_needs_the_tenders_words(check: ListingCheck) -> None:
+    injector = check.for_type("injector")
+    names = _names("CADAVEROUS INJECTOR")
+    assert fitting_categories(names, "injector", injector) == names  # no titles: no rule
+    words = _words(check, "Cadaverous injector, 2 litre")
+    assert fitting_categories(names, "injector", injector, (), words) == names
+
+
+def test_ontology_types_skip_the_qualifier_rule(check: ListingCheck) -> None:
+    names = _names("Mineral Insulated Thermocouple")
+    words = _words(check, "Thermocouple K type with thermowell")
+    assert fitting_categories(names, "thermocouple", check, (), words) == names
+
+
+def _tails(check: ListingCheck) -> frozenset[str]:
+    from app.core.config import Settings
+
+    settings = Settings()
+    words = [*settings.GEM_TITLE_STOP_WORDS, *settings.GEM_CATEGORY_TAIL_WORDS]
+    return frozenset(w for t in words for w in normalize_for_search(t, check.vocabulary).split())
+
+
+def test_a_noun_right_after_a_title_key_is_another_product(check: ListingCheck) -> None:
+    """Trial 8022837: "SWITCH FOR WIPER" found switch-fuse units."""
+    switch = check.for_type("switch")
+    words = _words(check, "SWITCH FOR WIPER", "FAN SWITCH", "SWITCH FOR 4WD")
+    names = _names(
+        "Switch Disconnectors and Fuse Combination Units (Switch Fuse Unit) Conforming To IS/IEC "
+        "60947 (Part 3)"
+    )
+    assert fitting_categories(names, "switch", switch, (), words, _tails(check)) == []
+
+
+@pytest.mark.parametrize(("key", "category", "title"), [
+    ("starter_motor", "Starter Motors for IC Engines", "STARTER MOTOR 4 2 KW"),
+    ("foot_valve", "Foot Valves IS 4038", "Foot valve 50 mm"),
+    (
+        "aluminium_phosphide_formulation",
+        "Aluminium Phosphide Formulation (V3) Conforming to IS 6438",
+        "Aluminium Phosphide Formulation (V3) Conforming to IS 6438 (Q2)",
+    ),
+    ("y_strainer", "Y Strainer", "Y strainer 25 mm"),
+])  # fmt: skip
+def test_filler_standards_and_codes_may_follow_a_title_key(
+    check: ListingCheck, key: str, category: str, title: str
+) -> None:
+    keyed = check.for_type(key, ["type"])
+    names = _names(category)
+    assert fitting_categories(names, key, keyed, (), _words(check, title), _tails(check)) == names

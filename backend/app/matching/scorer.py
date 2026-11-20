@@ -114,9 +114,7 @@ def _order(name: str, s: Score, min_coverage_pct: float) -> tuple[bool, bool, fl
 
 def _source_url(report: ManufacturerItemReport) -> str | None:
     """The GeM listing page cited by the vendor's results, if any."""
-    return next(
-        (e.source_url for c in report.results for e in c.evidence if e.source_url), None
-    )
+    return next((e.source_url for c in report.results for e in c.evidence if e.source_url), None)
 
 
 def _gem(report: ManufacturerItemReport) -> bool:
@@ -129,7 +127,10 @@ def top_vendors(
 ) -> list[ItemVendor]:
     """The best vendors for one item, per source: catalogues (database) and GeM listings.
 
-    Only vendors with a document chosen for the item and at least one decision. Each source is
+    Only vendors with a document chosen for the item and at least one decision, except GeM
+    vendors: a GeM listing chosen for the item is shown even when nothing could be decided
+    (an item stating only its title, 8210284), after those with decisions, so an item the
+    database has nothing for still shows what GeM offers. Each source is
     ranked on its own, like the tender ranking (enough coverage first, then compatibility,
     coverage, name), on the item's results alone; catalogue vendors come first in the list. A
     GeM vendor is marked as such, with the listing page.
@@ -146,7 +147,7 @@ def top_vendors(
     eligible = [
         m
         for m in manufacturers
-        if (m.chosen or m.tied_documents) and m.score.compatibility_pct is not None
+        if (m.chosen or m.tied_documents) and (m.score.compatibility_pct is not None or _gem(m))
     ]
     eligible.sort(key=lambda m: _order(m.manufacturer, m.score, min_coverage_pct))
     catalogue = [m for m in eligible if not _gem(m)][:limit]
