@@ -430,6 +430,42 @@ class MatchService:
         """
         return self._types([e.item for e in self.parse_tender(tender).items], lambda _: False)
 
+    def branch_types(
+        self,
+        tender: str,
+        manufacturers: Sequence[str] | None = None,
+        *,
+        title_keys: bool = True,
+    ) -> list[UncoveredType]:
+        """The types a run's GeM branch searches: those with nothing in the database first.
+
+        A type no document of the run's makers declares gets only GeM vendors, so it is checked
+        before the budget runs out; covered types follow (GeM vendors beside the catalogues).
+
+        Args:
+            tender: Tender folder name.
+            manufacturers: The run's manufacturers; None counts every stored document.
+            title_keys: Also items whose title names no ontology type (a key from its words),
+                which is every item of a tender outside the ontologies.
+
+        Returns:
+            One entry per type, uncovered first, each group in first-item order.
+
+        Raises:
+            NotFoundError: If the tender folder has no tender.yaml.
+            DocumentParseError: If a tender file cannot be parsed.
+        """
+        every = [t for t in self.item_types(tender) if title_keys or not t.by_title]
+        self._source.refresh()
+        declared = self._source.product_types()
+        covered = {
+            t.product_type for t in every if self._covered(t.product_type, declared, manufacturers)
+        }
+        return [
+            *(t for t in every if t.product_type not in covered),
+            *(t for t in every if t.product_type in covered),
+        ]
+
     def _types(
         self, items: Sequence[LineItem], covered: Callable[[str], bool]
     ) -> list[UncoveredType]:

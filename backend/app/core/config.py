@@ -674,6 +674,12 @@ class Settings(BaseSettings):
         "product types, in parallel with the catalogue matching, and adds the listing vendors "
         "to the same report.",
     )
+    GEM_IN_RUN_TITLE_KEYS: bool = Field(
+        default=True,
+        description="The run's GeM branch also searches items whose title names no ontology "
+        "type (by title words), so items of any tender, valve/pump or not, get GeM vendors when "
+        "the database has nothing for them. Types with nothing in the database go first.",
+    )
     GEM_CHECK_IN_PROCESS: bool = Field(
         default=True,
         description="Run each GeM check of a run's GeM branch in a child process, so storing "

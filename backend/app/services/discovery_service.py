@@ -101,6 +101,16 @@ class DiscoveryMatcher(Protocol):
         """Every product type (or title key) of a tender's items."""
         ...
 
+    def branch_types(
+        self,
+        tender: str,
+        manufacturers: Sequence[str] | None = None,
+        *,
+        title_keys: bool = True,
+    ) -> list[UncoveredType]:
+        """The types a run's GeM branch searches, those with nothing in the database first."""
+        ...
+
     def add_listing_vendors(
         self, previous: TenderReport, brands: Mapping[str, Sequence[str]]
     ) -> TenderReport:
@@ -342,9 +352,14 @@ class DiscoveryService:
         if not (settings.DISCOVERY_ENABLED and settings.GEM_IN_RUN):
             return None
         started = time.monotonic()
-        # Only ontology product types: a title key of an item naming none is often a mis-read
-        # line ("transportation" found GeM ventilators); those keep the check asked by hand.
-        types = [t for t in self._matcher().item_types(tender) if not t.by_title]
+        with session_scope(self._session_factory) as session:
+            manufacturers = list(RunRepository(session).get_or_raise(run_id).manufacturers or [])
+        # Every item, typed or not (GEM_IN_RUN_TITLE_KEYS): an item the database has nothing
+        # for gets at least its GeM vendors; those types are checked first. A mis-read title
+        # key finds no fitting listing (`ListingCheck.for_type`), so it adds nothing.
+        types = self._matcher().branch_types(
+            tender, manufacturers or None, title_keys=settings.GEM_IN_RUN_TITLE_KEYS
+        )
         if not types:
             return None
         with session_scope(self._session_factory) as session:

@@ -106,3 +106,29 @@ def test_item_types_lists_every_type_covered_or_not(monkeypatch: Any) -> None:
         ("gate_valve", ["1", "3"], ["Gate Valve DN100 PN16", "Gate Valve DN150"]),
         ("control_valve", ["2"], [TITLE]),
     ]
+
+
+def _parsed(service: MatchService, monkeypatch: Any, *titles: str) -> None:
+    items = [
+        SimpleNamespace(item=SimpleNamespace(title=t, item_no=str(n)))
+        for n, t in enumerate(titles, 1)
+    ]
+    monkeypatch.setattr(service, "parse_tender", lambda tender: SimpleNamespace(items=items))
+
+
+def test_the_gem_branch_searches_types_without_database_documents_first(monkeypatch: Any) -> None:
+    service = _service(KEYS)
+    _parsed(service, monkeypatch, "Gate Valve DN100", TITLE, "Supply of Hydraulic Hose Pipe")
+    found = service.branch_types("GEM_X", ["KSB"])
+    assert [(t.product_type, t.by_title) for t in found] == [
+        ("control_valve", False),  # no document of KSB: GeM is its only source
+        ("hydraulic_hose_pipe", True),  # not a valve or pump: searched by its title words
+        ("gate_valve", False),  # KSB has a document: GeM vendors only beside it
+    ]
+
+
+def test_the_gem_branch_can_leave_title_keys_out(monkeypatch: Any) -> None:
+    service = _service(KEYS)
+    _parsed(service, monkeypatch, "Gate Valve DN100", "Supply of Hydraulic Hose Pipe")
+    found = service.branch_types("GEM_X", ["KSB"], title_keys=False)
+    assert [t.product_type for t in found] == ["gate_valve"]
