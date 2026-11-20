@@ -71,6 +71,16 @@ export function RequirementTable({ report }: { report: TenderReport }) {
           Needs review only
         </label>
         <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={filters.showUnchecked}
+            onChange={(e) => {
+              change({ showUnchecked: e.target.checked });
+            }}
+          />
+          Show unchecked rows
+        </label>
+        <label className="flex items-center gap-2 text-sm">
           Search
           <input
             type="search"

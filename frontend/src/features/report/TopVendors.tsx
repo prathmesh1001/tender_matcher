@@ -1,27 +1,27 @@
 import { SellerDeclaredBadge } from "../../components/report/EvidenceCell";
+import { ProofList } from "../../components/report/ProofList";
 import { Card } from "../../components/ui/Card";
 import { matchLevel } from "../../lib/matchLevel";
+import { vendorProof } from "../../lib/proof";
 import type { GemRecommendation, ItemReport, ItemVendor, TenderReport } from "../../types/report";
 
-function pct(value: number | null): string {
-  return value === null ? "not decided" : `${value.toFixed(0)}%`;
+function scoreLine(vendor: ItemVendor): string {
+  const { compatibility_pct: pct, decided, total } = vendor.score;
+  const parts = [matchLevel(pct)];
+  if (pct !== null) parts.push(`${pct.toFixed(0)}%`);
+  parts.push(`${String(decided)} of ${String(total)} checked`);
+  return parts.join(" · ");
 }
 
-function Vendor({ vendor }: { vendor: ItemVendor }) {
+function Vendor({ vendor, item }: { vendor: ItemVendor; item: ItemReport }) {
   const gem = vendor.source === "gem_listing";
   return (
-    <li className="space-y-0.5">
+    <li className="space-y-1">
       <p>
         <span className="font-semibold">
           {vendor.rank}. {vendor.manufacturer}
         </span>{" "}
-        <span className="text-ink-600">
-          {pct(vendor.score.compatibility_pct)} match, {vendor.score.decided} of{" "}
-          {vendor.score.total} checked
-        </span>
-        <span className="ml-2 text-xs font-semibold">
-          {matchLevel(vendor.score.compatibility_pct)}
-        </span>
+        <span className="text-ink-600">{scoreLine(vendor)}</span>
         {vendor.low_coverage && (
           <span className="ml-2 text-xs font-semibold text-status-partial">Few checked</span>
         )}
@@ -36,6 +36,7 @@ function Vendor({ vendor }: { vendor: ItemVendor }) {
           vendor.document
         )}
       </p>
+      <ProofList lines={vendorProof(item, vendor.manufacturer)} />
     </li>
   );
 }
@@ -44,10 +45,12 @@ function VendorList({
   title,
   vendors,
   empty,
+  item,
 }: {
   title: string;
   vendors: ItemVendor[];
   empty: string;
+  item: ItemReport;
 }) {
   return (
     <section aria-label={title}>
@@ -57,7 +60,7 @@ function VendorList({
       ) : (
         <ol className="mt-1 space-y-2 text-sm">
           {vendors.map((v) => (
-            <Vendor key={v.manufacturer} vendor={v} />
+            <Vendor key={v.manufacturer} vendor={v} item={item} />
           ))}
         </ol>
       )}
@@ -135,11 +138,13 @@ function ItemRow({ item }: { item: ItemReport }) {
       <div className="mt-2 grid gap-4 md:grid-cols-2">
         <VendorList
           title="From database (catalogues)"
+          item={item}
           vendors={vendors.filter((v) => v.source === "catalogue")}
           empty="No catalogue vendor."
         />
         <VendorList
           title="From GeM"
+          item={item}
           vendors={vendors.filter((v) => v.source === "gem_listing")}
           empty="No GeM vendor."
         />

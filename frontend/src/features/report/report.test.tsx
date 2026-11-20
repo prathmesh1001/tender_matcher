@@ -169,14 +169,17 @@ describe("reportRows", () => {
 
   it("combines filters", () => {
     const rows = requirementRows(REPORT);
-    expect(filterRows(rows, NO_FILTERS)).toHaveLength(rows.length);
+    const all = { ...NO_FILTERS, showUnchecked: true };
+    expect(filterRows(rows, all)).toHaveLength(rows.length);
+    // by default rows nothing was decided on are left out
+    expect(filterRows(rows, NO_FILTERS).every((r) => r.result.status !== "unsupported")).toBe(true);
     expect(
-      filterRows(rows, { ...NO_FILTERS, manufacturer: "Acme", needsReview: true }).map(
+      filterRows(rows, { ...all, manufacturer: "Acme", needsReview: true }).map(
         (r) => r.result.requirement_id,
       ),
     ).toEqual(["10.2"]);
     expect(filterRows(rows, { ...NO_FILTERS, status: "full_match" })).toHaveLength(1);
-    expect(filterRows(rows, { ...NO_FILTERS, search: "pn 40" })).toHaveLength(1);
+    expect(filterRows(rows, { ...all, search: "pn 40" })).toHaveLength(1);
   });
 });
 
@@ -271,7 +274,10 @@ describe("ReportPage", () => {
     });
     await openReport();
     const database = within(screen.getByRole("region", { name: "From database (catalogues)" }));
-    expect(database.getByText("Partial match")).toBeInTheDocument();
+    expect(database.getByText(/^Partial match · 50% · /)).toBeInTheDocument();
+    // proof: the decided requirement with its quote and a link to the cited page
+    expect(database.getByText(/“Body: WCB”/)).toBeInTheDocument();
+    expect(database.getByRole("link", { name: "alpha.pdf, p.7" })).toBeInTheDocument();
     const related = within(screen.getByRole("region", { name: "Related on GeM" }));
     expect(related.getByText(/shares 'impeller'/)).toBeInTheDocument();
     const card = screen
@@ -324,6 +330,7 @@ describe("ReportPage", () => {
     serve();
     const user = userEvent.setup();
     await openReport();
+    await user.click(screen.getByLabelText("Show unchecked rows"));
     expect(screen.getByRole("status", { name: "" })).toHaveTextContent("4 of 4 rows");
     await user.click(screen.getByLabelText("Needs review only"));
     expect(screen.getByText("3 of 4 rows")).toBeInTheDocument();
@@ -407,7 +414,9 @@ describe("EvidenceCell", () => {
         },
       ],
     });
+    const user = userEvent.setup();
     await openReport();
+    await user.click(screen.getByLabelText("Show unchecked rows"));
     expect(screen.getByText(/Cited for review only, this decides nothing/)).toBeInTheDocument();
   });
 

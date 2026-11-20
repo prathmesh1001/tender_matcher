@@ -18,6 +18,8 @@ export interface RowFilters {
   status: MatchStatus | "";
   needsReview: boolean;
   search: string;
+  /** Also rows nothing was decided on (unsupported, not applicable). */
+  showUnchecked: boolean;
 }
 
 export const NO_FILTERS: RowFilters = {
@@ -25,7 +27,10 @@ export const NO_FILTERS: RowFilters = {
   status: "",
   needsReview: false,
   search: "",
+  showUnchecked: false,
 };
+
+const UNCHECKED: MatchStatus[] = ["unsupported", "not_applicable"];
 
 /** The report's results as flat rows; each tied catalogue keeps its own, and none looks picked. */
 export function requirementRows(report: TenderReport): RequirementRow[] {
@@ -65,6 +70,7 @@ export function filterRows(rows: RequirementRow[], filters: RowFilters): Require
     (row) =>
       (filters.manufacturer === "" || row.manufacturer === filters.manufacturer) &&
       (filters.status === "" || row.result.status === filters.status) &&
+      (filters.showUnchecked || filters.status !== "" || !UNCHECKED.includes(row.result.status)) &&
       (!filters.needsReview || row.result.needs_review) &&
       (search === "" ||
         row.requirement.toLowerCase().includes(search) ||
