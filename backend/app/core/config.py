@@ -700,6 +700,17 @@ class Settings(BaseSettings):
         "type (by title words), so items of any tender, valve/pump or not, get GeM vendors when "
         "the database has nothing for them. Types with nothing in the database go first.",
     )
+    GEM_RECOMMENDED_PER_CATEGORY: int = Field(
+        default=5,
+        ge=1,
+        description="Most listings shown per buyer GeM category as the tender's recommended GeM "
+        "vendors (listings offered, not checked against the specification).",
+    )
+    GEM_RELATED_PER_ITEM: int = Field(
+        default=3,
+        ge=1,
+        description="Most related GeM listings shown on an item that has no GeM vendor of its own.",
+    )
     GEM_CHECK_IN_PROCESS: bool = Field(
         default=True,
         description="Run each GeM check of a run's GeM branch in a child process, so storing "

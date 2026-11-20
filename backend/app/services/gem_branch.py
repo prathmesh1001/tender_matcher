@@ -15,6 +15,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from app.core.logging import log_context
+from app.schemas.report import TenderReport
 from app.services.match_service import UncoveredType
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,8 @@ class GemBranch:
     check: CheckType
     late: LateTypes
     saved_timeout_s: float = 3600.0  # how long the thread waits for the run's report
+    # Adds the buyer categories' listings to the run's report (`recommend.with_recommendations`).
+    recommend: Callable[[TenderReport], TenderReport] | None = None
     _brands: dict[str, list[str]] = field(default_factory=dict, init=False)
     _taken: set[str] = field(default_factory=set, init=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, init=False)

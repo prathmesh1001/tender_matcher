@@ -53,6 +53,7 @@ from app.discovery.pipeline import (
     recheck_stored,
 )
 from app.discovery.polite_fetcher import PageFetcher, PoliteFetcher
+from app.discovery.recommend import buyer_key, recommendations, with_recommendations
 from app.ingestion.gem_listing import process_listing
 from app.ingestion.ocr import build_ocr_engine
 from app.ingestion.pipeline import IngestOutcome, ListingSource, ingest_listing
@@ -308,6 +309,7 @@ class DiscoveryService:
         category: str,
         titles: list[str],
         buyer_categories: Sequence[str] = (),
+        trusted: bool = False,
     ) -> list[str]:
         """Search GeM for one type and store the listings that pass; record them on the job.
 
@@ -317,7 +319,10 @@ class DiscoveryService:
         """
         check = self._tools().check.for_type(product_type, self._settings.GEM_TITLE_STOP_WORDS)
         request = self._request(product_type, category, titles, check, buyer_categories)
-        withdrawn = self._withdraw_stale(request, check)
+        if trusted:  # a buyer category: its own page only, its own listings kept as they are
+            request = replace(request, trusted=True, search_urls=[], page_urls=[])
+        # A buyer category's stored listings are read again from its page, never withdrawn here.
+        withdrawn = [] if trusted else self._withdraw_stale(request, check)
         pages = find_category_pages(request, self._deps(check))
         logger.info(
             "gem categories",
@@ -365,6 +370,8 @@ class DiscoveryService:
         types = self._matcher().branch_types(
             tender, manufacturers or None, title_keys=settings.GEM_IN_RUN_TITLE_KEYS
         )
+        buyer = _buyer_types(types, settings.GEM_UNTYPED_CATEGORY)
+        types = [*buyer, *types]
         if not types:
             return None
         with session_scope(self._session_factory) as session:
@@ -390,10 +397,34 @@ class DiscoveryService:
             deadline=started + settings.GEM_RUN_BUDGET_SECONDS,
             check=self._check_in_process if settings.GEM_CHECK_IN_PROCESS else self.check_in_run,
             late=lambda late: self._late_types(run_id, late, [j for j, _ in queued]),
+            recommend=lambda report: self.recommend(run_id, report),
         )
         branch.start()
         logger.info("gem branch started", extra={"types": [t.product_type for t in types]})
         return branch
+
+    def recommend(self, run_id: uuid.UUID, report: TenderReport) -> TenderReport:
+        """The report with its buyer categories' GeM listings (`recommend.with_recommendations`).
+
+        Args:
+            run_id: The run whose discovery jobs hold the listings.
+            report: Its report, GeM listing vendors already added.
+
+        Returns:
+            The report with recommended (tender) and related (item) GeM vendors.
+        """
+        categories = report.buyer_gem_categories
+        if not categories:
+            return report
+        keys = {buyer_key(c) for c in categories}
+        with session_scope(self._session_factory) as session:
+            jobs = DiscoveryJobRepository(session).list_for_run(run_id)
+            listings = {j.product_type: list(j.listings) for j in jobs if j.product_type in keys}
+        settings = self._settings
+        recs = recommendations(categories, listings, settings.GEM_RECOMMENDED_PER_CATEGORY)
+        return with_recommendations(
+            report, recs, settings.GEM_TITLE_STOP_WORDS, settings.GEM_RELATED_PER_ITEM
+        )
 
     def _check_in_process(self, job_id: uuid.UUID, item_type: UncoveredType) -> list[str]:
         """`check_in_run` in a spawned child process; the brands are read from its job.
@@ -411,6 +442,7 @@ class DiscoveryService:
                 item_type.category,
                 item_type.titles,
                 item_type.buyer_categories,
+                item_type.trusted,
             ),
             name=f"gem-{item_type.product_type}",
             daemon=True,
@@ -447,6 +479,7 @@ class DiscoveryService:
                 item_type.category,
                 list(item_type.titles),
                 item_type.buyer_categories,
+                item_type.trusted,
             )
         except Exception as exc:
             reason = failure_reason(exc, self._settings.RUN_ERROR_MAX_CHARS)
@@ -632,6 +665,23 @@ class DiscoveryService:
             job.error = error
             job.result_run_id = result_run
             job.finished_at = datetime.now(UTC)
+
+
+def _buyer_types(types: Sequence[UncoveredType], category: str) -> list[UncoveredType]:
+    """One trusted GeM check per category the buyer selected for the bid, in bid order."""
+    names = list(dict.fromkeys(c for t in types for c in t.buyer_categories))
+    return [
+        UncoveredType(
+            buyer_key(name),
+            category,
+            [],
+            by_title=True,
+            titles=[name],
+            buyer_categories=[name],
+            trusted=True,
+        )
+        for name in names
+    ]
 
 
 def _item_titles(

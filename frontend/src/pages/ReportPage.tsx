@@ -9,7 +9,7 @@ import { GeneralTable } from "../features/report/GeneralTable";
 import { ReportSummary } from "../features/report/ReportSummary";
 import { ReportWarnings } from "../features/report/ReportWarnings";
 import { RequirementTable } from "../features/report/RequirementTable";
-import { TopVendors } from "../features/report/TopVendors";
+import { RecommendedGemVendors, TopVendors } from "../features/report/TopVendors";
 import { useReport, useRun } from "../hooks/queries";
 
 const EXPORT_LINK =
@@ -88,6 +88,7 @@ export function ReportPage() {
           </a>
         </div>
         <TopVendors report={data} />
+        <RecommendedGemVendors report={data} />
         <details className="rounded-xl border border-line bg-white p-4">
           <summary className="cursor-pointer font-semibold">
             Details: scores, every requirement with its evidence, GeM checks

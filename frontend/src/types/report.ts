@@ -89,6 +89,17 @@ export interface ItemVendor {
   source_url: string | null;
 }
 
+/** A GeM listing in a category the buyer selected: offered, not checked against the spec. */
+export interface GemRecommendation {
+  brand: string;
+  product: string;
+  url: string;
+  category: string;
+  sold_as: string | null;
+  /** Why it is shown for an item (the shared word), empty for the tender list. */
+  reason: string;
+}
+
 export interface ItemReport {
   item: { item_no: string; title: string; quantity: string | null; unit: string | null };
   product_type: string | null;
@@ -96,6 +107,8 @@ export interface ItemReport {
   manufacturers: ManufacturerItemReport[];
   /** The best vendors for this item (absent in reports made before it existed). */
   top_vendors?: ItemVendor[];
+  /** Related GeM listings when no GeM vendor matched the item. */
+  related_gem_vendors?: GemRecommendation[];
 }
 
 export interface RankingEntry {
@@ -164,4 +177,5 @@ export interface TenderReport {
   boq_title?: string | null;
   buyer_gem_categories?: string[];
   spare_parts?: SparePartsNotice | null;
+  recommended_gem_vendors?: GemRecommendation[];
 }

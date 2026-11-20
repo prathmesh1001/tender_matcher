@@ -15,6 +15,7 @@ import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
+from urllib.parse import urlsplit
 
 from app.core.exceptions import AppError, LinkFetchError
 from app.discovery.gem_cards import ListingCard, listing_cards, total_results
@@ -95,6 +96,9 @@ class DiscoveryRequest:
     max_pages: int = 1  # result pages read per category (12 products each)
     title_words: frozenset[str] | None = None  # every normalized item title word (title keys)
     buyer_categories: Sequence[str] = ()  # GeM categories the buyer selected (searched first)
+    # A buyer category checked for the whole tender: its own listings are kept as they are
+    # (`listing_rejection`); no keyword search, no product-name rules.
+    trusted: bool = False
     tail_words: frozenset[str] = frozenset()  # words that may follow a title key in a category
     max_per_brand: int = 1_000  # most listings opened per brand
     seller_rank: Sequence[str] = ()  # "sold as" classes, best first
@@ -140,9 +144,11 @@ def _buyer_pages(request: DiscoveryRequest, deps: DiscoveryDeps) -> dict[str, st
     found: dict[str, str] = {}
     check, product_type = deps.check, request.product_type
     for name in request.buyer_categories:
-        if not check.names_type_in(name, product_type):
-            continue
-        if check.foreign_in(name, product_type, request.excludes) is not None:
+        # A trusted request is the buyer category itself: no product-name rules.
+        if not request.trusted and (
+            not check.names_type_in(name, product_type)
+            or check.foreign_in(name, product_type, request.excludes)
+        ):
             continue
         try:
             fetched = deps.fetcher.get(search_url(request.base_url, name))
@@ -275,6 +281,39 @@ def candidate_cards(
     ]
 
 
+def listing_rejection(
+    listing: GemListing, request: DiscoveryRequest, check: ListingCheck
+) -> str | None:
+    """Why a listing is not kept for this request, or None to keep it.
+
+    A trusted request (a buyer category) keeps a listing that has enough specification rows
+    and sits in one of the request's own category pages (its URL's category); category pages
+    may show neighbouring products, which fail. Anything else is the listing check's call.
+
+    Args:
+        listing: A parsed listing.
+        request: What is looked for.
+        check: The listing check.
+
+    Returns:
+        A short reason, or None.
+    """
+    if not request.trusted:
+        return check.rejection(listing, request.product_type, request.excludes)
+    if len(listing.specs) < check.min_spec_rows:
+        return f"only {len(listing.specs)} specification rows (need {check.min_spec_rows})"
+    own = _listing_category(listing.url)
+    if own not in {_slug(p) for p in request.page_urls}:
+        return f"in GeM category {own or 'unknown'}, not a buyer category"
+    return None
+
+
+def _listing_category(url: str) -> str:
+    """The category slug a listing URL starts with ("/<category>/<name>/p-...")."""
+    parts = [p for p in urlsplit(url).path.split("/") if p]
+    return parts[0] if len(parts) >= 3 else ""
+
+
 def read_listing(
     card: ListingCard, request: DiscoveryRequest, deps: DiscoveryDeps, seen: dict[str, str]
 ) -> ListingOutcome:
@@ -302,7 +341,7 @@ def read_listing(
         brand=listing.brand or card.brand,
         model=listing.model,
     )
-    rejected = deps.check.rejection(listing, request.product_type, request.excludes)
+    rejected = listing_rejection(listing, request, deps.check)
     if rejected:
         return replace(base, reason=rejected)
     name = listing_name(listing).casefold()
@@ -358,7 +397,7 @@ def recheck_stored(
         The rejection reason, or None.
     """
     listing = parse_listing(html, url, request.empty_values)
-    return check.rejection(listing, request.product_type, request.excludes)
+    return listing_rejection(listing, request, check)
 
 
 def discover(request: DiscoveryRequest, deps: DiscoveryDeps) -> list[ListingOutcome]:

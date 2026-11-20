@@ -235,6 +235,58 @@ describe("ReportPage", () => {
     expect(gem.getByText("Few checked")).toBeInTheDocument();
   });
 
+  it("labels match levels and shows related and recommended GeM vendors", async () => {
+    const [item] = REPORT.items;
+    if (item === undefined) throw new Error("fixture has an item");
+    const rec = {
+      brand: "Kirloskar",
+      product: "Kirloskar Stainless Steel Pump Impeller",
+      url: "https://mkp.gem.gov.in/stainless-steel-pump-impeller/k/p-1-2-cat.html",
+      category: "Stainless Steel Pump Impeller",
+      sold_as: "oem",
+      reason: "",
+    };
+    serve({
+      ...REPORT,
+      recommended_gem_vendors: [rec],
+      items: [
+        {
+          ...item,
+          top_vendors: [
+            {
+              rank: 1,
+              manufacturer: "Acme",
+              score: { ...SCORE, compatibility_pct: 50 },
+              low_coverage: false,
+              source: "catalogue",
+              document: "alpha.pdf",
+              source_url: null,
+            },
+          ],
+          related_gem_vendors: [
+            { ...rec, reason: "GeM category shares 'impeller' with the item title" },
+          ],
+        },
+      ],
+    });
+    await openReport();
+    const database = within(screen.getByRole("region", { name: "From database (catalogues)" }));
+    expect(database.getByText("Partial match")).toBeInTheDocument();
+    const related = within(screen.getByRole("region", { name: "Related on GeM" }));
+    expect(related.getByText(/shares 'impeller'/)).toBeInTheDocument();
+    const card = screen
+      .getByRole("heading", { name: "Recommended GeM vendors for this tender" })
+      .closest("section");
+    if (card === null) throw new Error("card section");
+    expect(
+      within(card).getByRole("heading", { name: "Stainless Steel Pump Impeller" }),
+    ).toBeVisible();
+    expect(within(card).getAllByRole("link", { name: rec.product })[0]).toHaveAttribute(
+      "href",
+      rec.url,
+    );
+  });
+
   it("says when an item has no vendor from a source", async () => {
     serve();
     await openReport();

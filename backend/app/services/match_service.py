@@ -103,6 +103,7 @@ class UncoveredType:
     titles: list[str] = field(default_factory=list)  # the items' titles, each once
     # GeM categories the buyer selected for the whole bid; searched first.
     buyer_categories: list[str] = field(default_factory=list)
+    trusted: bool = False  # a buyer GeM category: its own listings are kept as they are
 
 
 @dataclass(slots=True)

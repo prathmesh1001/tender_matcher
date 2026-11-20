@@ -31,6 +31,7 @@ def run_gem_check(
     category: str,
     titles: list[str],
     buyer_categories: list[str] | None = None,
+    trusted: bool = False,
 ) -> None:
     """Process entry point: check one product type on GeM and record it on its job.
 
@@ -40,6 +41,7 @@ def run_gem_check(
         category: Its ontology category.
         titles: The run's item titles of the type (the GeM search words come from them).
         buyer_categories: GeM categories the buyer selected for the bid (searched first).
+        trusted: The check is of a buyer category itself (its own listings kept as they are).
     """
     settings = get_settings()
     configure_logging(settings.LOG_LEVEL, json_output=settings.LOG_JSON)
@@ -59,5 +61,6 @@ def run_gem_check(
             [],
             titles=list(titles),
             buyer_categories=list(buyer_categories or []),
+            trusted=trusted,
         ),
     )

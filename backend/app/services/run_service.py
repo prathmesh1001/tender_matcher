@@ -327,9 +327,9 @@ class RunService:
         """The report with the GeM listing vendors the branch found within its budget."""
         brands = branch.collect()
         logger.info("gem branch collected", extra={"types": sorted(brands)})
-        if not brands:
-            return report
-        return self._matcher().add_listing_vendors(report, brands)
+        if brands:
+            report = self._matcher().add_listing_vendors(report, brands)
+        return branch.recommend(report) if branch.recommend is not None else report
 
     def _finish_failed(self, run_id: uuid.UUID, reason: str) -> None:
         with session_scope(self._session_factory) as session:

@@ -1,6 +1,7 @@
 import { SellerDeclaredBadge } from "../../components/report/EvidenceCell";
 import { Card } from "../../components/ui/Card";
-import type { ItemReport, ItemVendor, TenderReport } from "../../types/report";
+import { matchLevel } from "../../lib/matchLevel";
+import type { GemRecommendation, ItemReport, ItemVendor, TenderReport } from "../../types/report";
 
 function pct(value: number | null): string {
   return value === null ? "not decided" : `${value.toFixed(0)}%`;
@@ -17,6 +18,9 @@ function Vendor({ vendor }: { vendor: ItemVendor }) {
         <span className="text-ink-600">
           {pct(vendor.score.compatibility_pct)} match, {vendor.score.decided} of{" "}
           {vendor.score.total} checked
+        </span>
+        <span className="ml-2 text-xs font-semibold">
+          {matchLevel(vendor.score.compatibility_pct)}
         </span>
         {vendor.low_coverage && (
           <span className="ml-2 text-xs font-semibold text-status-partial">Few checked</span>
@@ -61,6 +65,66 @@ function VendorList({
   );
 }
 
+function Recommendation({ rec }: { rec: GemRecommendation }) {
+  return (
+    <li className="space-y-0.5">
+      <p>
+        <span className="font-semibold">{rec.brand}</span>{" "}
+        <span className="text-xs text-ink-600">{rec.sold_as ?? ""}</span>
+      </p>
+      <p className="text-xs text-ink-600">
+        <a className="underline" href={rec.url} target="_blank" rel="noreferrer">
+          {rec.product}
+        </a>
+        {rec.reason !== "" && <> · {rec.reason}</>}
+      </p>
+    </li>
+  );
+}
+
+function RelatedOnGem({ recs }: { recs: GemRecommendation[] }) {
+  if (recs.length === 0) return null;
+  return (
+    <section aria-label="Related on GeM" className="mt-2">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-600">
+        Related on GeM (not checked against the spec)
+      </h4>
+      <ul className="mt-1 space-y-2 text-sm">
+        {recs.map((r) => (
+          <Recommendation key={r.url} rec={r} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Listings of the GeM categories the buyer selected: the tender's recommended GeM vendors. */
+export function RecommendedGemVendors({ report }: { report: TenderReport }) {
+  const recs = report.recommended_gem_vendors ?? [];
+  if (recs.length === 0) return null;
+  const categories = [...new Set(recs.map((r) => r.category))];
+  return (
+    <Card title="Recommended GeM vendors for this tender">
+      <p className="mb-3 text-sm text-ink-600">
+        Sellers in the GeM categories the buyer selected for this bid. Offered on GeM; not checked
+        against the specification.
+      </p>
+      {categories.map((category) => (
+        <section key={category} aria-label={category} className="mb-3 last:mb-0">
+          <h3 className="text-sm font-semibold">{category}</h3>
+          <ul className="mt-1 space-y-2 text-sm">
+            {recs
+              .filter((r) => r.category === category)
+              .map((r) => (
+                <Recommendation key={r.url} rec={r} />
+              ))}
+          </ul>
+        </section>
+      ))}
+    </Card>
+  );
+}
+
 function ItemRow({ item }: { item: ItemReport }) {
   const vendors = item.top_vendors ?? [];
   return (
@@ -80,6 +144,7 @@ function ItemRow({ item }: { item: ItemReport }) {
           empty="No GeM vendor."
         />
       </div>
+      <RelatedOnGem recs={item.related_gem_vendors ?? []} />
     </li>
   );
 }

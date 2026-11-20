@@ -89,6 +89,19 @@ class ManufacturerItemReport(BaseModel):
     score: Score
 
 
+class GemRecommendation(BaseModel):
+    """A GeM listing in a category the buyer selected: offered, not checked against the spec."""
+
+    model_config = ConfigDict(frozen=True)
+
+    brand: str
+    product: str = Field(description="The listing's title on GeM.")
+    url: str
+    category: str = Field(description="The buyer's GeM category the listing is in.")
+    sold_as: str | None = Field(default=None, description='"oem", "resellers authorized", ...')
+    reason: str = Field(default="", description="Why it is shown for this item, if for one.")
+
+
 class ItemVendor(BaseModel):
     """One of the best vendors for one item, with its score on that item alone."""
 
@@ -124,6 +137,11 @@ class ItemReport(BaseModel):
         default_factory=list,
         description="The best vendors for this item alone (catalogue makers and GeM sellers), "
         "ranked like the tender ranking; only vendors with a document and a decision.",
+    )
+    related_gem_vendors: list[GemRecommendation] = Field(
+        default_factory=list,
+        description="When no GeM vendor matched the item: listings of a buyer category sharing "
+        "a product word with the item title. Related only, never checked against the spec.",
     )
 
 
@@ -265,4 +283,9 @@ class TenderReport(BaseModel):
     )
     spare_parts: SparePartsNotice | None = Field(
         default=None, description="Set when the BOQ title buys spare parts."
+    )
+    recommended_gem_vendors: list[GemRecommendation] = Field(
+        default_factory=list,
+        description="Listings in the GeM categories the buyer selected for the bid; the tender's "
+        "recommended GeM vendors even where no item matched one.",
     )

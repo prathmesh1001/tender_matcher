@@ -245,3 +245,28 @@ def test_the_buyers_own_category_is_searched_first(tmp_path: Path, check: Listin
     assert pages.page_urls == [page_url(BASE, "stainless-steel-pump-impeller")]
     # the shaft category names no impeller: never searched for this item
     assert not any("Shaft" in url for url in fetcher.asked)
+
+
+def test_a_trusted_buyer_category_keeps_its_own_listings_only(check: ListingCheck) -> None:
+    from app.discovery.gem_parser import SpecRow
+    from app.discovery.pipeline import listing_rejection
+
+    rows = tuple(SpecRow(None, f"Row {n}", "x") for n in range(6))
+    page = page_url(BASE, "stainless-steel-pump-impeller")
+    request = replace(
+        _request("buyer_category_stainless_steel_pump_impeller"), trusted=True, page_urls=[page]
+    )
+    own = GemListing(
+        BASE + "/stainless-steel-pump-impeller/kirloskar-impeller/p-1-2-cat.html",
+        "Kirloskar Stainless Steel Pump Impeller",
+        "Kirloskar",
+        None,
+        rows,
+    )
+    assert listing_rejection(own, request, check) is None
+    neighbour = replace(own, url=BASE + "/pump-impeller-puller/x/p-3-4-cat.html")
+    assert listing_rejection(neighbour, request, check) == (
+        "in GeM category pump-impeller-puller, not a buyer category"
+    )
+    thin = replace(own, specs=rows[:2])
+    assert listing_rejection(thin, request, check) is not None
