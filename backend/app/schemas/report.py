@@ -8,6 +8,7 @@ from app.schemas.enums import (
     ExtractionIssueCode,
     ExtractionStatus,
     MatchStatus,
+    VendorMatchLevel,
     VendorSource,
 )
 from app.schemas.matching import Comparison, SubTypeFit
@@ -118,6 +119,10 @@ class ItemVendor(BaseModel):
     source_url: str | None = Field(
         default=None, description="The GeM listing page, for a GeM vendor."
     )
+    match_level: VendorMatchLevel | None = Field(
+        default=None, description="Category from the rules (`scorer.vendor_level`)."
+    )
+    level_reason: str = Field(default="", description="Why it needs review, in words.")
 
 
 class ItemReport(BaseModel):

@@ -274,7 +274,8 @@ describe("ReportPage", () => {
     });
     await openReport();
     const database = within(screen.getByRole("region", { name: "From database (catalogues)" }));
-    expect(database.getByText(/^Partial match · 50% · /)).toBeInTheDocument();
+    expect(database.getByText("Partial match (1)")).toBeInTheDocument();
+    expect(database.getByText(/^50% · /)).toBeInTheDocument();
     // proof: the decided requirement with its quote and a link to the cited page
     expect(database.getByText(/“Body: WCB”/)).toBeInTheDocument();
     expect(database.getByRole("link", { name: "alpha.pdf, p.7" })).toBeInTheDocument();
@@ -291,6 +292,43 @@ describe("ReportPage", () => {
       "href",
       rec.url,
     );
+  });
+
+  it("groups an item's vendors by match level with the review reason", async () => {
+    const [item] = REPORT.items;
+    if (item === undefined) throw new Error("fixture has an item");
+    const vendor = {
+      score: SCORE,
+      low_coverage: false,
+      source: "catalogue" as const,
+      document: "alpha.pdf",
+      source_url: null,
+    };
+    serve({
+      ...REPORT,
+      items: [
+        {
+          ...item,
+          top_vendors: [
+            { ...vendor, rank: 1, manufacturer: "KSB", match_level: "full_match" },
+            { ...vendor, rank: 2, manufacturer: "Delval", match_level: "partial_match" },
+            {
+              ...vendor,
+              rank: 3,
+              manufacturer: "Bray",
+              match_level: "needs_review",
+              level_reason: "only 2 of 5 requirements checked",
+            },
+          ],
+        },
+      ],
+    });
+    await openReport();
+    const database = within(screen.getByRole("region", { name: "From database (catalogues)" }));
+    expect(database.getByText("Full match (1)")).toBeInTheDocument();
+    expect(database.getByText("Partial match (1)")).toBeInTheDocument();
+    expect(database.getByText("Needs review (1)")).toBeInTheDocument();
+    expect(database.getByText("Review: only 2 of 5 requirements checked")).toBeInTheDocument();
   });
 
   it("says when an item has no vendor from a source", async () => {

@@ -1,3 +1,5 @@
+import type { MatchLevel } from "../lib/matchLevel";
+
 /**
  * Types mirroring backend/app/schemas/report.py and matching.py. Keep field names identical.
  */
@@ -87,6 +89,10 @@ export interface ItemVendor {
   document: string;
   /** The GeM listing page, for a GeM vendor. */
   source_url: string | null;
+  /** Category from the backend rules; absent in reports saved before levels existed. */
+  match_level?: MatchLevel | null;
+  /** Why it needs review, in words. */
+  level_reason?: string;
 }
 
 /** A GeM listing in a category the buyer selected: offered, not checked against the spec. */

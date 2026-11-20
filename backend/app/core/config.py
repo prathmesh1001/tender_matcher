@@ -492,10 +492,11 @@ class Settings(BaseSettings):
         default=24, ge=2, description="Longer quote pieces are never split."
     )
     REPORT_TOP_VENDORS_PER_ITEM: int = Field(
-        default=3,
+        default=6,
         ge=1,
         le=20,
-        description="Vendors listed per item as its best (catalogue makers and GeM sellers).",
+        description="Vendors listed per item as its best, per source (catalogue makers, GeM "
+        "sellers), each with its match level.",
     )
     RANKING_MIN_COVERAGE_PCT: float = Field(
         default=50.0,

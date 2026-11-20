@@ -17,7 +17,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from app.schemas.enums import ExtractionStatus, MatchStatus, VendorSource
 from app.schemas.matching import Comparison
-from app.schemas.report import ManufacturerItemReport, TenderReport
+from app.schemas.report import ItemVendor, ManufacturerItemReport, TenderReport
 from app.schemas.requirements import Requirement
 
 Value = str | int | float | None
@@ -65,6 +65,7 @@ _TOP_VENDOR_COLUMNS: Final = (
     ("Rank", 7),
     ("Vendor", 22),
     ("Source", 18),
+    ("Match level", 18),
     ("Compatibility %", 15),
     ("Coverage %", 12),
     ("Decided", 9),
@@ -293,6 +294,14 @@ def _by_status_sheet(sheet: Worksheet, report: TenderReport) -> None:
     _finish_table(sheet)
 
 
+def _level(vendor: ItemVendor) -> str:
+    """The vendor's match level in words, with the review reason if any."""
+    if vendor.match_level is None:
+        return ""
+    words = vendor.match_level.value.replace("_", " ").capitalize()
+    return f"{words}: {vendor.level_reason}" if vendor.level_reason else words
+
+
 def _top_vendors_sheet(sheet: Worksheet, report: TenderReport) -> None:
     """Each item's best vendors (catalogue makers and GeM sellers), best first."""
     sheet.title = "Top vendors"
@@ -308,6 +317,7 @@ def _top_vendors_sheet(sheet: Worksheet, report: TenderReport) -> None:
                     v.rank,
                     v.manufacturer,
                     source,
+                    _level(v),
                     _pct(v.score.compatibility_pct),
                     _pct(v.score.coverage_pct),
                     f"{v.score.decided}/{v.score.total}",

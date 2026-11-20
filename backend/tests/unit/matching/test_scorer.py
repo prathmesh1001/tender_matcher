@@ -2,8 +2,8 @@
 
 import pytest
 
-from app.matching.scorer import rank, score, top_vendors
-from app.schemas.enums import DecisionSource, MatchStatus, VendorSource
+from app.matching.scorer import rank, score, top_vendors, vendor_level
+from app.schemas.enums import DecisionSource, MatchStatus, VendorMatchLevel, VendorSource
 from app.schemas.matching import Comparison, Evidence, LabelBasis, SubTypeFit
 from app.schemas.report import CandidateSummary, ManufacturerItemReport
 
@@ -198,3 +198,75 @@ def test_gem_listing_of_the_item_sub_type_goes_before_a_better_scored_other() ->
     wedge = _with_fit(_vendor("XEN", [FULL, FULL], gem=True), SubTypeFit.MISMATCH)
     top = top_vendors([sluice, wedge, knife], min_coverage_pct=50.0, limit=3)
     assert [v.manufacturer for v in top] == ["getway", "ajanta", "XEN"]
+
+
+# ---------------------------------------------------------------- match level per vendor
+
+LEVEL = VendorMatchLevel
+
+
+def _level(vendor: ManufacturerItemReport) -> tuple[VendorMatchLevel, str]:
+    return vendor_level(vendor, min_coverage_pct=50.0)
+
+
+def test_every_checked_requirement_met_by_rules_is_a_full_match() -> None:
+    assert _level(_vendor("KSB", [FULL, FULL, UNSUPPORTED])) == (LEVEL.FULL_MATCH, "")
+
+
+def test_a_mix_is_a_partial_match_even_though_partial_rows_are_flagged() -> None:
+    vendor = _vendor("KSB", [FULL, MISSING, UNSUPPORTED])
+    assert _level(vendor) == (LEVEL.PARTIAL_MATCH, "")
+    flagged = _vendor("KSB", [FULL, FULL])
+    flagged = flagged.model_copy(update={"results": [_c(FULL), _c(PARTIAL, review=True)]})
+    flagged = flagged.model_copy(update={"score": score(flagged.results, SCORES)})
+    assert _level(flagged) == (LEVEL.PARTIAL_MATCH, "")
+
+
+def test_nothing_met_does_not_meet_the_spec() -> None:
+    assert _level(_vendor("KSB", [MISSING, MISSING])) == (LEVEL.DOES_NOT_MEET, "")
+
+
+def test_too_few_checked_needs_review_whatever_the_score() -> None:
+    vendor = _vendor("KSB", [FULL, UNSUPPORTED, UNSUPPORTED, UNSUPPORTED])  # 100 %, 25 % checked
+    assert _level(vendor) == (LEVEL.NEEDS_REVIEW, "only 1 of 4 requirements checked")
+
+
+def test_an_ai_judge_decision_needs_review() -> None:
+    vendor = _vendor("KSB", [FULL, FULL])
+    judged = _c(FULL).model_copy(update={"decided_by": DecisionSource.LLM})
+    vendor = vendor.model_copy(update={"results": [_c(FULL), judged]})
+    assert _level(vendor) == (LEVEL.NEEDS_REVIEW, "1 decided by the AI judge")
+
+
+def test_tied_catalogues_need_review() -> None:
+    vendor = _vendor("KSB", [FULL]).model_copy(update={"tied_documents": ["a.pdf", "b.pdf"]})
+    assert _level(vendor)[0] is LEVEL.NEEDS_REVIEW
+
+
+def test_nothing_decided_is_not_checked() -> None:
+    assert _level(_vendor("KSB", [UNSUPPORTED]))[0] is LEVEL.NOT_CHECKED
+
+
+def test_top_vendors_carry_their_level() -> None:
+    top = top_vendors([_vendor("KSB", [FULL, FULL]), _vendor("DAB", [FULL, MISSING])], 50.0, 6)
+    assert [(v.manufacturer, v.match_level) for v in top] == [
+        ("KSB", LEVEL.FULL_MATCH),
+        ("DAB", LEVEL.PARTIAL_MATCH),
+    ]
+
+
+def test_a_gem_seller_with_tied_listings_stays_a_gem_vendor() -> None:
+    # 8210284: BVI has two "Sluice Valve 100mm" listings nothing tells apart.
+    bvi = _vendor("BVI", [FULL], gem=True)
+    assert bvi.chosen is not None
+    second = bvi.chosen.model_copy(update={"document": "BVI-2.pdf"})
+    tied = bvi.model_copy(
+        update={
+            "chosen": None,
+            "candidates": [bvi.chosen, second],
+            "tied_documents": [bvi.chosen.document, second.document],
+        }
+    )
+    [vendor] = top_vendors([tied], 50.0, 6)
+    assert vendor.source is VendorSource.GEM_LISTING
+    assert vendor.match_level is VendorMatchLevel.NEEDS_REVIEW  # tied: a reviewer picks one

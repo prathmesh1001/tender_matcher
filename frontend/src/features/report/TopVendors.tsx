@@ -1,13 +1,23 @@
 import { SellerDeclaredBadge } from "../../components/report/EvidenceCell";
 import { ProofList } from "../../components/report/ProofList";
 import { Card } from "../../components/ui/Card";
-import { matchLevel } from "../../lib/matchLevel";
+import {
+  LEVEL_LABEL,
+  LEVEL_ORDER,
+  LEVEL_TONE,
+  levelFromPct,
+  type MatchLevel,
+} from "../../lib/matchLevel";
 import { vendorProof } from "../../lib/proof";
 import type { GemRecommendation, ItemReport, ItemVendor, TenderReport } from "../../types/report";
 
+function levelOf(vendor: ItemVendor): MatchLevel {
+  return vendor.match_level ?? levelFromPct(vendor.score.compatibility_pct);
+}
+
 function scoreLine(vendor: ItemVendor): string {
   const { compatibility_pct: pct, decided, total } = vendor.score;
-  const parts = [matchLevel(pct)];
+  const parts: string[] = [];
   if (pct !== null) parts.push(`${pct.toFixed(0)}%`);
   parts.push(`${String(decided)} of ${String(total)} checked`);
   return parts.join(" · ");
@@ -15,6 +25,7 @@ function scoreLine(vendor: ItemVendor): string {
 
 function Vendor({ vendor, item }: { vendor: ItemVendor; item: ItemReport }) {
   const gem = vendor.source === "gem_listing";
+  const reason = vendor.level_reason ?? "";
   return (
     <li className="space-y-1">
       <p>
@@ -22,10 +33,11 @@ function Vendor({ vendor, item }: { vendor: ItemVendor; item: ItemReport }) {
           {vendor.rank}. {vendor.manufacturer}
         </span>{" "}
         <span className="text-ink-600">{scoreLine(vendor)}</span>
-        {vendor.low_coverage && (
+        {vendor.match_level == null && vendor.low_coverage && (
           <span className="ml-2 text-xs font-semibold text-status-partial">Few checked</span>
         )}
       </p>
+      {reason !== "" && <p className="text-xs text-status-review">Review: {reason}</p>}
       <p className="text-xs text-ink-600">
         {gem && <SellerDeclaredBadge />}{" "}
         {gem && vendor.source_url !== null ? (
@@ -41,6 +53,29 @@ function Vendor({ vendor, item }: { vendor: ItemVendor; item: ItemReport }) {
   );
 }
 
+function LevelGroup({
+  level,
+  vendors,
+  item,
+}: {
+  level: MatchLevel;
+  vendors: ItemVendor[];
+  item: ItemReport;
+}) {
+  return (
+    <div>
+      <p className={`text-xs font-semibold ${LEVEL_TONE[level]}`}>
+        {LEVEL_LABEL[level]} ({vendors.length})
+      </p>
+      <ol className="mt-1 space-y-2 text-sm">
+        {vendors.map((v) => (
+          <Vendor key={v.manufacturer} vendor={v} item={item} />
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function VendorList({
   title,
   vendors,
@@ -52,17 +87,21 @@ function VendorList({
   empty: string;
   item: ItemReport;
 }) {
+  const groups = LEVEL_ORDER.map((level) => ({
+    level,
+    vendors: vendors.filter((v) => levelOf(v) === level),
+  })).filter((g) => g.vendors.length > 0);
   return (
     <section aria-label={title}>
       <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-600">{title}</h4>
       {vendors.length === 0 ? (
         <p className="mt-1 text-sm text-ink-600">{empty}</p>
       ) : (
-        <ol className="mt-1 space-y-2 text-sm">
-          {vendors.map((v) => (
-            <Vendor key={v.manufacturer} vendor={v} item={item} />
+        <div className="mt-1 space-y-3">
+          {groups.map((g) => (
+            <LevelGroup key={g.level} level={g.level} vendors={g.vendors} item={item} />
           ))}
-        </ol>
+        </div>
       )}
     </section>
   );

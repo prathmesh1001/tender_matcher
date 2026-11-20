@@ -26,6 +26,8 @@
   --color-status-missing: #b91c1c;
   --color-status-unsupported: #4b5563;
   --color-status-na: #64748b;
+  /* A vendor result a person must check (few requirements checked, AI judge, tied). */
+  --color-status-review: #1d4ed8;
   /* Evidence typed in by a GeM Marketplace seller, not taken from a manufacturer document. */
   --color-source-seller: #6d28d9;
 

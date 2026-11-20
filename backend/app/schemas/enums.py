@@ -104,6 +104,16 @@ class ReviewFlag(StrEnum):
     SELLER_DECLARED = "seller_declared"  # cited only from GeM listings a seller typed in
 
 
+class VendorMatchLevel(StrEnum):
+    """How one vendor meets one item, from how its checked requirements were decided."""
+
+    FULL_MATCH = "full_match"  # every checked requirement fully met, all by rules
+    PARTIAL_MATCH = "partial_match"  # rules decided a mix: some met, some not
+    NEEDS_REVIEW = "needs_review"  # too few checked, an LLM decision, or tied catalogues
+    DOES_NOT_MEET = "does_not_meet"  # rules decided, nothing met
+    NOT_CHECKED = "not_checked"  # nothing could be decided
+
+
 class DecisionSource(StrEnum):
     """What produced a match decision."""
 

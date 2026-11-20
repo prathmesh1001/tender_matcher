@@ -8,12 +8,18 @@ count at all). Every requirement weighs
 coverage are marked and listed after the others, so a high score on little evidence never
 leads; within each group by compatibility, then coverage, with nothing decided last. The same
 order picks each item's top vendors (`top_vendors`), on that item's results alone.
+
+Each top vendor also gets a match level from its decided results on the item (`vendor_level`):
+needs review when too few requirements were checked (below the minimum coverage), when the
+LLM judge decided any of them, or when catalogues are tied; otherwise full match (every decided
+requirement full), does not meet spec (none met) or partial match (a mix). Partial results
+carry their own review flag; that flag alone does not move a vendor to needs review.
 """
 
 from collections.abc import Mapping, Sequence
 from typing import Final
 
-from app.schemas.enums import MatchStatus, VendorSource
+from app.schemas.enums import DecisionSource, MatchStatus, VendorMatchLevel, VendorSource
 from app.schemas.matching import Comparison, SubTypeFit
 from app.schemas.report import ItemVendor, ManufacturerItemReport, RankingEntry, Score
 
@@ -119,8 +125,11 @@ def _source_url(report: ManufacturerItemReport) -> str | None:
 
 
 def _gem(report: ManufacturerItemReport) -> bool:
-    """True if the vendor's chosen document is a GeM listing (seller-declared)."""
-    return report.chosen is not None and report.chosen.seller_declared
+    """True if the vendor's chosen document, or every tied one, is a GeM listing."""
+    if report.chosen is not None:
+        return report.chosen.seller_declared
+    tied = [c for c in report.candidates if c.document in report.tied_documents]
+    return bool(tied) and all(c.seller_declared for c in tied)
 
 
 def top_vendors(
@@ -170,12 +179,59 @@ def _sub_type_rank(report: ManufacturerItemReport) -> int:
     return _SUB_TYPE_RANK.get(report.chosen.sub_type_fit, 1) if report.chosen else 1
 
 
+_DECIDED: Final = (
+    MatchStatus.FULL_MATCH,
+    MatchStatus.PARTIAL_MATCH,
+    MatchStatus.MISSING_CAPABILITY,
+)
+
+
+def _review_reason(report: ManufacturerItemReport, min_coverage_pct: float) -> str:
+    """Why the vendor's result on the item cannot stand without a reviewer; "" if it can."""
+    s = report.score
+    if report.tied_documents:
+        return "tied catalogues: a reviewer picks one"
+    if s.coverage_pct < min_coverage_pct:
+        return f"only {s.decided} of {s.total} requirements checked"
+    llm = sum(c.decided_by is DecisionSource.LLM and c.status in _DECIDED for c in report.results)
+    if llm:
+        return f"{llm} decided by the AI judge"
+    return ""
+
+
+def vendor_level(
+    report: ManufacturerItemReport, min_coverage_pct: float
+) -> tuple[VendorMatchLevel, str]:
+    """The vendor's match level on one item, and why it needs review if it does.
+
+    Args:
+        report: One manufacturer's results on the item (score worked out).
+        min_coverage_pct: Coverage below this needs review.
+
+    Returns:
+        (level, reason); the reason is "" unless the level is needs review.
+    """
+    s = report.score
+    if s.compatibility_pct is None:
+        return VendorMatchLevel.NOT_CHECKED, ""
+    reason = _review_reason(report, min_coverage_pct)
+    if reason:
+        return VendorMatchLevel.NEEDS_REVIEW, reason
+    met = s.counts.get(MatchStatus.FULL_MATCH, 0) + s.counts.get(MatchStatus.PARTIAL_MATCH, 0)
+    if met == 0:
+        return VendorMatchLevel.DOES_NOT_MEET, ""
+    if met == s.decided and s.counts.get(MatchStatus.PARTIAL_MATCH, 0) == 0:
+        return VendorMatchLevel.FULL_MATCH, ""
+    return VendorMatchLevel.PARTIAL_MATCH, ""
+
+
 def _vendors(
     ranked: Sequence[ManufacturerItemReport], min_coverage_pct: float, gem: bool
 ) -> list[ItemVendor]:
-    """Ranked vendors of one source as `ItemVendor`s, ranks from 1."""
+    """Ranked vendors of one source as `ItemVendor`s, ranks from 1, with their match level."""
     out: list[ItemVendor] = []
     for i, m in enumerate(ranked, start=1):
+        level, reason = vendor_level(m, min_coverage_pct)
         out.append(
             ItemVendor(
                 rank=i,
@@ -185,6 +241,8 @@ def _vendors(
                 source=VendorSource.GEM_LISTING if gem else VendorSource.CATALOGUE,
                 document=m.chosen.title if m.chosen else ", ".join(m.tied_documents),
                 source_url=_source_url(m) if gem else None,
+                match_level=level,
+                level_reason=reason,
             )
         )
     return out
