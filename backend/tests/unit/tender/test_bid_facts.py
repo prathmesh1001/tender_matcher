@@ -56,7 +56,9 @@ def test_a_bid_without_the_rows_has_no_facts() -> None:
 
 def test_spare_parts_notice_names_a_known_maker() -> None:
     title = "Spares parts for various pump model of Kirloskar brother limited"
-    notice = spare_parts_notice(title, SPARE_WORDS, ["KSB", "Kirloskar Brothers", "NA"])
+    notice = spare_parts_notice(
+        title, SPARE_WORDS, ["KSB", "Kirloskar", "Kirloskar Brothers", "NA"]
+    )
     assert notice is not None
     assert notice.oem == "Kirloskar Brothers"
 

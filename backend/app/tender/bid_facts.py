@@ -123,5 +123,7 @@ def spare_parts_notice(
     words = _words(boq_title)
     if not set(_words(" ".join(spare_words))) & set(words):
         return None
-    oem = next((m for m in makers if (own := _maker_words(m)) and own <= set(words)), None)
+    named = [m for m in makers if (own := _maker_words(m)) and own <= set(words)]
+    # The fullest name the title holds: "Kirloskar Brothers" before a GeM brand "Kirloskar".
+    oem = max(named, key=lambda m: len(_maker_words(m)), default=None)
     return SparePartsNotice(boq_title=boq_title, oem=oem)

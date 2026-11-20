@@ -101,7 +101,9 @@ def test_item_types_lists_every_type_covered_or_not(monkeypatch: Any) -> None:
         SimpleNamespace(item=SimpleNamespace(title=t, item_no=str(n)))
         for n, t in enumerate(["Gate Valve DN100 PN16", TITLE, "Gate Valve DN150"], 1)
     ]
-    monkeypatch.setattr(service, "parse_tender", lambda tender: SimpleNamespace(items=items, facts=BidFacts()))
+    monkeypatch.setattr(
+        service, "parse_tender", lambda tender: SimpleNamespace(items=items, facts=BidFacts())
+    )
     found = service.item_types("GEM_X")
     assert [(t.product_type, t.item_nos, t.titles) for t in found] == [
         ("gate_valve", ["1", "3"], ["Gate Valve DN100 PN16", "Gate Valve DN150"]),
@@ -114,7 +116,9 @@ def _parsed(service: MatchService, monkeypatch: Any, *titles: str) -> None:
         SimpleNamespace(item=SimpleNamespace(title=t, item_no=str(n)))
         for n, t in enumerate(titles, 1)
     ]
-    monkeypatch.setattr(service, "parse_tender", lambda tender: SimpleNamespace(items=items, facts=BidFacts()))
+    monkeypatch.setattr(
+        service, "parse_tender", lambda tender: SimpleNamespace(items=items, facts=BidFacts())
+    )
 
 
 def test_the_gem_branch_searches_types_without_database_documents_first(monkeypatch: Any) -> None:
