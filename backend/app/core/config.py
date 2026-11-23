@@ -498,8 +498,21 @@ class Settings(BaseSettings):
         description="Vendors listed per item as its best, per source (catalogue makers, GeM "
         "sellers), each with its match level.",
     )
+    REPORT_BEST_VENDORS_MIN: int = Field(
+        default=3,
+        ge=1,
+        le=20,
+        description="The tender's best vendors list is filled up to this many: full and partial "
+        "matches first, then the next best under their own level (needs review, related).",
+    )
+    REPORT_BEST_VENDORS_MAX: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Most vendors in the tender's best vendors list.",
+    )
     RANKING_MIN_COVERAGE_PCT: float = Field(
-        default=50.0,
+        default=30.0,
         ge=0,
         le=100,
         description="Manufacturers with less evidence coverage are marked low coverage and "
@@ -853,6 +866,26 @@ class Settings(BaseSettings):
     )
     GEM_MIN_SPEC_ROWS: int = Field(
         default=5, ge=1, description="A listing with fewer specification rows is not kept."
+    )
+    GEM_MIN_SPEC_ROWS_BUYER: int = Field(
+        default=1,
+        ge=1,
+        description="Fewest specification rows of a listing in a GeM category the buyer selected "
+        "(spares listings show only 4 rows; the buyer's own category already names the product).",
+    )
+    GEM_FIT_MIN_COVERAGE: float = Field(
+        default=0.6,
+        gt=0,
+        le=1,
+        description="When no GeM category names the item exactly: share of the shorter word list "
+        "(item phrase or category name part) that the two have in common, after abbreviations "
+        "are expanded (gem_marketplace.yaml word_equivalents).",
+    )
+    GEM_FIT_MIN_PRECISION: float = Field(
+        default=0.5,
+        gt=0,
+        le=1,
+        description="Same fit: share of the category name part's words that are item title words.",
     )
     GEM_SNAPSHOT_PREFIX: str = Field(
         default="gem_snapshots",

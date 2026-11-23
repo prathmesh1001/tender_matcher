@@ -1,0 +1,27 @@
+bid_number: GEM/2026/B/8161475
+source: Provided locally
+files:
+- file: bid.pdf
+  role: bid_document
+  url: null
+  fetched_at: '2026-11-22T16:15:31.183241Z'
+  sha256: 753f83d024e31a6c6cf0d62cd4dd5e6f74ea154d18cc1b2211ee12644c02c8de
+  content_type: application/pdf
+  depth: 0
+  note: provided locally; source URL unknown
+- file: gem_category_spec.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/rfdVlX3UCvPw4CWMJ4VIJbXn0YnrXOwozY2uEkYjIWo
+  fetched_at: '2026-11-22T16:15:33.048783Z'
+  sha256: ad263da2d30feb40babc8cd914b938541bb6fc57207345525dbf7ae59b8eb856
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Oct/GEM_2026_B_8161475/CLM0010/86256ATC_317c27da-894f-42c7-a4601791976162681_rrsuser733.pdf
+  fetched_at: '2026-11-22T16:15:34.826626Z'
+  sha256: d1bce95c509578513a29ca9b1a6c835af183503c1e49075712d829ef76c6963e
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1

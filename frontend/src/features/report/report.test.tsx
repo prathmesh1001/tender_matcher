@@ -238,7 +238,7 @@ describe("ReportPage", () => {
     expect(gem.getByText("Few checked")).toBeInTheDocument();
   });
 
-  it("labels match levels and shows related and recommended GeM vendors", async () => {
+  it("labels match levels and shows no unchecked GeM sellers", async () => {
     const [item] = REPORT.items;
     if (item === undefined) throw new Error("fixture has an item");
     const rec = {
@@ -279,19 +279,11 @@ describe("ReportPage", () => {
     // proof: the decided requirement with its quote and a link to the cited page
     expect(database.getByText(/“Body: WCB”/)).toBeInTheDocument();
     expect(database.getByRole("link", { name: "alpha.pdf, p.7" })).toBeInTheDocument();
-    const related = within(screen.getByRole("region", { name: "Related on GeM" }));
-    expect(related.getByText(/shares 'impeller'/)).toBeInTheDocument();
-    const card = screen
-      .getByRole("heading", { name: "Recommended GeM vendors for this tender" })
-      .closest("section");
-    if (card === null) throw new Error("card section");
+    expect(screen.queryByRole("region", { name: "Related on GeM" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/shares 'impeller'/)).not.toBeInTheDocument();
     expect(
-      within(card).getByRole("heading", { name: "Stainless Steel Pump Impeller" }),
-    ).toBeVisible();
-    expect(within(card).getAllByRole("link", { name: rec.product })[0]).toHaveAttribute(
-      "href",
-      rec.url,
-    );
+      screen.queryByRole("heading", { name: "Recommended GeM vendors for this tender" }),
+    ).not.toBeInTheDocument();
   });
 
   it("groups an item's vendors by match level with the review reason", async () => {
@@ -329,6 +321,72 @@ describe("ReportPage", () => {
     expect(database.getByText("Partial match (1)")).toBeInTheDocument();
     expect(database.getByText("Needs review (1)")).toBeInTheDocument();
     expect(database.getByText("Review: only 2 of 5 requirements checked")).toBeInTheDocument();
+  });
+
+  it("lists the tender's checked best vendors with their own level", async () => {
+    const base = {
+      level_reason: "",
+      items_full: 0,
+      items_partial: 0,
+      items_listed: 1,
+      best_compatibility_pct: null,
+      source_url: null,
+      category: null,
+    };
+    serve({
+      ...REPORT,
+      best_vendors: [
+        {
+          ...base,
+          rank: 1,
+          name: "KSB",
+          source: "catalogue",
+          match_level: "full_match",
+          items_full: 1,
+          best_compatibility_pct: 100,
+        },
+        {
+          ...base,
+          rank: 2,
+          name: "Champion",
+          source: "gem_listing",
+          match_level: "partial_match",
+          items_partial: 1,
+          level_reason: "product name only, specs not checked",
+          source_url: "https://mkp.gem.gov.in/spark-plug/c/p-1-2-cat.html",
+        },
+        {
+          ...base,
+          rank: 3,
+          name: "Mahindra",
+          source: null,
+          match_level: null,
+          items_listed: 0,
+          level_reason: "sells in the buyer's GeM category 'OEM Spares'; not checked",
+          category: "OEM Spares",
+        },
+      ],
+    });
+    await openReport();
+    const card = screen
+      .getByRole("heading", { name: "Best vendors for this tender" })
+      .closest("section");
+    if (card === null) throw new Error("card section");
+    const best = within(card);
+    expect(
+      best.getByText("2 vendors fully or partly match an item.", { exact: false }),
+    ).toBeVisible();
+    expect(best.getByText("1. KSB")).toBeVisible();
+    expect(best.getByText("Full match")).toBeVisible();
+    expect(best.getByText(/full on 1 · of 1 item · best 100%/)).toBeVisible();
+    expect(best.getByText("product name only, specs not checked")).toBeVisible();
+    expect(best.getByRole("link", { name: "GeM page" })).toHaveAttribute(
+      "href",
+      "https://mkp.gem.gov.in/spark-plug/c/p-1-2-cat.html",
+    );
+    // an unchecked buyer-category seller of an older report is not listed
+    expect(best.queryByText(/GeM \(buyer category\)/)).not.toBeInTheDocument();
+    expect(best.getAllByRole("listitem")).toHaveLength(2);
   });
 
   it("says when an item has no vendor from a source", async () => {

@@ -269,5 +269,60 @@ def test_a_trusted_buyer_category_keeps_its_own_listings_only(check: ListingChec
     assert listing_rejection(neighbour, request, check) == (
         "in GeM category pump-impeller-puller, not a buyer category"
     )
+    # spares listings show only a few rows: the buyer's own category needs fewer (A1/B1 work)
     thin = replace(own, specs=rows[:2])
-    assert listing_rejection(thin, request, check) is not None
+    assert listing_rejection(thin, request, check) is None
+    strict = replace(request, min_spec_rows_buyer=3)
+    assert listing_rejection(thin, strict, check) == "only 2 specification rows (need 3)"
+
+
+def test_a_buyer_category_slug_ignores_filler_words(check: ListingCheck) -> None:
+    from app.discovery.gem_parser import SpecRow
+    from app.discovery.pipeline import listing_rejection
+
+    rows = tuple(SpecRow(None, f"Row {n}", "x") for n in range(6))
+    # GeM drops "for" from the listing slug of "PHPA for Water Shut off (Low Temperature) (ONGC)"
+    page = page_url(BASE, "chemicals-phpa-for-water-shut-off-low-temperature-ongc")
+    request = replace(
+        _request("buyer_category_phpa"),
+        trusted=True,
+        page_urls=[page],
+        filler_words=frozenset({"for", "of", "and"}),
+    )
+    listing = GemListing(
+        BASE + "/phpa-water-shut-off-low-temperature-ongc/snf-flopam/p-1-2-cat.html",
+        "Unbranded PHPA for Water Shut Off",
+        "Unbranded",
+        None,
+        rows,
+    )
+    assert listing_rejection(listing, request, check) is None
+    assert listing_rejection(listing, replace(request, filler_words=frozenset()), check)
+
+
+def test_a_fitted_category_keeps_its_listings_unless_they_name_another_product(
+    check: ListingCheck,
+) -> None:
+    from app.discovery.gem_parser import SpecRow
+    from app.discovery.pipeline import listing_rejection
+
+    rows = tuple(SpecRow(None, f"Row {n}", "x") for n in range(6))
+    page = page_url(BASE, "fasteners-hexagonal-head-bolts-v2-isi-marked-to-is-1363-part-1")
+    key = "hex_head_bolt"
+    request = replace(_request(key), fitted=True, page_urls=[page])
+    keyed = check.for_type(key)
+    bolt = GemListing(
+        BASE + "/hexagonal-head-bolts-v2-isi-marked-to-is-1363-part-1/x/p-1-2-cat.html",
+        "Unbranded Hexagonal Head Bolts M8",
+        "Unbranded",
+        None,
+        rows,
+    )
+    assert listing_rejection(bolt, request, keyed) is None
+    elsewhere = replace(bolt, url=BASE + "/square-head-bolts/x/p-3-4-cat.html")
+    reason = listing_rejection(elsewhere, request, keyed)
+    assert reason is not None
+    assert "not a category chosen for the item" in reason
+    assert listing_rejection(replace(bolt, specs=rows[:2]), request, keyed) is not None
+    valve = replace(bolt, title="Unbranded Ball Valve 25 mm")
+    assert listing_rejection(valve, request, keyed) == "names ball valve"

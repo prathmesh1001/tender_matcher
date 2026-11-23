@@ -247,6 +247,14 @@ def test_nothing_decided_is_not_checked() -> None:
     assert _level(_vendor("KSB", [UNSUPPORTED]))[0] is LEVEL.NOT_CHECKED
 
 
+def test_a_gem_listing_with_nothing_decided_is_a_partial_match_by_name_only() -> None:
+    # B1: an item stating only its title ("Spark Plug"); the listing names the product
+    listing = _vendor("Champion", [UNSUPPORTED], gem=True)
+    assert _level(listing) == (LEVEL.PARTIAL_MATCH, "product name only, specs not checked")
+    no_document = _vendor("Champion", [UNSUPPORTED], gem=True, document=False)
+    assert _level(no_document)[0] is LEVEL.NOT_CHECKED
+
+
 def test_top_vendors_carry_their_level() -> None:
     top = top_vendors([_vendor("KSB", [FULL, FULL]), _vendor("DAB", [FULL, MISSING])], 50.0, 6)
     assert [(v.manufacturer, v.match_level) for v in top] == [

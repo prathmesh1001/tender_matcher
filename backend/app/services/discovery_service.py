@@ -18,7 +18,7 @@ import multiprocessing
 import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from functools import cache
 from typing import Protocol
@@ -40,6 +40,7 @@ from app.db.repositories import (
 )
 from app.db.session import session_scope
 from app.discovery.card_fit import item_wants
+from app.discovery.category_fit import FitWords
 from app.discovery.gem_config import GemMarketplaceConfig, load_gem_config
 from app.discovery.gem_parser import GemListing
 from app.discovery.gem_search import rank_words, search_queries, search_url
@@ -48,6 +49,7 @@ from app.discovery.pipeline import (
     DiscoveryDeps,
     DiscoveryRequest,
     ListingOutcome,
+    WordFit,
     discover,
     find_category_pages,
     page_url,
@@ -128,6 +130,8 @@ class DiscoveryTools:
     store: FileStore
     check: ListingCheck
     processing: ProcessingOptions
+    # Every ontology's one-word abbreviations ("nrv" -> "check valve"), for the category fit.
+    abbreviations: Mapping[str, str] = field(default_factory=dict)
 
 
 def _job_response(job: DiscoveryJob) -> DiscoveryJobResponse:
@@ -322,13 +326,15 @@ class DiscoveryService:
         request = self._request(product_type, category, titles, check, buyer_categories)
         if trusted:  # a buyer category: its own page only, its own listings kept as they are
             request = replace(request, trusted=True, search_urls=[], page_urls=[])
-        # A buyer category's stored listings are read again from its page, never withdrawn here.
-        withdrawn = [] if trusted else self._withdraw_stale(request, check)
         pages = find_category_pages(request, self._deps(check))
         logger.info(
             "gem categories",
             extra={"source": pages.source, "categories": pages.names, "type": product_type},
         )
+        if pages.source == "fitted":  # its listings are judged by the chosen categories
+            request = replace(request, fitted=True, page_urls=pages.page_urls)
+        # A buyer category's stored listings are read again from its page, never withdrawn here.
+        withdrawn = [] if trusted else self._withdraw_stale(request, check)
         if not pages.page_urls:
             self._record(job_id, withdrawn)
             label = product_type.replace("_", " ")
@@ -550,6 +556,25 @@ class DiscoveryService:
                 for t in [*settings.GEM_TITLE_STOP_WORDS, *settings.GEM_CATEGORY_TAIL_WORDS]
                 for w in normalize_for_search(t, check.vocabulary).split()
             ),
+            fit=WordFit(
+                self._fit_words(check),
+                list(titles),
+                settings.GEM_FIT_MIN_COVERAGE,
+                settings.GEM_FIT_MIN_PRECISION,
+            ),
+            min_spec_rows_buyer=settings.GEM_MIN_SPEC_ROWS_BUYER,
+            filler_words=frozenset(w.casefold() for w in config.category_filler_words),
+        )
+
+    def _fit_words(self, check: ListingCheck) -> FitWords:
+        """Word rules of the category fit: config equivalents over the ontology abbreviations."""
+        config = self._config()
+        equivalents = {**self._tools().abbreviations, **config.word_equivalents}
+        return FitWords.build(
+            check.vocabulary,
+            equivalents,
+            config.category_cut_words,
+            [*config.category_filler_words, *self._settings.GEM_TITLE_STOP_WORDS],
         )
 
     def _record(self, job_id: uuid.UUID, outcomes: Sequence[ListingOutcome]) -> None:
@@ -719,6 +744,7 @@ def build_discovery_tools(settings: Settings) -> DiscoveryTools:
         processing=ProcessingOptions.from_settings(
             settings, vocabulary, matcher, build_ocr_engine(settings)
         ),
+        abbreviations={k: v for o in ontologies for k, v in o.abbreviations.items()},
     )
 
 

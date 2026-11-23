@@ -91,8 +91,26 @@ export interface ItemVendor {
   source_url: string | null;
   /** Category from the backend rules; absent in reports saved before levels existed. */
   match_level?: MatchLevel | null;
-  /** Why it needs review, in words. */
+  /** Why it needs review, or what a partial match by product name rests on. */
   level_reason?: string;
+}
+
+/** One of the tender's best vendors over all its items (backend `reporting.best_vendors`). */
+export interface TenderVendor {
+  rank: number;
+  /** Manufacturer (catalogue) or GeM brand. */
+  name: string;
+  /** null: a seller in the buyer's GeM category that no item was checked against. */
+  source: VendorSource | null;
+  /** Its best level on any item; null when related only (never checked). */
+  match_level: MatchLevel | null;
+  level_reason: string;
+  items_full: number;
+  items_partial: number;
+  items_listed: number;
+  best_compatibility_pct: number | null;
+  source_url: string | null;
+  category: string | null;
 }
 
 /** A GeM listing in a category the buyer selected: offered, not checked against the spec. */
@@ -184,4 +202,6 @@ export interface TenderReport {
   buyer_gem_categories?: string[];
   spare_parts?: SparePartsNotice | null;
   recommended_gem_vendors?: GemRecommendation[];
+  /** Best vendors over all items: full and partial first, filled up to a minimum. */
+  best_vendors?: TenderVendor[];
 }

@@ -13,7 +13,10 @@ Each top vendor also gets a match level from its decided results on the item (`v
 needs review when too few requirements were checked (below the minimum coverage), when the
 LLM judge decided any of them, or when catalogues are tied; otherwise full match (every decided
 requirement full), does not meet spec (none met) or partial match (a mix). Partial results
-carry their own review flag; that flag alone does not move a vendor to needs review.
+carry their own review flag; that flag alone does not move a vendor to needs review. A GeM
+listing chosen for the item with nothing decided (an item stating only its title) is a partial
+match by product name only, with that reason; any other vendor with nothing decided is not
+checked.
 """
 
 from collections.abc import Mapping, Sequence
@@ -24,6 +27,7 @@ from app.schemas.matching import Comparison, SubTypeFit
 from app.schemas.report import ItemVendor, ManufacturerItemReport, RankingEntry, Score
 
 _PERCENT = 100.0
+NAME_ONLY_REASON: Final = "product name only, specs not checked"
 
 
 def score(comparisons: Sequence[Comparison], status_scores: Mapping[MatchStatus, float]) -> Score:
@@ -213,6 +217,10 @@ def vendor_level(
     """
     s = report.score
     if s.compatibility_pct is None:
+        # A GeM listing chosen for the item names its product (the listing check) but has no
+        # requirement it could be checked on: a match by name only (user decision B1).
+        if report.chosen is not None and _gem(report):
+            return VendorMatchLevel.PARTIAL_MATCH, NAME_ONLY_REASON
         return VendorMatchLevel.NOT_CHECKED, ""
     reason = _review_reason(report, min_coverage_pct)
     if reason:

@@ -37,6 +37,19 @@ class GemMarketplaceConfig(BaseModel):
         default_factory=list,
         description="How a product is sold (card 'sold_as' classes), best first.",
     )
+    word_equivalents: dict[str, str] = Field(
+        default_factory=dict,
+        description="One-word abbreviation -> its full words, applied to item titles and GeM "
+        "category names before their shared words are counted.",
+    )
+    category_cut_words: list[str] = Field(
+        default_factory=list,
+        description="Words a category name or item title is cut before ('as per', 'conforming').",
+    )
+    category_filler_words: list[str] = Field(
+        default_factory=list,
+        description="Words never counted as shared, and left out when category slugs are compared.",
+    )
 
     def categories_for(self, product_type: str) -> list[str]:
         """Category slugs configured for a product type (empty if none).

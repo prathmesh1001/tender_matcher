@@ -1,0 +1,27 @@
+bid_number: GEM/2026/B/8244845
+source: Provided locally
+files:
+- file: bid.pdf
+  role: bid_document
+  url: null
+  fetched_at: '2026-11-22T16:33:37.200237Z'
+  sha256: 2fde9f644409ac65cb27731db22d6c097d8d17d621c13550357ca44a096acd72
+  content_type: application/pdf
+  depth: 0
+  note: provided locally; source URL unknown
+- file: gem_category_spec.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/OZ6pnplSPEIVh5-AzzEfFKJlJ6LjcPBBM3WMI52ks0g
+  fetched_at: '2026-11-22T16:33:38.468281Z'
+  sha256: 0bc7bc4358832c07b430820788f3fb4bc21e940109c84e3c5695c5a3e25e893d
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Nov/GEM_2026_B_8244845/CLM0010/atc1_60ac7c0e-e894-4ced-83881793869416634_apo6hrpsu.pdf
+  fetched_at: '2026-11-22T16:33:42.288456Z'
+  sha256: 3284175dcc2dbc096e3384fe91e75f4580a9fb2a51a1369b9537ef1a17624a05
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1

@@ -1,0 +1,140 @@
+bid_number: GEM/2026/B/8126656
+source: Provided locally
+files:
+- file: bid.pdf
+  role: bid_document
+  url: null
+  fetched_at: '2026-11-22T16:19:51.855609Z'
+  sha256: c2df1a0423e856093c3fce868e3b4a87865c6e90eeb8872131960b0a64888e8d
+  content_type: application/pdf
+  depth: 0
+  note: provided locally; source URL unknown
+- file: gem_category_spec.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/nnIgccGkhtf3_EXCaPGChlrzQCywhOV8mZjs_Sd7pcg
+  fetched_at: '2026-11-22T16:19:53.989431Z'
+  sha256: 9785d1efc285fe4c9bd81dd24b1065049cc55d74b06a12349b32e894b7e820c7
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_2.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/mxqD6DhUVxcsnYAsneAF5J1tfxvgMifgCvI5xrtm9r0
+  fetched_at: '2026-11-22T16:19:54.261220Z'
+  sha256: dcae690d301847d1c4445ebe94ac0eb1fb744ebf2c103eaac82f7f8be1b427ec
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_3.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/PBNoW5Y6VFUuhJ-0lGubagSYNwnSvebLOfs1x38cgJo
+  fetched_at: '2026-11-22T16:19:54.499410Z'
+  sha256: fe7791f188630fa608e85e1b3daa3c0e2e2915f762c3a41789a00d3a5b7d4e24
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_4.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/mYiNxHhoVxHobOQ5i1Y13HjetQglrFdfK9otuCFCd70
+  fetched_at: '2026-11-22T16:19:54.817156Z'
+  sha256: c38f4470e67350b5fbeecaf7bbb2bfb6e2a534a90065a8b82ec507d41f2c4234
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_5.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/8cuaQs_YKLYgYx272kmoeMBYdAWE_EaygO2IbQJXpYY
+  fetched_at: '2026-11-22T16:19:55.120529Z'
+  sha256: 37946c7889c74ccb057b9875c2f6c89fe864b1c78bd22c6f7721b8fee98e371c
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_6.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/Y8T-PLqI3X5AEauTyk9_yzgEPRThUJOzXDr3mz-ialo
+  fetched_at: '2026-11-22T16:19:55.573438Z'
+  sha256: 36bf0fb071c06cc364e97b98b04c0defcb0db44ed0c3105d620c3e7d9605c745
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_7.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/jH02MyJ_8sj5dQO2TingTYMuXdD9QpCWCvXLtxVQT7A
+  fetched_at: '2026-11-22T16:19:55.805436Z'
+  sha256: 8635d3a95ca2f3251c7c02e7f73c0125007dc3182041e9fe6ecfafe49ab6b2be
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_8.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/mB51ar0wovWH6nwvHivF-0IAaznY8a7-rG9G6VIH-uQ
+  fetched_at: '2026-11-22T16:19:56.151767Z'
+  sha256: c2c535263c19b99ca18cba1a51472bb9d7d2e77f52cba902c1d2d54c5392f2f8
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_9.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/AQIfHfQg3n9JH2O5ivJuTxrOqXjBHdxS61iAzPLCGmY
+  fetched_at: '2026-11-22T16:19:56.470144Z'
+  sha256: 4b352539919bb47ca06ded3d8ec73a506143b1af8da957fd886636e3c87f14c3
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_10.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/T6rYHzkX620QpUUMiypHTuW9Igrl6bfRqUJLSf0KD0k
+  fetched_at: '2026-11-22T16:19:56.867130Z'
+  sha256: 8654c6c54856f4bd3c5231824598e277ac966197575eb903cfe2e6988d3f42dc
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_11.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/XFuE3-z_qSLLXM7UomeqwLAHCdwEkVhBPVb6iZxh9k8
+  fetched_at: '2026-11-22T16:19:57.068576Z'
+  sha256: 7aa0d21cf2ff96d369c58ac9e6684e716184ccfc50ff1511b289e27632307a77
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_12.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/JNXyO0j03N5nXiP4SqJFfJIOd5AeWAadoAYs224zyNg
+  fetched_at: '2026-11-22T16:19:57.292503Z'
+  sha256: f8a381bbd3e34c84a75b7100505296bfc86a83524d857c2faa11d450df6e09e7
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_13.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/8g2uSaEUmRuLH2to7WTtdD_BvjFCmtF8T8jqrnsfNl8
+  fetched_at: '2026-11-22T16:19:57.619005Z'
+  sha256: e65ff8f66fa94dfa99cf2f7b29dad0e425c8673ae627d422e5a96015efbec33b
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: gem_category_spec_14.html
+  role: gem_category_spec
+  url: https://bidplus.gem.gov.in/bidding/bid/showCatalogue/bwb7-c-e27eIGUOWLR_KY-U5-m7SJNemL0PG2AGMIvw
+  fetched_at: '2026-11-22T16:19:57.913549Z'
+  sha256: 259d0f76ed3faaf192f379380846f935908f4c57c3da918913c1ae56c4f1b6b0
+  content_type: text/html; charset=UTF-8
+  found_in: bid.pdf
+  depth: 1
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Oct/GEM_2026_B_8126656/CL10360/blac_17cace52-260d-4bc4-ab511791367197558_SURGICALCONSUMABLE@SJH.pdf
+  fetched_at: '2026-11-22T16:19:59.111006Z'
+  sha256: a004ebf376aa2836288b37b063a9b8e6461672e481929bb9c58ce7c4aae47c91
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1
+- file: null
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Oct/GEM_2026_B_8126656/CLM0010/blac_cee986ac-bb97-4b2b-87d41791367299832_SURGICALCONSUMABLE@SJH.pdf
+  fetched_at: '2026-11-22T16:19:59.444410Z'
+  sha256: a004ebf376aa2836288b37b063a9b8e6461672e481929bb9c58ce7c4aae47c91
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1
+  duplicate_of: atc.pdf

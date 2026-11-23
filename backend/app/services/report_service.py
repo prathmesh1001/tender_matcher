@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.core.exceptions import InvalidInputError, NotFoundError, RunNotReadyError
 from app.db.repositories import DocumentRepository, ResultRepository, RunRepository
+from app.reporting.best_vendors import with_best_vendors
 from app.reporting.report_rows import RowContext, cited_hashes, report_rows
 from app.schemas.enums import MatchStatus
 from app.schemas.report import TenderReport
@@ -35,9 +36,20 @@ class ReportService:
         results: ResultRepository,
         documents: DocumentRepository,
         status_scores: Mapping[MatchStatus, float],
+        best_vendors: tuple[int, int] = (3, 10),
     ) -> None:
+        """Wire the repositories.
+
+        Args:
+            runs: Run rows.
+            results: Result rows.
+            documents: Stored documents (cited evidence must exist).
+            status_scores: Score of each decided status.
+            best_vendors: (min, max) of the tender's best vendors list.
+        """
         self._runs = runs
         self._results = results
+        self._best_vendors = best_vendors
         self._documents = documents
         self._status_scores = status_scores
 
@@ -82,6 +94,7 @@ class ReportService:
             raise InvalidInputError(
                 f"Run {run_id} already has a report", details={"run_id": str(run_id)}
             )
+        report = with_best_vendors(report, *self._best_vendors)
         hashes = cited_hashes(report)
         document_ids = self._documents.ids_by_sha256(hashes)
         missing = sorted(hashes - document_ids.keys())
@@ -114,4 +127,5 @@ def build_report_service(session: Session, settings: Settings) -> ReportService:
         ResultRepository(session),
         DocumentRepository(session),
         {MatchStatus(k): v for k, v in settings.STATUS_SCORES.items()},
+        (settings.REPORT_BEST_VENDORS_MIN, settings.REPORT_BEST_VENDORS_MAX),
     )

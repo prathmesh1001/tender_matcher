@@ -36,3 +36,38 @@ rank_ignore_words: [with, and, for, the, of, type, make, nos, "no", as, per, "or
 seller_rank: [oem, authorized, resellers]
 
 empty_values: [NA, N/A, "-", Not Applicable, Not Available, None]
+
+# When no GeM category from the search names an item exactly, every category the search offered
+# is scored by the words it shares with the item title (GEM_FIT_MIN_COVERAGE / _PRECISION). Both
+# sides are written the same way first: each abbreviation becomes its full words (the ontology
+# `abbreviations` are used too). Generic, for any tender category; one word per key.
+word_equivalents:
+  hex: hexagonal
+  hexagon: hexagonal
+  ss: stainless steel
+  ms: mild steel
+  gi: galvanized iron
+  galvanised: galvanized
+  cs: carbon steel
+  ci: cast iron
+  pvc: polyvinyl chloride
+  upvc: unplasticized polyvinyl chloride
+  cpvc: chlorinated polyvinyl chloride
+  hdpe: high density polyethylene
+  assy: assembly
+  nrv: non return valve
+  sds: sds
+  elec: electrical
+  elect: electrical
+
+# A GeM category name is cut into parts at brackets, " - ", commas, "&", "/", ":" and before
+# these words; a part is compared with the item ("Hexagonal Head Bolts (V2) ISI marked to IS 1363"
+# -> "Hexagonal Head Bolts"). Item titles are cut the same way ("SS hex head bolt set as per ...").
+category_cut_words: [as per, conforming, confirming, according, compliant, isi, marked, for, with,
+                     including, to, as, per, under]
+
+# Words left out on both sides when a listing's category slug is compared with a buyer category's
+# page ("phpa-water-shut-off..." is the category "PHPA for Water Shut off ..."), and when shared
+# words are counted.
+category_filler_words: [for, of, and, the, to, in, "on", with, a, an, set, sets, nos, "no", type,
+                        item, items, annexure, supply, make, model, size, other]

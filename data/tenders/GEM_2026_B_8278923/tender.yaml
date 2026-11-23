@@ -1,0 +1,35 @@
+bid_number: GEM/2026/B/8278923
+source: Provided locally
+files:
+- file: bid.pdf
+  role: bid_document
+  url: null
+  fetched_at: '2026-11-19T18:54:10.345371Z'
+  sha256: adc36642ea8f51435956da7dc7b89246330efd52e57465c197d6e76fd8832ea7
+  content_type: application/pdf
+  depth: 0
+  note: provided locally; source URL unknown
+- file: buyer_spec.pdf
+  role: buyer_spec
+  url: https://mkp.gem.gov.in/catalog_data/catalog_support_document/buyer_documents/11561239/54/78/703/CatalogAttrs/SpecificationDocument/2026/11/7/gem-upload-tender_-talcher-ot-bfv_2026-11-07-10-10-23_e0787f677a49fff2a3a8b76023fd99ac.pdf
+  fetched_at: '2026-11-19T18:54:25.513373Z'
+  sha256: 2b8486bce1e1befa95031e6d4b00d96ef094945ed42b88267b4ef56565effda4
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Nov/GEM_2026_B_8278923/CL10360/Integrity_85812669-d471-4ea3-acac1794885280023_abhishek.kumar_bap.pdf
+  fetched_at: '2026-11-19T18:54:35.106272Z'
+  sha256: cbfce2982335bfe6df16013a68aa009404b9fc0ad0308e572352bb2bec0ec8e8
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1
+- file: atc_2.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Nov/GEM_2026_B_8278923/CLM0010/ATC_60d397b5-8a3c-4fcf-91c01794829986904_abhishek.kumar_bap.pdf
+  fetched_at: '2026-11-19T18:54:36.463035Z'
+  sha256: 5e213f9480eeeb33a602b21a3e6e1fbe77875ef8de0219b5a3ea12b6e1a04d3e
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1

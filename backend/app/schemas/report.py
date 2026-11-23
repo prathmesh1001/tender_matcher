@@ -122,7 +122,39 @@ class ItemVendor(BaseModel):
     match_level: VendorMatchLevel | None = Field(
         default=None, description="Category from the rules (`scorer.vendor_level`)."
     )
-    level_reason: str = Field(default="", description="Why it needs review, in words.")
+    level_reason: str = Field(
+        default="",
+        description="Why it needs review, or what a partial match by product name rests on.",
+    )
+
+
+class TenderVendor(BaseModel):
+    """One of the tender's best vendors, over all its items (`reporting.best_vendors`)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    rank: int = Field(ge=1)
+    name: str = Field(description="Manufacturer (catalogue) or GeM brand.")
+    source: VendorSource | None = Field(
+        description="Where its evidence comes from; None for a buyer-category GeM seller that "
+        "no item was checked against (related only)."
+    )
+    match_level: VendorMatchLevel | None = Field(
+        description="Its best level on any item; None when related only (never checked)."
+    )
+    level_reason: str = Field(default="", description="Why that level, in words, if needed.")
+    items_full: int = Field(default=0, ge=0, description="Items it fully matches.")
+    items_partial: int = Field(default=0, ge=0, description="Items it partly matches.")
+    items_listed: int = Field(
+        default=0, ge=0, description="Items it is among the top vendors of, at any level."
+    )
+    best_compatibility_pct: float | None = Field(
+        default=None, description="Its highest compatibility % on one item."
+    )
+    source_url: str | None = Field(default=None, description="A GeM listing page, if any.")
+    category: str | None = Field(
+        default=None, description="The buyer's GeM category, for a related seller."
+    )
 
 
 class ItemReport(BaseModel):
@@ -293,4 +325,9 @@ class TenderReport(BaseModel):
         default_factory=list,
         description="Listings in the GeM categories the buyer selected for the bid; the tender's "
         "recommended GeM vendors even where no item matched one.",
+    )
+    best_vendors: list[TenderVendor] = Field(
+        default_factory=list,
+        description="The tender's best vendors over all items (database and GeM): full and "
+        "partial matches first, filled up to a minimum with the next best under their own level.",
     )

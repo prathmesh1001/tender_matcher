@@ -1,0 +1,35 @@
+bid_number: GEM/2026/B/8265143
+source: Provided locally
+files:
+- file: bid.pdf
+  role: bid_document
+  url: null
+  fetched_at: '2026-11-22T12:49:38.062278Z'
+  sha256: ecab2bd1cfea705318c3b6147c0364bbcfa9f1f26edcfedbc2c19b0c6ac5869f
+  content_type: application/pdf
+  depth: 0
+  note: provided locally; source URL unknown
+- file: boq_spec.pdf
+  role: boq_spec
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqDocument/2026/11/11/item_description_2026-11-11-20-28-19_637e614155e970214bbcdb76a1139ee3.pdf
+  fetched_at: '2026-11-22T12:49:46.917558Z'
+  sha256: 7478e1e7bd41887a699c954d92b19b86a760fa461a367fa9b0da39a3399a3c29
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1
+- file: boq_items.csv
+  role: boq_items
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqLineItemsDocument/2026/11/11/boqexpmt_2026-11-11-20-28-19_6f69dadf27ba9fd698a70850c13744df.csv
+  fetched_at: '2026-11-22T12:49:47.014859Z'
+  sha256: 33ad4e535d7d78311b82143d35cb052f61ef2abea1a0f9860d83fda7112e612a
+  content_type: application/octet-stream
+  found_in: bid.pdf
+  depth: 1
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Nov/GEM_2026_B_8265143/CLM0010/ATC_feac9f62-17c1-4358-8d171794411432729_buy1@ts.pdf
+  fetched_at: '2026-11-22T12:49:47.872316Z'
+  sha256: a73dfeff0cdc86d74109b8d4818051582da0bfe285208c3c9488f25d1de85347
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1

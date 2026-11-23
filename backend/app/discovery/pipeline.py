@@ -1,11 +1,13 @@
 """Read GeM Marketplace listings for one product type: search -> categories -> listings -> stored.
 
 Stages, each its own small function: search GeM with the items' words and keep the categories
-that fit the type (`find_category_pages`; the hand-listed categories of gem_marketplace.yaml
-only when the search finds none), read up to `max_pages` result pages of each and rank their
-product cards (product fit, how it is sold, seller rating; at most `max_per_brand` per brand),
-skip the ones already stored, fetch each page (robots.txt and the pause are the fetcher's job),
-freeze the HTML in the file store, parse it, check it, then hand it to `save` (ingestion). At
+that fit the type (`find_category_pages`: categories naming the type exactly; else the ones
+sharing the most words with the item titles, `category_fit`; the hand-listed categories of
+gem_marketplace.yaml only when both find none), read up to `max_pages` result pages of each
+and rank their product cards (product fit, how it is sold, seller rating; at most
+`max_per_brand` per brand), skip the ones already stored, fetch each page (robots.txt and the
+pause are the fetcher's job), freeze the HTML in the file store, parse it, check it, then hand
+it to `save` (ingestion). At
 most `max_categories` categories and `max_listings` product pages are read per call. A listing
 that fails any step is reported with the reason and never stored.
 """
@@ -19,8 +21,15 @@ from urllib.parse import urlsplit
 
 from app.core.exceptions import AppError, LinkFetchError
 from app.discovery.card_fit import ItemWant, pick_for_items, rank_for_item
+from app.discovery.category_fit import FitWords, best_categories
 from app.discovery.gem_cards import ListingCard, known_brand, listing_cards, total_results
-from app.discovery.gem_parser import GemListing, listing_urls, parse_listing, search_categories
+from app.discovery.gem_parser import (
+    CategoryLink,
+    GemListing,
+    listing_urls,
+    parse_listing,
+    search_categories,
+)
 from app.discovery.gem_search import fitting_categories, search_url
 from app.discovery.listing_check import ListingCheck
 from app.discovery.polite_fetcher import PageFetcher
@@ -106,6 +115,23 @@ class DiscoveryRequest:
     seller_rank: Sequence[str] = ()  # "sold as" classes, best first
     # One wish per distinct item (sub-type, size, title words); cards are picked per item.
     item_wants: Sequence[ItemWant] = ()
+    # Word fit used when no search category names the type exactly; None turns it off.
+    fit: WordFit | None = None
+    # Categories chosen by the word fit: a listing is kept if it sits in one of them (like a
+    # buyer category) and its title names no other product.
+    fitted: bool = False
+    min_spec_rows_buyer: int = 1  # fewest rows of a listing in a buyer's category
+    filler_words: frozenset[str] = frozenset()  # left out when category slugs are compared
+
+
+@dataclass(frozen=True, slots=True)
+class WordFit:
+    """The word fit of a request (`category_fit.best_categories`)."""
+
+    words: FitWords
+    titles: Sequence[str]
+    min_coverage: float
+    min_precision: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,7 +140,7 @@ class CategoryPages:
 
     page_urls: list[str]
     names: list[str]
-    source: str  # "search", "configured" or "none"
+    source: str  # "buyer", "search", "fitted", "configured" or "none"
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +210,7 @@ def find_category_pages(request: DiscoveryRequest, deps: DiscoveryDeps) -> Categ
     """
     found = _buyer_pages(request, deps)
     source = "buyer" if found else "search"
+    offered: list[CategoryLink] = []  # every category the searches showed, for the word fit
     for url in request.search_urls:
         if len(found) >= request.max_categories:
             break
@@ -193,6 +220,7 @@ def find_category_pages(request: DiscoveryRequest, deps: DiscoveryDeps) -> Categ
             logger.warning("gem search not read", extra={"url": url, "error": exc.message})
             continue
         links = search_categories(fetched.content.decode("utf-8", errors="replace"))
+        offered += links
         fitting = fitting_categories(
             links,
             request.product_type,
@@ -203,6 +231,9 @@ def find_category_pages(request: DiscoveryRequest, deps: DiscoveryDeps) -> Categ
         )
         for link in fitting:
             found.setdefault(page_url(request.base_url, link.slug), link.name)
+    if not found:
+        found = _fitted_pages(request, offered, deps)
+        source = "fitted"
     if found:
         pages = list(found)[: request.max_categories]
         return CategoryPages(pages, [found[p] for p in pages], source)
@@ -210,6 +241,25 @@ def find_category_pages(request: DiscoveryRequest, deps: DiscoveryDeps) -> Categ
         pages = list(request.page_urls)
         return CategoryPages(pages, [_slug(p) for p in pages], "configured")
     return CategoryPages([], [], "none")
+
+
+def _fitted_pages(
+    request: DiscoveryRequest, offered: Sequence[CategoryLink], deps: DiscoveryDeps
+) -> dict[str, str]:
+    """Pages of the offered categories that best share the item titles' words.
+
+    A category naming another product type (or a configured look-alike) is left out, as in the
+    exact rule.
+    """
+    fit = request.fit
+    if fit is None:
+        return {}
+    ranked = best_categories(offered, fit.titles, fit.words, fit.min_coverage, fit.min_precision)
+    return {
+        page_url(request.base_url, link.slug): link.name
+        for link in ranked
+        if deps.check.foreign_in(link.name, request.product_type, request.excludes) is None
+    }
 
 
 def _slug(page: str) -> str:
@@ -298,9 +348,11 @@ def listing_rejection(
 ) -> str | None:
     """Why a listing is not kept for this request, or None to keep it.
 
-    A trusted request (a buyer category) keeps a listing that has enough specification rows
+    A trusted request (a buyer category) keeps a listing that has `min_spec_rows_buyer` rows
     and sits in one of the request's own category pages (its URL's category); category pages
-    may show neighbouring products, which fail. Anything else is the listing check's call.
+    may show neighbouring products, which fail. A fitted request (categories chosen by shared
+    words) keeps a listing with the usual rows that sits in one of its pages and whose title
+    names no other product. Anything else is the listing check's call.
 
     Args:
         listing: A parsed listing.
@@ -310,24 +362,32 @@ def listing_rejection(
     Returns:
         A short reason, or None.
     """
-    if not request.trusted:
+    if not (request.trusted or request.fitted):
         return check.rejection(listing, request.product_type, request.excludes)
-    if len(listing.specs) < check.min_spec_rows:
-        return f"only {len(listing.specs)} specification rows (need {check.min_spec_rows})"
+    need = request.min_spec_rows_buyer if request.trusted else check.min_spec_rows
+    if len(listing.specs) < need:
+        return f"only {len(listing.specs)} specification rows (need {need})"
     own = _listing_category(listing.url)
-    if not own or not any(_same_category(_slug(p), own) for p in request.page_urls):
-        return f"in GeM category {own or 'unknown'}, not a buyer category"
-    return None
+    if not own or not any(
+        _same_category(_slug(p), own, request.filler_words) for p in request.page_urls
+    ):
+        kind = "a buyer category" if request.trusted else "a category chosen for the item"
+        return f"in GeM category {own or 'unknown'}, not {kind}"
+    other = None if request.trusted else check.foreign_in(listing.title, request.product_type)
+    return f"names {other.replace('_', ' ')}" if other else None
 
 
-def _same_category(page_slug: str, own: str) -> bool:
+def _same_category(page_slug: str, own: str, filler: frozenset[str] = frozenset()) -> bool:
     """True if a category page's slug is the listing's category.
 
     Search links carry the parent path ("industrial-pumps-...-stainless-steel-pump-impeller");
-    listing URLs only the category's own slug ("stainless-steel-pump-impeller").
+    listing URLs only the category's own slug ("stainless-steel-pump-impeller"). GeM drops
+    some filler words from listing slugs ("phpa-water-shut-off-..." in "PHPA for Water Shut
+    off ..."), so `filler` words are left out of both first.
     """
-    page, own = page_slug.strip("-"), own.strip("-")
-    return page == own or page.endswith(f"-{own}")
+    page = [w for w in page_slug.split("-") if w and w not in filler]
+    mine = [w for w in own.split("-") if w and w not in filler]
+    return bool(mine) and page[-len(mine) :] == mine
 
 
 def _listing_category(url: str) -> str:

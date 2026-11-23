@@ -1,0 +1,35 @@
+bid_number: GEM/2026/B/8210284
+source: Provided locally
+files:
+- file: bid.pdf
+  role: bid_document
+  url: null
+  fetched_at: '2026-11-20T05:39:06.710915Z'
+  sha256: 5d187d5d2536168f931a3b993178592427f52f8e8c636b00ea0b6db2f63b411e
+  content_type: application/pdf
+  depth: 0
+  note: provided locally; source URL unknown
+- file: boq_spec.pdf
+  role: boq_spec
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqDocument/2026/10/28/technical_ordering_specification_valves_2026-10-28-13-01-29_f17e71ddc8a08d66f76de3d94fce5019.pdf
+  fetched_at: '2026-11-20T05:39:17.301671Z'
+  sha256: cc01abefe337ef430a0b9216488aee4ed3369c8bd6d544d9fe6525702555c053
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1
+- file: boq_items.csv
+  role: boq_items
+  url: https://mkp.gem.gov.in/uploaded_documents/51/16/877/OrderItem/BoqLineItemsDocument/2026/10/28/boq_item_sample_file_-3_2026-10-28-13-01-29_c334cb8d18466251af9e451e4d4c5253.csv
+  fetched_at: '2026-11-20T05:39:17.358213Z'
+  sha256: ae363f19db60f7508d9e8bb89c03cc0385043d159a8d9b4a92be648b8d19588d
+  content_type: application/octet-stream
+  found_in: bid.pdf
+  depth: 1
+- file: atc.pdf
+  role: atc
+  url: https://fulfilment.gem.gov.in/contract/slafds?fileDownloadPath=SLA_UPLOAD_PATH/2026/Oct/GEM_2026_B_8210284/CLM0010/BSATC_0b5afee5-f3c2-4bf9-a39f1793173376168_cpurchase.pdf
+  fetched_at: '2026-11-20T05:39:18.389001Z'
+  sha256: 29cfe5f53128530e920600dbbd20ed26539d8cf0bd584ef942396d81c164e395
+  content_type: application/pdf
+  found_in: bid.pdf
+  depth: 1
