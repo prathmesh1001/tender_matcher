@@ -8,6 +8,21 @@ a coverage % and a rank.
 The core rule is **never guess**. If evidence is missing or a quote cannot be found on its page,
 the result is `unsupported`, not a confident match.
 
+## At a glance
+
+**Tech stack:** Python 3.14, FastAPI, SQLAlchemy, PostgreSQL + pgvector (HNSW), BGE-M3 embeddings,
+BM25 + vector hybrid search with RRF and cross-encoder reranking, an optional LLM judge, Redis +
+RQ, React + TypeScript, Docker Compose.
+
+**Results** against 101 hand-labelled rows on 5 tenders ([eval/results.md](eval/results.md)):
+
+| Metric | Rules only | Rules + LLM judge |
+|---|---|---|
+| Coverage | 52% | 58% |
+| Decided accuracy | 79% | 78% |
+| `full_match` precision | 95% | 93% |
+| Citation accuracy | 69% | 70% |
+
 ## Run with Docker
 
 You need Docker with Compose v2, 2.7 GB for the images plus room for the downloaded models, and
